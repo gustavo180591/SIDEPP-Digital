@@ -1,0 +1,193 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // o DATABASE_URL_DOCKER dentro del contenedor
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Institution {
+  id                String            @id @default(cuid())
+  name              String
+  cuit              String?           @unique
+  address           String?
+  city              String?
+  state             String?
+  country           String?           @default("Argentina")
+  responsibleName   String?
+  responsibleEmail  String?
+
+  members           Member[]
+  periods           PayrollPeriod[]
+  transfers         BankTransfer[]
+  pdfFiles          PdfFile[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([name])
+  @@index([cuit])
+}
+
+model Member {
+  id                  String   @id @default(cuid())
+  numeroOrden         String   @unique
+  numeroMatricula     String   @unique
+  firstName           String
+  lastName            String
+  institucionId       String?
+  institucion         Institution? @relation(fields: [institucionId], references: [id], onDelete: SetNull)
+  documentoIdentidad  String   @unique
+  nacionalidad        String   @default("Argentina")
+  status              String   @default("active")
+  email               String?  @unique
+  phone               String?
+  address             String?
+  city                String?
+  state               String?
+  postalCode          String?
+  country             String?  @default("Argentina")
+  membershipStartDate DateTime
+
+  contributions       ContributionLine[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([lastName, firstName])
+  @@index([institucionId])
+}
+
+model PayrollPeriod {
+  id            String         @id @default(cuid())
+  institutionId String
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  /// Ej.: "Noviembre 2024"
+  label         String
+  month         Int
+  year          Int
+
+  /// Ej.: "Apte. Sindical SIDEPP (1%)"
+  concept       String
+
+  // Totales del listado PDF (si están)
+  peopleCount   Int?
+  totalAmount   Decimal?       @db.Decimal(18, 2)
+
+  lines         ContributionLine[]
+  pdfFiles      PdfFile[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([institutionId, month, year, concept], name: "uq_period_institution_month_year_concept")
+  @@index([institutionId, year, month])
+}
+
+model ContributionLine {
+  id            String       @id @default(cuid())
+  periodId      String
+  period        PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  memberId      String?
+  member        Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  // Nombre tal como vino en el PDF (para conciliación manual/fuzzy)
+  rawName       String
+
+  // Campos que suelen aparecer en los listados
+  quantity      Int?
+  legajos       Int?
+  conceptAmount Decimal?      @db.Decimal(18, 2)
+  totalRem      Decimal?      @db.Decimal(18, 2)
+
+  status        ContributionStatus @default(PENDING)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([periodId])
+  @@index([memberId])
+}
+
+enum ContributionStatus {
+  PENDING
+  MATCHED
+  MISSING
+}
+
+model BankTransfer {
+  id             String   @id @default(cuid())
+  institutionId  String
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  datetime       DateTime
+  reference      String?  // Nro. de Referencia
+  operationNo    String?  // Número de Operación
+  cbuDestino     String?
+  cuentaOrigen   String?
+  importe        Decimal   @db.Decimal(18, 2)
+  cuitOrdenante  String?
+  cuitBenef      String?
+  titular        String?
+
+  pdfFiles       PdfFile[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([institutionId, datetime])
+  @@index([importe])
+}
+
+model PdfFile {
+  id             String   @id @default(cuid())
+  fileName       String
+  kind           PdfKind
+  storagePath    String
+
+  institutionId  String?
+  institution    Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  periodId       String?
+  period         PayrollPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
+
+  transferId     String?
+  transfer       BankTransfer? @relation(fields: [transferId], references: [id], onDelete: SetNull)
+
+  parsed         Boolean  @default(false)
+  parseErrors    String?
+  uploadedBy     String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([kind])
+  @@index([institutionId])
+  @@index([periodId])
+  @@index([transferId])
+}
+
+enum PdfKind {
+  LISTADO
+  TRANSFER
+}
+
+model User {
+  id        String  @id @default(cuid())
+  email     String  @unique
+  hash      String
+  role      Role    @default(OPERATOR)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  VIEWER
+}

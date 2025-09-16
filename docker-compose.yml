@@ -1,0 +1,108 @@
+name: sidepp-digital
+
+volumes:
+  db_data:
+  uploads:
+  data-uploads:
+  data-extractions:
+
+networks:
+  sidepp_net:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:16
+    container_name: sidepp_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-aportes}
+    ports:
+      # host 5433 -> contenedor 5432 (acordado y libre)
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-aportes}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - sidepp_net
+
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: sidepp_app_dev
+    profiles: ["dev"]
+    environment:
+      NODE_ENV: development
+      PORT: 5173
+      ORIGIN: http://localhost:5173
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+      JWT_SECRET: ${JWT_SECRET}
+      FILE_STORAGE_DIR: ${FILE_STORAGE_DIR}
+      UPLOAD_DIR: ${UPLOAD_DIR}
+      EXTRACTION_DIR: ${EXTRACTION_DIR}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+      - uploads:/uploads
+      - data-uploads:/data/uploads
+      - data-extractions:/data/extractions
+    networks:
+      - sidepp_net
+
+  app-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+    container_name: sidepp_app_prod
+    profiles: ["prod"]
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+      JWT_SECRET: ${JWT_SECRET}
+      FILE_STORAGE_DIR: ${FILE_STORAGE_DIR}
+      UPLOAD_DIR: ${UPLOAD_DIR}
+      EXTRACTION_DIR: ${EXTRACTION_DIR}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/uploads
+      - data-uploads:/data/uploads
+      - data-extractions:/data/extractions
+    networks:
+      - sidepp_net
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: sidepp_pgadmin
+    profiles: ["dev","prod"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      # El contenedor escucha en 80, exponemos 5050 en host
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sidepp_net
+    restart: unless-stopped
