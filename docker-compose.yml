@@ -11,6 +11,9 @@ networks:
     driver: bridge
 
 services:
+  # =========================
+  # PostgreSQL Database
+  # =========================
   db:
     image: postgres:16
     container_name: sidepp_db
@@ -19,8 +22,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
       POSTGRES_DB: ${POSTGRES_DB:-aportes}
     ports:
-      # host 5433 -> contenedor 5432 (acordado y libre)
-      - "5433:5432"
+      # Host 5434 -> Contenedor 5432 (tu setup actual)
+      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-aportes}"]
       interval: 5s
@@ -30,7 +33,11 @@ services:
       - db_data:/var/lib/postgresql/data
     networks:
       - sidepp_net
+    restart: unless-stopped
 
+  # ==========================================
+  # App DEV (SvelteKit + Vite 5173)
+  # ==========================================
   app-dev:
     build:
       context: .
@@ -41,12 +48,14 @@ services:
     environment:
       NODE_ENV: development
       PORT: 5173
+      HOST: 0.0.0.0
       ORIGIN: http://localhost:5173
       DATABASE_URL: ${DATABASE_URL_DOCKER}
       JWT_SECRET: ${JWT_SECRET}
       FILE_STORAGE_DIR: ${FILE_STORAGE_DIR}
       UPLOAD_DIR: ${UPLOAD_DIR}
       EXTRACTION_DIR: ${EXTRACTION_DIR}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy
@@ -60,7 +69,11 @@ services:
       - data-extractions:/data/extractions
     networks:
       - sidepp_net
+    restart: unless-stopped
 
+  # ==========================================
+  # App PROD (adapter-node a 3000)
+  # ==========================================
   app-prod:
     build:
       context: .
@@ -71,6 +84,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      HOST: 0.0.0.0
       ORIGIN: ${ORIGIN:-http://localhost:3000}
       DATABASE_URL: ${DATABASE_URL_DOCKER}
       JWT_SECRET: ${JWT_SECRET}
@@ -90,6 +104,9 @@ services:
       - sidepp_net
     restart: unless-stopped
 
+  # ==========================
+  # pgAdmin (UI DB)
+  # ==========================
   pgadmin:
     image: dpage/pgadmin4:8
     container_name: sidepp_pgadmin
