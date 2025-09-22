@@ -1,13 +1,26 @@
-// See https://svelte.dev/docs/kit/types#app.d.ts
-// for information about these interfaces
+// src/app.d.ts
+// Esta declaración le dice a SvelteKit qué guarda en event.locals
 declare global {
-	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
+  namespace App {
+    interface Locals {
+      user?: {
+        id: string;
+        email: string;
+        name?: string | null;
+        role: 'ADMIN' | 'OPERATOR' | 'VIEWER';
+      };
+    }
+
+    // Para acceder a user desde load() en +layout/+page
+    interface PageData {
+      user?: Locals['user'];
+    }
+
+    // interface Error {}
+    // interface Platform {}
+    // interface PrivateEnv {}
+    // interface PublicEnv {}
+  }
 }
 
 export {};
