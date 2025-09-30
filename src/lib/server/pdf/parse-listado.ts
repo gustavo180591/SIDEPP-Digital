@@ -14,6 +14,13 @@ export interface ParseResult {
   errors: string[];
   warnings: string[];
   details: Array<{ lineNumber: number; line: string; error?: string; warning?: string }>;
+  // Datos específicos de tabla
+  tableData?: {
+    personas?: number;
+    totalRemunerativo?: number;
+    cantidadLegajos?: number;
+    montoConcepto?: number;
+  };
 }
 
 /* ===== Util simple de log ===== */
@@ -28,7 +35,14 @@ const log = {
 const PATTERNS = {
   DATE: /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/,
   CUIT: /(\d{2}[- ]?\d{8}[- ]?\d)/,
-  AMOUNT: /(\d{1,3}(?:\.\d{3})*(?:,\d+)?)/ // 12.345,67 | 12345,67 | 123
+  AMOUNT: /(\d{1,3}(?:\.\d{3})*(?:,\d+)?)/, // 12.345,67 | 12345,67 | 123
+  // Patrones mejorados para datos específicos de tabla
+  PERSONAS: /(?:cantidad de personas|cantidad personas)[\s:]*(\d+)/i,
+  TOTAL_REMUNERATIVO: /(?:total|tot)[\s]*(?:remunerativo|rem)[\s:]*(\d{1,3}(?:\.\d{3})*(?:,\d+)?)/i,
+  CANTIDAD_LEGAJOS: /(?:cantidad|legajos?)[\s:]*(\d+)/i,
+  MONTO_CONCEPTO: /(?:monto|concepto)[\s:]*(\d{1,3}(?:\.\d{3})*(?:,\d+)?)/i,
+  // Patrón para filas de la tabla: NOMBRE APELLIDO 12345.67 1 123.45
+  TABLE_ROW: /^([A-ZÁÉÍÓÚÑ\s]+?)\s+(\d{1,3}(?:\.\d{3})*(?:,\d+)?)\s+(\d+)\s+(\d{1,3}(?:\.\d{3})*(?:,\d+)?)$/
 };
 
 type LineType = 'header' | 'data' | 'footer' | 'unknown';
@@ -85,6 +99,96 @@ export function extractLineData(line: string): {
   return out as { cuit?: string; fecha?: string; importe?: string; nombre?: string };
 }
 
+/* ===== Extracción de datos específicos de tabla ===== */
+function extractTableData(text: string): {
+  personas?: number;
+  totalRemunerativo?: number;
+  cantidadLegajos?: number;
+  montoConcepto?: number;
+} {
+  const result: Record<string, number> = {};
+  
+  log.debug('Extrayendo datos específicos de tabla...');
+  
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  
+  // Buscar la sección de totales
+  const totalesIndex = lines.findIndex(line => /totales?/i.test(line));
+  if (totalesIndex !== -1) {
+    log.debug('Sección de totales encontrada en línea:', totalesIndex);
+    
+    // Buscar "Cantidad de Personas: X" en las líneas siguientes
+    for (let i = totalesIndex; i < Math.min(totalesIndex + 5, lines.length); i++) {
+      const line = lines[i];
+      log.debug('Analizando línea de totales:', line);
+      
+      // Buscar cantidad de personas
+      const personasMatch = line.match(PATTERNS.PERSONAS);
+      if (personasMatch && !result.personas) {
+        result.personas = parseInt(personasMatch[1]);
+        log.debug('Personas encontradas en totales:', result.personas);
+      }
+      
+      // Buscar el monto total (último número en la línea)
+      const montoMatch = line.match(/(\d{1,3}(?:\.\d{3})*(?:,\d+)?)\s*$/);
+      if (montoMatch && !result.montoConcepto) {
+        const amount = montoMatch[1].replace(/\./g, '').replace(',', '.');
+        result.montoConcepto = parseFloat(amount);
+        log.debug('Monto del concepto encontrado en totales:', result.montoConcepto);
+      }
+    }
+  }
+  
+  // Calcular totales de la tabla si no se encontraron en la sección de totales
+  if (!result.personas || !result.montoConcepto) {
+    log.debug('Calculando totales de la tabla...');
+    let totalPersonas = 0;
+    let totalMonto = 0;
+    let totalLegajos = 0;
+    let totalRemunerativo = 0;
+    
+    // Buscar líneas que parecen filas de datos
+    for (const line of lines) {
+      const rowMatch = line.match(PATTERNS.TABLE_ROW);
+      if (rowMatch) {
+        totalPersonas++;
+        const remunerativo = parseFloat(rowMatch[2].replace(/\./g, '').replace(',', '.'));
+        const legajos = parseInt(rowMatch[3]);
+        const monto = parseFloat(rowMatch[4].replace(/\./g, '').replace(',', '.'));
+        
+        totalRemunerativo += remunerativo;
+        totalLegajos += legajos;
+        totalMonto += monto;
+        
+        log.debug('Fila encontrada:', {
+          nombre: rowMatch[1].trim(),
+          remunerativo,
+          legajos,
+          monto
+        });
+      }
+    }
+    
+    // Usar los totales calculados si no se encontraron en la sección de totales
+    if (totalPersonas > 0) {
+      if (!result.personas) result.personas = totalPersonas;
+      if (!result.totalRemunerativo) result.totalRemunerativo = totalRemunerativo;
+      if (!result.cantidadLegajos) result.cantidadLegajos = totalLegajos;
+      if (!result.montoConcepto) result.montoConcepto = totalMonto;
+      
+      log.debug('Totales calculados de la tabla:', {
+        personas: totalPersonas,
+        totalRemunerativo,
+        cantidadLegajos: totalLegajos,
+        montoConcepto: totalMonto
+      });
+    }
+  }
+  
+  log.debug('Datos de tabla extraídos:', result);
+  return result;
+}
+
 /* ===== Parse principal ===== */
 export async function parseListado(fileBuffer: Buffer, pdfFile: PdfFile): Promise<ParseResult> {
   if (!pdfFile.periodId) throw new Error('Falta periodId en PdfFile para parsear LISTADO');
@@ -123,6 +227,10 @@ export async function parseListado(fileBuffer: Buffer, pdfFile: PdfFile): Promis
     log.warn(msg);
     return res;
   }
+
+  // Extraer datos específicos de tabla
+  const tableData = extractTableData(text);
+  res.tableData = tableData;
 
   // 2) Dividir en líneas y clasificar
   const rawLines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
