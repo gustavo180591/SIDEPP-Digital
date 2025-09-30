@@ -7,22 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Session {
-  id             String   @id @default(cuid())
-  userId         String
-  token          String   @unique
-  expiresAt      DateTime
-  userAgent      String?
-  ipAddress      String?
-  lastActivityAt DateTime @default(now())
-  createdAt      DateTime @default(now())
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([token])
-  @@map("sessions")
-}
-
 model Institution {
   id               String          @id @default(cuid())
   name             String
@@ -33,12 +17,12 @@ model Institution {
   country          String?         @default("Argentina")
   responsibleName  String?
   responsibleEmail String?
+  responsablePhone String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
-  transfers        BankTransfer[]
   members          Member[]
-  periods          PayrollPeriod[]
-  pdfFiles         PdfFile[]
+  users            User[]
+  payrollPeriods   PayrollPeriod[]
 
   @@index([name])
   @@index([cuit])
@@ -64,56 +48,53 @@ model Member {
   membershipStartDate DateTime
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
   contributions       ContributionLine[]
   institucion         Institution?       @relation(fields: [institucionId], references: [id])
 
-  @@index([lastName, firstName])
-  @@index([institucionId])
+  @@map("members")
 }
 
 model PayrollPeriod {
   id            String             @id @default(cuid())
   institutionId String
-  /// Etiqueta legible (ej. "Noviembre 2024")
-  label         String
   month         Int
   year          Int
-  concept       String
+  concept       String?
   peopleCount   Int?
   totalAmount   Decimal?           @db.Decimal(18, 2)
+  pdfFileId    String             @unique
+  transferId   String
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
-  lines         ContributionLine[]
   institution   Institution        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  pdfFiles      PdfFile[]
+  pdfFile      PdfFile?
+  transfer     BankTransfer?     
 
   @@unique([institutionId, month, year, concept], name: "uq_period_institution_month_year_concept")
-  @@index([institutionId, year, month])
+  @@map("payroll_periods")
 }
 
 model ContributionLine {
   id            String             @id @default(cuid())
-  periodId      String
   memberId      String?
-  rawName       String
+  name          String?
   quantity      Int?
-  legajos       Int?
   conceptAmount Decimal?           @db.Decimal(18, 2)
   totalRem      Decimal?           @db.Decimal(18, 2)
   status        ContributionStatus @default(PENDING)
+  pdfFileId     String?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   member        Member?            @relation(fields: [memberId], references: [id])
-  period        PayrollPeriod      @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  pdfFile       PdfFile?           @relation(fields: [pdfFileId], references: [id])
 
-  @@index([periodId])
-  @@index([memberId])
+  @@map("contribution_lines")
 }
 
 model BankTransfer {
   id            String      @id @default(cuid())
-  institutionId String
-  datetime      DateTime
+  datetime      DateTime?
   reference     String?
   operationNo   String?
   cbuDestino    String?
@@ -122,50 +103,40 @@ model BankTransfer {
   cuitOrdenante String?
   cuitBenef     String?
   titular       String?
+  periodId      String      @unique
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  pdfFiles      PdfFile[]
+  
+  period        PayrollPeriod   @relation(fields: [periodId], references: [id])
 
-  @@index([institutionId, datetime])
-  @@index([importe])
+  @@map("bank_transfers")
 }
 
 model PdfFile {
   id            String         @id @default(cuid())
   fileName      String
-  kind          PdfKind
-  storagePath   String
-  parsed        Boolean        @default(false)
-  parseErrors   String?
-  uploadedBy    String?
-  institutionId String?
-  periodId      String?
-  transferId    String?
+  periodId      String         @unique
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  mimeType      String?
-  size          Int?
-  institution   Institution?   @relation(fields: [institutionId], references: [id])
-  period        PayrollPeriod? @relation(fields: [periodId], references: [id])
-  transfer      BankTransfer?  @relation(fields: [transferId], references: [id])
+  
+  contributionLine ContributionLine[]
+  period        PayrollPeriod @relation(fields: [periodId], references: [id])
 
-  @@index([kind])
-  @@index([institutionId])
-  @@index([periodId])
-  @@index([transferId])
+  @@map("pdf_files")
 }
 
 model User {
   id          String    @id @default(cuid())
   email       String    @unique
   name        String?
-  hash        String
-  role        UserRole  @default(VIEWER)
-  lastLoginAt DateTime?
+  password    String
+  institutionId String?
+  role        UserRole  @default(INTITUTION)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  sessions    Session[]
+  deletedAt   DateTime?
+
+  institution   Institution? @relation(fields: [institutionId], references: [id])
 
   @@index([email])
   @@map("users")
@@ -177,13 +148,8 @@ enum ContributionStatus {
   MISSING
 }
 
-enum PdfKind {
-  LISTADO
-  TRANSFER
-}
-
 enum UserRole {
   ADMIN
   OPERATOR
-  VIEWER
+  INTITUTION
 }
