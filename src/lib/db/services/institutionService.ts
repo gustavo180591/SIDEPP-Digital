@@ -98,12 +98,33 @@ export class InstitutionService {
   }
 
   /**
-   * Obtener miembros de una institución
+   * Obtener miembros de una institución con búsqueda y paginación
    */
-  static async getMembers(institutionId: string) {
+  static async getMembers(institutionId: string, options: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}) {
     try {
-      const members = await prisma.member.findMany({
-        where: { institucionId: institutionId },
+      const { search = '', page = 1, limit = 10 } = options;
+      
+      // Construir condiciones WHERE
+      const where: any = { institucionId: institutionId };
+      
+      if (search) {
+        where.OR = [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { numeroOrden: { contains: search, mode: 'insensitive' } },
+          { numeroMatricula: { contains: search, mode: 'insensitive' } },
+          { documentoIdentidad: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      // Usar el paginador
+      const result = await paginate(prisma.member, {
+        where,
         select: {
           id: true,
           firstName: true,
@@ -111,13 +132,19 @@ export class InstitutionService {
           email: true,
           numeroOrden: true,
           numeroMatricula: true,
+          documentoIdentidad: true,
+          membershipStartDate: true,
           status: true,
           createdAt: true,
           updatedAt: true
         },
         orderBy: { createdAt: 'desc' }
+      }, {
+        page,
+        perPage: limit
       });
-      return members;
+
+      return result;
     } catch (error) {
       console.error('Error al obtener miembros:', error);
       throw new Error('No se pudieron obtener los miembros');

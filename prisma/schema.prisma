@@ -29,12 +29,12 @@ model Institution {
 
 model Member {
   id                  String             @id @default(cuid())
-  numeroOrden         String             @unique
-  numeroMatricula     String             @unique
+  numeroOrden         String
+  numeroMatricula     String
   firstName           String
   lastName            String
   institucionId       String?
-  documentoIdentidad  String             @unique
+  documentoIdentidad  String
   nacionalidad        String             @default("Argentina")
   status              String             @default("active")
   email               String?            @unique
@@ -50,7 +50,8 @@ model Member {
   deletedAt           DateTime?
   contributions       ContributionLine[]
   institucion         Institution?       @relation(fields: [institucionId], references: [id])
-
+  
+  @@unique([documentoIdentidad, institucionId], name: "unique_documento_institution")
   @@map("members")
 }
 
