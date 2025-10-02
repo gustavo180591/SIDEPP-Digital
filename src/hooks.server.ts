@@ -1,85 +1,112 @@
 // import { redirect, type Handle } from '@sveltejs/kit';
 // import { sequence } from '@sveltejs/kit/hooks';
-// import { prisma } from '$lib/db';
-// import { compare } from 'bcryptjs';
+// import { UserService } from '$lib/db/services/userService';
 // import jwt from 'jsonwebtoken';
-// const { sign, verify } = jwt;
 
-// const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-// const JWT_EXPIRES_IN = '7d';
+// const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// const publicRoutes = ['/login', '/register', '/api/auth/login', '/api/auth/register', '/unauthorized'];
+// // Rutas públicas que no requieren autenticación
+// const publicRoutes = ['/login', '/api/auth', '/unauthorized', '/logout'];
 
 // // Función para validar token JWT
 // async function validateToken(token: string) {
 //   try {
-//     const decoded = verify(token, JWT_SECRET) as { userId: string; email: string };
-//     const user = await prisma.user.findUnique({
-//       where: { id: decoded.userId },
-//       select: {
-//         id: true,
-//         email: true,
-//         name: true,
-//         role: true,
-//         isActive: true,
-//         institutionId: true
-//       }
-//     });
-
+//     const decoded = jwt.verify(token, JWT_SECRET) as { 
+//       userId: string; 
+//       email: string; 
+//       role: string;
+//       institutionId?: string;
+//     };
+    
+//     // Verificar que el usuario aún existe y está activo
+//     const user = await UserService.findById(decoded.userId);
+    
 //     if (!user || !user.isActive) {
 //       return null;
 //     }
 
-//     return user;
+//     return {
+//       id: user.id,
+//       email: user.email,
+//       name: user.name,
+//       role: user.role,
+//       institutionId: user.institutionId
+//     };
 //   } catch (error) {
+//     console.error('Error validating token:', error);
 //     return null;
 //   }
 // }
 
 // // Función para generar token JWT
-// export function generateToken(userId: string, email: string) {
-//   return sign({ userId, email }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+// export function generateToken(userId: string, email: string, role: string, institutionId?: string) {
+//   return jwt.sign(
+//     { userId, email, role, institutionId }, 
+//     JWT_SECRET, 
+//     { expiresIn: '7d' }
+//   );
 // }
 
 // const auth: Handle = async ({ event, resolve }) => {
 //   const token = event.cookies.get('auth_token');
-
-//   if (token) {
-//     const user = await validateToken(token);
-//     if (user) {
-//       event.locals.user = {
-//         id: user.id,
-//         email: user.email,
-//         name: user.name,
-//         role: user.role as 'ADMIN' | 'OPERATOR' | 'VIEWER',
-//         institutionId: user.institutionId
-//       };
-//     } else {
-//       event.cookies.delete('auth_token', { path: '/' });
-//     }
-//   }
-
-//   // Bloqueo de rutas públicas/privadas
+  
+//   // Verificar si la ruta es pública
 //   const isPublic = publicRoutes.some((route) => event.url.pathname.startsWith(route));
-//   if (!isPublic && !event.locals.user) {
-//     throw redirect(303, '/login?redirect=' + encodeURIComponent(event.url.pathname));
+  
+//   // Si no hay token de autenticación, solo permitir rutas públicas
+//   if (!token) {
+//     if (!isPublic) {
+//       throw redirect(303, '/login');
+//     }
+//     return resolve(event);
 //   }
 
-//   // Autorización por rol
+//   // Validar token si existe
+//   const user = await validateToken(token);
+//   if (user) {
+//     console.log('✅ Usuario autenticado en hook:', user.email, 'Rol:', user.role);
+//     event.locals.user = user;
+//   } else {
+//     // Token inválido, eliminar cookie y redirigir a login
+//     console.log('❌ Token inválido en hook');
+//     event.cookies.delete('auth_token', { path: '/' });
+//     throw redirect(303, '/login');
+//   }
+
+//   // Si es la ruta raíz y hay usuario autenticado, redirigir al dashboard
+//   if (event.url.pathname === '/' && event.locals.user) {
+//     console.log('🔄 Redirigiendo desde ruta raíz a dashboard');
+//     throw redirect(303, '/dashboard');
+//   }
+
+//   // Autorización por rol (solo si hay usuario autenticado)
 //   if (event.locals.user) {
 //     const userRole = event.locals.user.role;
 //     const path = event.url.pathname;
+    
+//     console.log('🔐 Verificando autorización - Ruta:', path, 'Rol:', userRole);
 
-//     const adminRoutes = ['/admin', '/instituciones'];
-//     const operatorRoutes = ['/upload', '/reports'];
+//     // Definir rutas que requieren roles específicos
+//     const adminRoutes = ['/dashboard/usuarios', '/dashboard/instituciones'];
+//     const operatorRoutes = ['/dashboard/upload'];
 
 //     const needsAdmin = adminRoutes.some((r) => path.startsWith(r));
 //     const needsOperator = operatorRoutes.some((r) => path.startsWith(r));
+    
+//     console.log('🔐 Necesita admin:', needsAdmin, 'Necesita operator:', needsOperator);
 
-//     if ((needsAdmin && userRole !== 'ADMIN') ||
-//         (needsOperator && !['ADMIN', 'OPERATOR'].includes(userRole))) {
+//     // Verificar permisos
+//     if (needsAdmin && userRole !== 'ADMIN') {
+//       console.log('❌ Sin permisos de admin, redirigiendo a unauthorized');
 //       throw redirect(303, '/unauthorized');
 //     }
+    
+//     if (needsOperator && !['ADMIN', 'OPERATOR'].includes(userRole)) {
+//       console.log('❌ Sin permisos de operator, redirigiendo a unauthorized');
+//       throw redirect(303, '/unauthorized');
+//     }
+    
+//     console.log('✅ Permisos OK, continuando');
 //   }
 
 //   return resolve(event);
