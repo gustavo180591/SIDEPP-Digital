@@ -25,6 +25,17 @@ export type PaginationParams = {
 const paginate = paginator({ page: 1, perPage: 10 });
 
 export class PdfService {
+  private static serializePdf(pdf: any): PdfFileWithPeriod {
+    const period = pdf.period ? {
+      ...pdf.period,
+      totalAmount: pdf.period.totalAmount != null ? Number(pdf.period.totalAmount) : null,
+      transfer: pdf.period.transfer ? {
+        ...pdf.period.transfer,
+        importe: pdf.period.transfer.importe != null ? Number(pdf.period.transfer.importe) : null
+      } : null
+    } : null;
+    return { ...pdf, period } as PdfFileWithPeriod;
+  }
   /**
    * Obtener PDFs de una institución con búsqueda y paginación
    */
@@ -75,7 +86,8 @@ export class PdfService {
         perPage: limit
       });
 
-      return result as PaginatedResult<PdfFileWithPeriod>;
+      const data = (result.data as any[]).map(PdfService.serializePdf);
+      return { ...result, data } as PaginatedResult<PdfFileWithPeriod>;
     } catch (error) {
       console.error('Error al obtener PDFs:', error);
       throw new Error('No se pudieron obtener los PDFs');
@@ -97,8 +109,8 @@ export class PdfService {
           }
         }
       });
-      
-      return pdfFile;
+
+      return pdfFile ? PdfService.serializePdf(pdfFile) : null;
     } catch (error) {
       console.error('Error al obtener PDF:', error);
       throw new Error('No se pudo obtener el PDF');
@@ -117,8 +129,12 @@ export class PdfService {
         },
         orderBy: { createdAt: 'desc' }
       });
-      
-      return contributionLines;
+
+      return contributionLines.map((c) => ({
+        ...c,
+        conceptAmount: c.conceptAmount != null ? Number(c.conceptAmount) : null,
+        totalRem: c.totalRem != null ? Number(c.totalRem) : null
+      }));
     } catch (error) {
       console.error('Error al obtener líneas de contribución:', error);
       throw new Error('No se pudieron obtener las líneas de contribución');
@@ -162,7 +178,7 @@ export class PdfService {
 
       return {
         totalPdfs,
-        totalAmount: totalAmountResult._sum.totalAmount || 0,
+        totalAmount: totalAmountResult._sum.totalAmount != null ? Number(totalAmountResult._sum.totalAmount) : 0,
         recentUploads
       };
     } catch (error) {

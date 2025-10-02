@@ -1,41 +1,55 @@
 import { error } from '@sveltejs/kit';
 import { InstitutionService } from '$lib/db/services/institutionService';
-import { PdfService } from '$lib/db/services/pdfService';
+import { PayrollService } from '$lib/db/services/payrollService';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
-  const institutionId = params.id;
-  const pdfId = params.id; // El segundo [id] en la ruta es el ID del PDF
+export const load: PageServerLoad = async ({ params, url }) => {
+  // Resolver IDs con fallbacks de URL
+  let urlInstitutionId: string | undefined = params.id as string | undefined;
+  let payrollId: string | undefined = (params as any).id_1 ?? (params as any).pdfId ?? (params as any).pid;
+
+  if (!urlInstitutionId || !payrollId) {
+    const segments = url.pathname.split('/').filter(Boolean);
+    // .../dashboard/instituciones/{instId}/comprobantes/{payrollId}
+    const idx = segments.findIndex((s) => s === 'instituciones');
+    if (idx >= 0) {
+      urlInstitutionId = urlInstitutionId || segments[idx + 1];
+      payrollId = payrollId || segments[idx + 3];
+    }
+  }
   
-  if (!institutionId || !pdfId) {
-    throw error(400, 'ID de institución y PDF requeridos');
+  if (!payrollId) {
+    throw error(400, 'ID de nómina (payroll) requerido');
   }
 
   try {
-    // Obtener los datos de la institución
-    const institution = await InstitutionService.getById(institutionId);
+  // Obtener el payroll (con pdfFile y contribution lines)
+  const payroll = await PayrollService.getById(payrollId);
     
-    if (!institution) {
-      throw error(404, 'Institución no encontrada');
-    }
-
-    // Obtener los datos del PDF
-    const pdfFile = await PdfService.getById(pdfId);
-    
-    if (!pdfFile) {
+  if (!payroll) {
       throw error(404, 'Comprobante no encontrado');
-    }
+  }
 
-    // Obtener las líneas de contribución
-    const contributionLines = await PdfService.getContributionLines(pdfId);
+  // Usar la institución del payroll para garantizar consistencia
+  const institutionIdFromPayroll: string = payroll.institutionId as string;
+  const institution = await InstitutionService.getById(institutionIdFromPayroll);
+  if (!institution) {
+    throw error(404, 'Institución no encontrada');
+  }
+
+  const contributionLines = payroll.pdfFile?.contributionLine ?? [];
 
     return {
       institution,
-      pdfFile,
-      contributionLines
+      pdfFile: payroll.pdfFile,
+      contributionLines,
+      payroll
     };
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error al cargar comprobante:', err);
+    if (err?.status && typeof err.status === 'number') {
+      throw err;
+    }
     throw error(500, 'Error interno del servidor');
   }
 };

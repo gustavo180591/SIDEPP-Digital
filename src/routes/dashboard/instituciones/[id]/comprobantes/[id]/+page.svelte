@@ -39,19 +39,19 @@
   <div class="container mx-auto p-6">
     <!-- Header con navegación -->
     <div class="flex items-center gap-4 mb-6">
-      <a href="/instituciones" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
         Volver a Instituciones
       </a>
-      <a href="/instituciones/{data.institution.id}" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones/{data.institution.id}" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
         Ver Institución
       </a>
-      <a href="/instituciones/{data.institution.id}/comprobantes" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones/{data.institution.id}/comprobantes" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
@@ -83,12 +83,12 @@
             <div>
               <label class="text-sm font-medium text-gray-500">Período</label>
               <p class="text-gray-900">
-                {data.pdfFile.period.month.toString().padStart(2, '0')}/{data.pdfFile.period.year}
+                {data.payroll.month.toString().padStart(2, '0')}/{data.payroll.year}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Concepto</label>
-              <p class="text-gray-900">{data.pdfFile.period.concept || 'Sin concepto'}</p>
+              <p class="text-gray-900">{data.payroll.concept || 'Sin concepto'}</p>
             </div>
           </div>
         </div>
@@ -101,19 +101,28 @@
           <div class="space-y-3">
             <div>
               <label class="text-sm font-medium text-gray-500">Cantidad de Personas</label>
-              <p class="text-gray-900 text-2xl font-bold">{data.pdfFile.period.peopleCount || 0}</p>
+              <p class="text-gray-900 text-2xl font-bold">{data.payroll.peopleCount || 0}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Monto Total</label>
               <p class="text-gray-900 text-2xl font-bold text-green-600">
-                {formatCurrency(data.pdfFile.period.totalAmount || 0)}
+                {formatCurrency(data.payroll.totalAmount || 0)}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Estado de Transferencia</label>
               <div class="mt-1">
-                {@const status = getTransferStatus(data.pdfFile.period.transfer)}
-                <span class="badge {status.class}">{status.text}</span>
+                {#key data.payroll.transfer}
+                  {#if data.payroll.transfer}
+                    <span class="badge {getTransferStatus(data.payroll.transfer).class}">
+                      {getTransferStatus(data.payroll.transfer).text}
+                    </span>
+                  {:else}
+                    <span class="badge {getTransferStatus(null).class}">
+                      {getTransferStatus(null).text}
+                    </span>
+                  {/if}
+                {/key}
               </div>
             </div>
           </div>
@@ -122,7 +131,7 @@
     </div>
 
     <!-- Información de Transferencia Bancaria -->
-    {#if data.pdfFile.period.transfer}
+    {#if data.payroll.transfer}
       <div class="card bg-white shadow-sm mb-6">
         <div class="card-body">
           <h2 class="card-title text-xl mb-4">Transferencia Bancaria</h2>
@@ -130,30 +139,30 @@
             <div>
               <label class="text-sm font-medium text-gray-500">Fecha de Transferencia</label>
               <p class="text-gray-900">
-                {data.pdfFile.period.transfer.datetime ? formatDate(data.pdfFile.period.transfer.datetime) : 'No especificada'}
+                {data.payroll.transfer.datetime ? formatDate(data.payroll.transfer.datetime) : 'No especificada'}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Número de Operación</label>
-              <p class="text-gray-900 font-mono">{data.pdfFile.period.transfer.operationNo || 'No especificado'}</p>
+              <p class="text-gray-900 font-mono">{data.payroll.transfer.operationNo || 'No especificado'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Referencia</label>
-              <p class="text-gray-900">{data.pdfFile.period.transfer.reference || 'No especificada'}</p>
+              <p class="text-gray-900">{data.payroll.transfer.reference || 'No especificada'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Importe</label>
               <p class="text-gray-900 text-xl font-bold text-green-600">
-                {formatCurrency(data.pdfFile.period.transfer.importe)}
+                {formatCurrency(data.payroll.transfer.importe)}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">CBU Destino</label>
-              <p class="text-gray-900 font-mono">{data.pdfFile.period.transfer.cbuDestino || 'No especificado'}</p>
+              <p class="text-gray-900 font-mono">{data.payroll.transfer.cbuDestino || 'No especificado'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Titular</label>
-              <p class="text-gray-900">{data.pdfFile.period.transfer.titular || 'No especificado'}</p>
+              <p class="text-gray-900">{data.payroll.transfer.titular || 'No especificado'}</p>
             </div>
           </div>
         </div>

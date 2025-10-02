@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { InstitutionService } from '$lib/db/services/institutionService';
+import { PayrollService } from '$lib/db/services/payrollService';
 import { PdfService } from '$lib/db/services/pdfService';
 import type { PageServerLoad } from './$types';
 
@@ -25,8 +26,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');
 
-    // Obtener los PDFs de la institución con filtros
-    const pdfs = await PdfService.getByInstitution(institutionId, {
+    // Obtener los payrolls (mapeados a pdf-like para la tabla)
+    const pdfs = await PayrollService.getByInstitution(institutionId, {
       search,
       year,
       month

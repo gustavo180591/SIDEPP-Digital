@@ -7,10 +7,13 @@ type LogDefinition = {
   emit: 'stdout' | 'event';
 };
 
+// Habilitar logs de consultas solo si se especifica explícitamente
+const ENABLE_QUERY_LOG = false;
+
 // Configuración de logs detallada
 const logOptions: LogDefinition[] = process.env.NODE_ENV === 'development' 
   ? [
-      { level: 'query', emit: 'event' },
+      ...(ENABLE_QUERY_LOG ? [{ level: 'query', emit: 'event' } as LogDefinition] : []),
       { level: 'error', emit: 'stdout' },
       { level: 'warn', emit: 'stdout' },
       { level: 'info', emit: 'stdout' }
@@ -19,7 +22,7 @@ const logOptions: LogDefinition[] = process.env.NODE_ENV === 'development'
 
 // Crear una instancia de Prisma con logging mejorado
 const prismaClient = new PrismaClient({
-  log: logOptions
+  // log: logOptions
 });
 
 // Tipos para los eventos de Prisma
@@ -38,21 +41,23 @@ interface LogEvent {
 }
 
 // Agregar listeners de eventos para mejor depuración
-if (process.env.NODE_ENV === 'development') {
-  prismaClient.$on('query' as never, (e: QueryEvent) => {
-    console.log('Query: ' + e.query);
-    console.log('Params: ' + e.params);
-    console.log('Duration: ' + e.duration + 'ms');
-  });
+// if (process.env.NODE_ENV === 'development') {
+//   if (ENABLE_QUERY_LOG) {
+//     prismaClient.$on('query' as never, (e: QueryEvent) => {
+//       console.log('Query: ' + e.query);
+//       console.log('Params: ' + e.params);
+//       console.log('Duration: ' + e.duration + 'ms');
+//     });
+//   }
 
-  prismaClient.$on('error' as never, (e: LogEvent) => {
-    console.error('Prisma Error:', e.message);
-  });
+//   prismaClient.$on('error' as never, (e: LogEvent) => {
+//     console.error('Prisma Error:', e.message);
+//   });
 
-  prismaClient.$on('warn' as never, (e: LogEvent) => {
-    console.warn('Prisma Warning:', e.message);
-  });
-}
+//   prismaClient.$on('warn' as never, (e: LogEvent) => {
+//     console.warn('Prisma Warning:', e.message);
+//   });
+// }
 
 // Patrón singleton para Prisma Client
 const globalForPrisma = globalThis as unknown as { prisma?: typeof prismaClient };

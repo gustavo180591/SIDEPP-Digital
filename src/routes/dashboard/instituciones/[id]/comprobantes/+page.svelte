@@ -62,8 +62,9 @@
   }
 
   // Función para ver detalles de un PDF
-  function viewPdfDetails(pdf: PdfFileWithPeriod) {
-    goto(`/instituciones/${data.institution.id}/comprobantes/${pdf.id}`);
+  function viewPdfDetails(pdf: any) {
+    const payrollId = pdf?.period?.id || pdf?.id;
+    goto(`/dashboard/instituciones/${data.institution.id}/comprobantes/${payrollId}`);
   }
 </script>
 
@@ -75,13 +76,13 @@
   <div class="container mx-auto p-6">
     <!-- Header con navegación -->
     <div class="flex items-center gap-4 mb-6">
-      <a href="/instituciones" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
         Volver a Instituciones
       </a>
-      <a href="/instituciones/{data.institution.id}" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones/{data.institution.id}" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>

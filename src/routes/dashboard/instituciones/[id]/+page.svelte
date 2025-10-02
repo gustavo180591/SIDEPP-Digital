@@ -99,6 +99,11 @@
       console.error('Error al eliminar institución:', error);
     }
   }
+
+  // Función para abrir modal de ver comprobantes
+  function openViewComprobantesModal() {
+    goto(`/dashboard/instituciones/${data.institution.id}/comprobantes`);
+  }
 </script>
 
 <svelte:head>
@@ -109,7 +114,7 @@
   <div class="container mx-auto p-6">
     <!-- Header con navegación -->
     <div class="flex items-center gap-4 mb-6">
-      <a href="/instituciones" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
@@ -133,11 +138,17 @@
         </svg>
         Editar Institución
       </button>
-      <button class="btn btn-error" on:click={openDeleteModal}>
+      <button class="btn btn-error text-white" on:click={openDeleteModal}>
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
         </svg>
         Eliminar Institución
+      </button>
+      <button class="btn btn-success text-white" on:click={openViewComprobantesModal}>
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        Ver Comprobantes
       </button>
     </div>
 
