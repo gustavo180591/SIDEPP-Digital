@@ -107,14 +107,13 @@ export class InstitutionService {
   } = {}) {
     try {
       const { search = '', page = 1, limit = 10 } = options;
-      
+
       // Construir condiciones WHERE
       const where: any = { institucionId: institutionId };
-      
+
       if (search) {
         where.OR = [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName: { contains: search, mode: 'insensitive' } },
+          { fullName: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
           { numeroOrden: { contains: search, mode: 'insensitive' } },
           { numeroMatricula: { contains: search, mode: 'insensitive' } },
@@ -127,16 +126,23 @@ export class InstitutionService {
         where,
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
           numeroOrden: true,
           numeroMatricula: true,
+          fullName: true,
+          email: true,
           documentoIdentidad: true,
-          membershipStartDate: true,
+          nacionalidad: true,
           status: true,
+          phone: true,
+          address: true,
+          city: true,
+          state: true,
+          postalCode: true,
+          country: true,
+          membershipStartDate: true,
           createdAt: true,
-          updatedAt: true
+          updatedAt: true,
+          deletedAt: true
         },
         orderBy: { createdAt: 'desc' }
       }, {

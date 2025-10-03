@@ -2,14 +2,20 @@ import { prisma } from '../index';
 import type { Member } from '@prisma/client';
 
 export type CreateMemberData = {
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email?: string;
-  numeroOrden: string;
-  numeroMatricula: string;
+  numeroOrden?: string;
+  numeroMatricula?: string;
   documentoIdentidad: string;
-  membershipStartDate: Date;
-  status?: 'active' | 'inactive';
+  nacionalidad?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  membershipStartDate?: Date;
+  status?: string;
   institucionId: string;
 };
 
@@ -20,12 +26,18 @@ export class MemberService {
     try {
       const member = await prisma.member.create({
         data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
+          fullName: data.fullName,
           email: data.email,
           numeroOrden: data.numeroOrden,
           numeroMatricula: data.numeroMatricula,
           documentoIdentidad: data.documentoIdentidad,
+          nacionalidad: data.nacionalidad,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          postalCode: data.postalCode,
+          country: data.country,
           membershipStartDate: data.membershipStartDate,
           status: data.status || 'active',
           institucionId: data.institucionId
@@ -41,9 +53,13 @@ export class MemberService {
   static async findById(id: string): Promise<Member | null> {
     try {
       const member = await prisma.member.findUnique({
-        where: { id }
+        where: { id },
+        include: {
+          institucion: true,
+          contributions: true
+        }
       });
-      
+
       return member;
     } catch (error) {
       console.error('Error al obtener miembro:', error);
@@ -56,17 +72,23 @@ export class MemberService {
       const member = await prisma.member.update({
         where: { id },
         data: {
-          firstName: data.firstName,
-          lastName: data.lastName,
+          fullName: data.fullName,
           email: data.email,
           numeroOrden: data.numeroOrden,
           numeroMatricula: data.numeroMatricula,
           documentoIdentidad: data.documentoIdentidad,
+          nacionalidad: data.nacionalidad,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          postalCode: data.postalCode,
+          country: data.country,
           membershipStartDate: data.membershipStartDate,
           status: data.status
         }
       });
-      
+
       return member;
     } catch (error) {
       console.error('Error al actualizar miembro:', error);

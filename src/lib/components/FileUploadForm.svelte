@@ -5,8 +5,12 @@
   let fileInputFopid: HTMLInputElement | null = null;
   // let fileInputTransfer: HTMLInputElement | null = null; // TEMPORAL: Comentado para testing
   let uploading = false;
-  let selectedPeriod: string = '';
+  let selectedMonth: string = '';
+  let selectedYear: number | string = '';
   let allowOCR: boolean = true;
+
+  // Computed value para selectedPeriod en formato YYYY-MM
+  $: selectedPeriod = selectedMonth && selectedYear ? `${selectedYear}-${selectedMonth}` : '';
   type Checks = {
     sumTotal?: number;
     declaredTotal?: number | null;
@@ -171,12 +175,36 @@
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
         <label for="period" class="mb-1 block text-sm font-medium text-gray-700">Mes/Año</label>
-        <input
-          id="period"
-          type="month"
-          bind:value={selectedPeriod}
-          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-        />
+        <div class="grid grid-cols-2 gap-2">
+          <select
+            id="month"
+            bind:value={selectedMonth}
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
+            <option value="">Mes</option>
+            <option value="01">Enero</option>
+            <option value="02">Febrero</option>
+            <option value="03">Marzo</option>
+            <option value="04">Abril</option>
+            <option value="05">Mayo</option>
+            <option value="06">Junio</option>
+            <option value="07">Julio</option>
+            <option value="08">Agosto</option>
+            <option value="09">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
+          <input
+            id="year"
+            type="number"
+            placeholder="Año"
+            bind:value={selectedYear}
+            min="2000"
+            max="2099"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        </div>
       </div>
       <div></div>
     </div>

@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
     return {
       institution,
-      members: members.data,
+      members: members.data ? members.data : [],
       pagination: {
         currentPage: members.meta.currentPage,
         totalPages: members.meta.lastPage,

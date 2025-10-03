@@ -77,13 +77,12 @@ async function main() {
   // 3) Miembros
   const [member1, member2, member3] = await Promise.all([
     prisma.member.upsert({
-      where: { numeroMatricula: 'MAT-001' },
+      where: { email: 'analopez@example.com' },
       update: {},
       create: {
         numeroOrden: 'ORD-001',
         numeroMatricula: 'MAT-001',
-        firstName: 'Ana',
-        lastName: 'López',
+        fullName: 'Ana López',
         documentoIdentidad: '30111222',
         email: 'analopez@example.com',
         phone: '11-1234-5678',
@@ -96,13 +95,12 @@ async function main() {
       }
     }),
     prisma.member.upsert({
-      where: { numeroMatricula: 'MAT-002' },
+      where: { email: 'crodriguez@example.com' },
       update: {},
       create: {
         numeroOrden: 'ORD-002',
         numeroMatricula: 'MAT-002',
-        firstName: 'Carlos',
-        lastName: 'Rodríguez',
+        fullName: 'Carlos Rodríguez',
         documentoIdentidad: '30222333',
         email: 'crodriguez@example.com',
         phone: '11-2345-6789',
@@ -115,13 +113,12 @@ async function main() {
       }
     }),
     prisma.member.upsert({
-      where: { numeroMatricula: 'MAT-010' },
+      where: { email: 'lmartinez@example.com' },
       update: {},
       create: {
         numeroOrden: 'ORD-003',
         numeroMatricula: 'MAT-010',
-        firstName: 'Laura',
-        lastName: 'Martínez',
+        fullName: 'Laura Martínez',
         documentoIdentidad: '27333444',
         email: 'lmartinez@example.com',
         phone: '11-3456-7890',

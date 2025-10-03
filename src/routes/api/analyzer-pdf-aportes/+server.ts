@@ -281,59 +281,35 @@ function extractTableData(text: string): {
 	
 	console.log('[extractTableData] Iniciando extracción de tabla...');
 	
-	// PRIORIDAD 1: Buscar en sección de TOTALES
-	const totalesIndex = lines.findIndex(line => /^totales?\s*$/i.test(line));
-	
-	if (totalesIndex !== -1 && totalesIndex < lines.length - 1) {
-		console.log('[extractTableData] Sección TOTALES encontrada en línea:', totalesIndex);
-		
-		// Buscar las siguientes 10 líneas después de "TOTALES"
-		for (let i = totalesIndex + 1; i < Math.min(totalesIndex + 10, lines.length); i++) {
-			const line = lines[i];
-			
-			// Buscar "Cantidad de Personas: X"
-			const personasMatch = line.match(/cantidad\s+de\s+personas\s*:?\s*(\d+)/i);
-			if (personasMatch && !result.personas) {
-				result.personas = parseInt(personasMatch[1]);
-				console.log('[extractTableData] Personas encontradas:', result.personas);
-			}
-			
-			// Buscar "Tot. Remunerativo: X" o "Total Remunerativo X"
-			const totalRemMatch = line.match(/(?:tot\.?\s+remunerativo|total\s+remunerativo)\s*:?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/i);
-			if (totalRemMatch && !result.totalRemunerativo) {
-				const amount = totalRemMatch[1].replace(/\./g, '').replace(',', '.');
-				result.totalRemunerativo = parseFloat(amount);
-				console.log('[extractTableData] Total Remunerativo encontrado:', result.totalRemunerativo);
-			}
-			
-			// Buscar "Cantidad: X" o "Cantidad de Legajos: X"
-			const legajosMatch = line.match(/(?:cantidad(?:\s+de\s+legajos)?)\s*:?\s*(\d+)/i);
-			if (legajosMatch && !result.cantidadLegajos && !result.personas) {
-				result.cantidadLegajos = parseInt(legajosMatch[1]);
-				console.log('[extractTableData] Cantidad Legajos encontrado:', result.cantidadLegajos);
-			}
-			
-			// Buscar "Monto del Concepto: X" o "Monto: X"
-			const montoMatch = line.match(/(?:monto(?:\s+del?\s+concepto)?)\s*:?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/i);
-			if (montoMatch && !result.montoConcepto) {
-				const amount = montoMatch[1].replace(/\./g, '').replace(',', '.');
-				result.montoConcepto = parseFloat(amount);
-				console.log('[extractTableData] Monto del Concepto encontrado:', result.montoConcepto);
-			}
-			
-			// Si la línea tiene formato "etiqueta: valor" donde valor es un monto grande
-			if (!result.montoConcepto && i === totalesIndex + 1) {
-				const lastNumberMatch = line.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*$/);
-				if (lastNumberMatch) {
-					const amount = lastNumberMatch[1].replace(/\./g, '').replace(',', '.');
-					const parsed = parseFloat(amount);
-					// Solo si es un monto significativo (mayor a 100)
-					if (parsed > 100) {
-						result.montoConcepto = parsed;
-						console.log('[extractTableData] Monto del Concepto (último número en TOTALES):', result.montoConcepto);
-					}
+	// PRIORIDAD 1: Buscar línea "Totales:" seguida del número total
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+
+		// Buscar "Totales:" con o sin el número en la misma línea
+		if (/^totales?\s*:?\s*/i.test(line)) {
+			console.log('[extractTableData] Línea "Totales:" encontrada:', line);
+
+			// Extraer el número si está en la misma línea
+			const sameLineMatch = line.match(/totales?\s*:?\s*([\d.]+)/i);
+			if (sameLineMatch) {
+				result.montoConcepto = parseFloat(sameLineMatch[1]);
+				console.log('[extractTableData] Monto del Concepto (misma línea):', result.montoConcepto);
+			} else if (i + 1 < lines.length) {
+				// Si no está en la misma línea, buscar en la siguiente
+				const nextLine = lines[i + 1];
+				const nextLineMatch = nextLine.match(/^\s*([\d.]+)\s*$/);
+				if (nextLineMatch) {
+					result.montoConcepto = parseFloat(nextLineMatch[1]);
+					console.log('[extractTableData] Monto del Concepto (línea siguiente):', result.montoConcepto);
 				}
 			}
+		}
+
+		// Buscar "Cantidad de Personas:"
+		const personasMatch = line.match(/cantidad\s+de\s+personas\s*:?\s*(\d+)/i);
+		if (personasMatch && !result.personas) {
+			result.personas = parseInt(personasMatch[1]);
+			console.log('[extractTableData] Personas encontradas:', result.personas);
 		}
 	}
 	
@@ -355,24 +331,26 @@ function extractTableData(text: string): {
 				continue;
 			}
 			
-			// Patrón CORREGIDO: todos los valores en UNA LÍNEA
-			const personaMatch = line.match(/^([a-záéíóúñ\s]+?)\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s+(\d+)\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)$/i);
-			
+			// Patrón mejorado: captura números con puntos como separadores de miles
+			// Formato: "NOMBRE  123456.78  2  1234.56" o "NOMBRE  12.34  1  123.45"
+			const personaMatch = line.match(/^([a-záéíóúñ\s]+?)\s+([\d.]+)\s+(\d+)\s+([\d.]+)$/i);
+
 			if (personaMatch) {
 				const nombre = personaMatch[1].trim();
-				const totRemStr = personaMatch[2].replace(/\./g, '').replace(',', '.');
+				const totRemStr = personaMatch[2];
 				const legajos = parseInt(personaMatch[3]);
-				const montoStr = personaMatch[4].replace(/\./g, '').replace(',', '.');
-				
+				const montoStr = personaMatch[4];
+
+				// Los números en el PDF usan punto como separador decimal (formato inglés)
 				const totRemunerativo = parseFloat(totRemStr);
 				const montoConcepto = parseFloat(montoStr);
-				
+
 				if (Number.isFinite(montoConcepto) && montoConcepto > 0) {
 					totalPersonas++;
 					totalMonto += montoConcepto;
 					totalLegajos += legajos;
 					totalRemunerativo += totRemunerativo;
-					
+
 					console.log(`[extractTableData] Persona: ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 				}
 			}
@@ -427,37 +405,38 @@ function extractPersonas(text: string): Array<{
 			continue;
 		}
 		
-		// Patrón CORREGIDO: "NOMBRE APELLIDO  TOT_REMUNERATIVO  CANTIDAD_LEGAJOS  MONTO_DEL_CONCEPTO"
-		// Todos los valores numéricos están en UNA SOLA LÍNEA
-		const personaMatch = line.match(/^([a-záéíóúñ\s]+?)\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s+(\d+)\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)$/i);
-		
+		// Patrón mejorado: captura números con puntos como separadores decimales
+		// Formato: "NOMBRE  123456.78  2  1234.56"
+		const personaMatch = line.match(/^([a-záéíóúñ\s]+?)\s+([\d.]+)\s+(\d+)\s+([\d.]+)$/i);
+
 		if (personaMatch) {
 			const nombre = personaMatch[1].trim();
-			const totRemStr = personaMatch[2].replace(/\./g, '').replace(',', '.');
+			const totRemStr = personaMatch[2];
 			const legajos = parseInt(personaMatch[3]);
-			const montoStr = personaMatch[4].replace(/\./g, '').replace(',', '.');
-			
+			const montoStr = personaMatch[4];
+
+			// Los números en el PDF usan punto como separador decimal (formato inglés)
 			const totRemunerativo = parseFloat(totRemStr);
 			const montoConcepto = parseFloat(montoStr);
-			
+
 			// Validar que los montos sean razonables
 			if (!Number.isFinite(montoConcepto) || montoConcepto < 0) {
 				console.log(`[extractPersonas] Monto del Concepto inválido para ${nombre}:`, personaMatch[4]);
 				continue;
 			}
-			
+
 			if (!Number.isFinite(totRemunerativo) || totRemunerativo < 0) {
 				console.log(`[extractPersonas] Tot Remunerativo inválido para ${nombre}:`, personaMatch[2]);
 				continue;
 			}
-			
+
 			personas.push({
 				nombre: nombre.toUpperCase(),
 				totRemunerativo,
 				cantidadLegajos: legajos,
 				montoConcepto: montoConcepto
 			});
-			
+
 			console.log(`[extractPersonas] Persona agregada: ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 		}
 	}
