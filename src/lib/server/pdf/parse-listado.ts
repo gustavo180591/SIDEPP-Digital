@@ -255,28 +255,53 @@ export async function parseListado(fileBuffer: Buffer, pdfFile: PdfFile): Promis
 
   for (const line of dataLines) {
     res.processed++;
-    const d = extractLineData(line.content);
 
-    if (!d.importe) {
-      res.skipped++;
-      const warning = 'No se pudo extraer el importe';
-      res.warnings.push(warning);
-      res.details.push({ lineNumber: line.number, line: line.content, warning });
-      continue;
+    // Intentar parsear como fila de tabla primero: NOMBRE APELLIDO totalRem quantity conceptAmount
+    const rowMatch = line.content.match(PATTERNS.TABLE_ROW);
+
+    if (rowMatch) {
+      // Patrón de tabla detectado
+      const name = rowMatch[1].trim();
+      const totalRem = new Prisma.Decimal(rowMatch[2].replace(/\./g, '').replace(',', '.'));
+      const quantity = parseInt(rowMatch[3]);
+      const conceptAmount = new Prisma.Decimal(rowMatch[4].replace(/\./g, '').replace(',', '.'));
+
+      contribs.push({
+        pdfFileId: pdfFile.id,
+        name,
+        totalRem,
+        quantity,
+        conceptAmount,
+        status: 'PENDING'
+      });
+
+      total = total.plus(conceptAmount);
+      res.count++;
+    } else {
+      // Fallback: parseo antiguo (solo CUIT + monto)
+      const d = extractLineData(line.content);
+
+      if (!d.importe) {
+        res.skipped++;
+        const warning = 'No se pudo extraer el importe';
+        res.warnings.push(warning);
+        res.details.push({ lineNumber: line.number, line: line.content, warning });
+        continue;
+      }
+
+      const amount = new Prisma.Decimal(d.importe);
+      const rawName = (d.nombre || '').trim() || (d.cuit ? `CUIT ${d.cuit}`  : 'SIN_NOMBRE');
+
+      contribs.push({
+        pdfFileId: pdfFile.id,
+        name: rawName,
+        conceptAmount: amount,
+        status: 'PENDING'
+      });
+
+      total = total.plus(amount);
+      res.count++;
     }
-
-    const amount = new Prisma.Decimal(d.importe);
-    const rawName = (d.nombre || '').trim() || (d.cuit ? `CUIT ${d.cuit}`  : 'SIN_NOMBRE');
-
-    contribs.push({
-      periodId: pdfFile.periodId,
-      rawName,
-      conceptAmount: amount,
-      status: 'PENDING'
-    });
-
-    total = total.plus(amount);
-    res.count++;
   }
 
   if (contribs.length === 0) {

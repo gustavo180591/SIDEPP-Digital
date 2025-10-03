@@ -999,20 +999,15 @@ export const POST: RequestHandler = async ({ request }) => {
 				const selected = parseSelectedPeriod(selectedPeriodRaw);
 				const useYear = selected?.year ?? detected.year ?? null;
 				const useMonth = selected?.month ?? detected.month ?? null;
-				
+
 				console.log('[APORTES][29] Período detectado:', detected);
 				console.log('[APORTES][29] Período seleccionado:', selected);
 				console.log('[APORTES][29] Usando:', { year: useYear, month: useMonth });
-				
+
 				if (!useYear || !useMonth) {
-					console.warn('[APORTES][29] ⚠️ No se pudo determinar el período. Usando valores por defecto.');
-					// En lugar de fallar, usar valores por defecto
-					// return json({
-					// 	status: 'error',
-					// 	message: 'No se pudo determinar el período (mes/año). Seleccione un período o verifique el PDF.',
-					// 	preview,
-					// 	institution
-					// }, { status: 400 });
+					const errorMsg = 'No se pudo determinar el período (mes/año). Seleccione un período o verifique el PDF.';
+					console.error('[APORTES][29] ❌', errorMsg);
+					throw new Error(errorMsg);
 				}
 
 				// Calcular personas y total
@@ -1045,8 +1040,8 @@ export const POST: RequestHandler = async ({ request }) => {
 						let period = await prisma.payrollPeriod.findFirst({
 							where: {
 								institutionId: institution.id,
-								month: useMonth || 1,
-								year: useYear || new Date().getFullYear()
+								month: useMonth,
+								year: useYear
 							}
 						});
 
@@ -1078,6 +1073,7 @@ export const POST: RequestHandler = async ({ request }) => {
 								});
 							} catch (updateErr) {
 								console.error('[APORTES][29] ❌ Error actualizando PayrollPeriod:', updateErr);
+								throw updateErr; // Relanzar para que el error se propague
 							}
 
 							return period.id;
@@ -1088,8 +1084,8 @@ export const POST: RequestHandler = async ({ request }) => {
 							period = await prisma.payrollPeriod.create({
 								data: {
 									institution: { connect: { id: institution.id } },
-									month: useMonth || 1,
-									year: useYear || new Date().getFullYear(),
+									month: useMonth,
+									year: useYear,
 									concept: concept,
 									peopleCount: peopleCount ?? undefined,
 									totalAmount: totalAmount,
@@ -1111,11 +1107,12 @@ export const POST: RequestHandler = async ({ request }) => {
 								await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1))); // Backoff exponencial
 								return getOrCreatePeriod(retryCount + 1);
 							}
-							throw createErr;
+							console.error('[APORTES][29] ❌ Error creando PayrollPeriod:', createErr);
+							throw createErr; // Relanzar para que el error se propague
 						}
 					} catch (err) {
 						console.error('[APORTES][29] ❌ Error al gestionar PayrollPeriod:', err);
-						return null;
+						throw err; // Relanzar para que el error se propague
 					}
 				};
 
@@ -1131,11 +1128,21 @@ export const POST: RequestHandler = async ({ request }) => {
 						console.log('[APORTES][29] ✓ PDF asociado al período:', { pdfFileId, periodId: createdPeriodId });
 					} catch (updateErr) {
 						console.error('[APORTES][29] ❌ Error asociando PDF:', updateErr);
+						throw updateErr; // Relanzar para que el error se propague
 					}
+				} else {
+					const errorMsg = 'No se pudo crear o encontrar el PayrollPeriod';
+					console.error('[APORTES][29] ❌', errorMsg);
+					throw new Error(errorMsg);
 				}
+			} else {
+				const errorMsg = 'Falta institución o pdfFileId para crear PayrollPeriod';
+				console.error('[APORTES][29] ❌', errorMsg);
+				throw new Error(errorMsg);
 			}
 		} catch (ppErr) {
 			console.error('[APORTES][29] ❌ Error general creando PayrollPeriod:', ppErr);
+			throw ppErr; // Relanzar para que el error llegue al catch principal y devuelva un 500
 		}
 
 		

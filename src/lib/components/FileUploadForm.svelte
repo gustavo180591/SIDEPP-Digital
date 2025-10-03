@@ -132,8 +132,14 @@
         resFopid.json()
       ]);
 
-      if (!resSueldos.ok) throw new Error(dataSueldos?.error || 'Error en Aportes Sueldos');
-      if (!resFopid.ok) throw new Error(dataFopid?.error || 'Error en Aportes FOPID');
+      if (!resSueldos.ok) {
+        console.error('Error en Aportes Sueldos:', dataSueldos);
+        throw new Error(dataSueldos?.error || dataSueldos?.message || `Error en Aportes Sueldos (${resSueldos.status})`);
+      }
+      if (!resFopid.ok) {
+        console.error('Error en Aportes FOPID:', dataFopid);
+        throw new Error(dataFopid?.error || dataFopid?.message || `Error en Aportes FOPID (${resFopid.status})`);
+      }
 
       resultSueldos = dataSueldos;
       resultFopid = dataFopid;

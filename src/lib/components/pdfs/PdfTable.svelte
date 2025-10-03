@@ -48,28 +48,8 @@
         </div>
       `
     },
-    {
-      key: 'peopleCount',
-      label: 'Personas',
-      render: (pdf: PdfFileWithPeriod) => `
-        <div class="text-center">
-          <span class="badge badge-outline">
-            ${pdf.period.peopleCount || 0}
-          </span>
-        </div>
-      `
-    },
-    {
-      key: 'totalAmount',
-      label: 'Monto Total',
-      render: (pdf: PdfFileWithPeriod) => `
-        <div class="text-right">
-          <div class="font-medium text-gray-900">
-            $${pdf.period.totalAmount ? Number(pdf.period.totalAmount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) : '0,00'}
-          </div>
-        </div>
-      `
-    },
+
+    
     {
       key: 'transfer',
       label: 'Transferencia',

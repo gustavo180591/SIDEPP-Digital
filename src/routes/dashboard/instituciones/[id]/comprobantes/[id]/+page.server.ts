@@ -37,13 +37,21 @@ export const load: PageServerLoad = async ({ params, url }) => {
     throw error(404, 'Institución no encontrada');
   }
 
-  const contributionLines = payroll.pdfFile?.contributionLine ?? [];
+  // Serializar los Decimals a números para evitar errores de SvelteKit
+    const serialize = (obj: any) => {
+      return JSON.parse(JSON.stringify(obj, (key, value) => {
+        if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'Decimal') {
+          return Number(value);
+        }
+        return value;
+      }));
+    };
 
     return {
       institution,
-      pdfFile: payroll.pdfFile,
-      contributionLines,
-      payroll
+      pdfFile: serialize(payroll.pdfFile),
+      contributionLines: serialize(payroll.pdfFile?.contributionLine ?? []),
+      payroll: serialize(payroll)
     };
   } catch (err: any) {
     console.error('Error al cargar comprobante:', err);

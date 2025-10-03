@@ -108,7 +108,31 @@ export class PayrollService {
       }))
     } : null;
 
-    return { ...transformedPeriod, pdfFile: transformedPdf, pdfFiles: p.pdfFiles };
+    // Transformar todos los pdfFiles
+    const transformedPdfFiles = p.pdfFiles.map((pdf) => ({
+      id: pdf.id,
+      fileName: pdf.fileName,
+      periodId: pdf.periodId,
+      createdAt: pdf.createdAt,
+      updatedAt: pdf.updatedAt,
+      bufferHash: pdf.bufferHash,
+      type: pdf.type,
+      contributionLine: pdf.contributionLine.map((c) => ({
+        id: c.id,
+        memberId: c.memberId,
+        name: c.name,
+        quantity: c.quantity,
+        conceptAmount: c.conceptAmount != null ? Number(c.conceptAmount) : null,
+        totalRem: c.totalRem != null ? Number(c.totalRem) : null,
+        status: c.status,
+        pdfFileId: c.pdfFileId,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        member: c.member
+      }))
+    }));
+
+    return { ...transformedPeriod, pdfFile: transformedPdf, pdfFiles: transformedPdfFiles };
   }
 }
 
