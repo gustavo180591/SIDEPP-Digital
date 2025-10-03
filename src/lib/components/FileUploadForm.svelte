@@ -1,7 +1,9 @@
 <script lang="ts">
   import AnalysisTable from './AnalysisTable.svelte';
 
-  let fileInput: HTMLInputElement | null = null;
+  let fileInputSueldos: HTMLInputElement | null = null;
+  let fileInputFopid: HTMLInputElement | null = null;
+  // let fileInputTransfer: HTMLInputElement | null = null; // TEMPORAL: Comentado para testing
   let uploading = false;
   let selectedPeriod: string = '';
   let allowOCR: boolean = true;
@@ -14,7 +16,7 @@
     periodMatches?: boolean | null;
   };
 
-  let result: null | {
+  type AnalyzerResult = {
     fileName: string;
     savedName: string;
     savedPath: string;
@@ -43,35 +45,116 @@
       };
     };
     checks?: Checks;
-  } = null;
+    transferAmount?: number | null;
+  };
+
+  let resultSueldos: AnalyzerResult | null = null;
+  let resultFopid: AnalyzerResult | null = null;
+  // let resultTransfer: AnalyzerResult | null = null; // TEMPORAL: Comentado para testing
+
+  let aportesTotal: number | null = null;
+  let transferImporte: number | null = null;
+  let totalsMatch: boolean | null = null;
   let errorMessage: string | null = null;
+
+  const sumFromResult = (r: AnalyzerResult | null): number => {
+    if (!r) return 0;
+    
+    // PRIORIDAD 1: Usar tableData.montoConcepto si existe (total de la tabla de TOTALES)
+    const tableAmount = r.preview?.listado?.tableData?.montoConcepto;
+    if (typeof tableAmount === 'number' && Number.isFinite(tableAmount) && tableAmount > 0) {
+      console.log('Usando tableData.montoConcepto:', tableAmount);
+      return tableAmount;
+    }
+    
+    // PRIORIDAD 2: Sumar desde el array de personas si existe
+    const personas = r.preview?.listado?.personas || [];
+    if (Array.isArray(personas) && personas.length > 0) {
+      const total = personas.reduce((acc, p) => acc + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
+      if (total > 0) {
+        console.log('Sumando desde personas:', total, '(', personas.length, 'personas)');
+        return total;
+      }
+    }
+    
+    // PRIORIDAD 3: Usar checks.sumTotal como fallback
+    const checksTotal = r.checks?.sumTotal;
+    if (typeof checksTotal === 'number' && Number.isFinite(checksTotal) && checksTotal > 0) {
+      console.log('Usando checks.sumTotal:', checksTotal);
+      return checksTotal;
+    }
+    
+    console.warn('No se pudo extraer monto del concepto del resultado');
+    return 0;
+  };
 
   async function onSubmit(e: Event) {
     e.preventDefault();
     errorMessage = null;
-    result = null;
-    const file = fileInput?.files?.[0];
-    if (!file) {
-      errorMessage = 'Selecciona un archivo PDF.';
+    resultSueldos = null;
+    resultFopid = null;
+    // resultTransfer = null; // TEMPORAL: Comentado para testing
+    aportesTotal = null;
+    transferImporte = null;
+    totalsMatch = null;
+
+    const fileSueldos = fileInputSueldos?.files?.[0];
+    const fileFopid = fileInputFopid?.files?.[0];
+    // const fileTransfer = fileInputTransfer?.files?.[0]; // TEMPORAL: Comentado para testing
+
+    // TEMPORAL: Solo validar los dos archivos de aportes
+    if (!fileSueldos || !fileFopid) {
+      errorMessage = 'Debes subir los dos archivos: Aportes Sueldos y Aportes FOPID.';
       return;
     }
     uploading = true;
     try {
-      const form = new FormData();
-      form.append('file', file);
-      if (selectedPeriod) {
-        form.append('selectedPeriod', selectedPeriod);
-      }
-      form.append('allowOCR', String(allowOCR));
-      const res = await fetch('/api/analyzer-pdf', {
-        method: 'POST',
-        body: form
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || 'Error al subir el archivo');
-      }
-      result = data;
+      const makeForm = (file: File) => {
+        const f = new FormData();
+        f.append('file', file);
+        if (selectedPeriod) f.append('selectedPeriod', selectedPeriod);
+        f.append('allowOCR', String(allowOCR));
+        return f;
+      };
+
+      // TEMPORAL: Solo procesar los dos archivos de aportes
+      const [resSueldos, resFopid] = await Promise.all([
+        fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileSueldos) }),
+        fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileFopid) })
+      ]);
+
+      const [dataSueldos, dataFopid] = await Promise.all([
+        resSueldos.json(),
+        resFopid.json()
+      ]);
+
+      if (!resSueldos.ok) throw new Error(dataSueldos?.error || 'Error en Aportes Sueldos');
+      if (!resFopid.ok) throw new Error(dataFopid?.error || 'Error en Aportes FOPID');
+
+      resultSueldos = dataSueldos;
+      resultFopid = dataFopid;
+      // resultTransfer = dataTransfer; // TEMPORAL: Comentado para testing
+
+      const totalSueldos = sumFromResult(resultSueldos);
+      const totalFopid = sumFromResult(resultFopid);
+      aportesTotal = totalSueldos + totalFopid;
+
+      console.log('=== RESUMEN DE TOTALES ===');
+      console.log('Total Aportes Sueldos:', totalSueldos);
+      console.log('Total Aportes FOPID:', totalFopid);
+      console.log('SUMA TOTAL APORTES:', aportesTotal);
+      console.log('=========================')
+
+      // TEMPORAL: Comentado para testing
+      // transferImporte = typeof dataTransfer?.transferAmount === 'number' ? dataTransfer.transferAmount : null;
+      // console.log('Importe Transferencia Bancaria:', transferImporte);
+      // 
+      // if (aportesTotal != null && transferImporte != null) {
+      //   const diferencia = Math.abs(aportesTotal - transferImporte);
+      //   totalsMatch = diferencia < 0.5;
+      //   console.log('Diferencia:', diferencia);
+      //   console.log('¿Coinciden?:', totalsMatch ? 'SÍ' : 'NO');
+      // }
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Error desconocido';
     } finally {
@@ -95,17 +178,47 @@
           class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
         />
       </div>
+      <div></div>
+    </div>
+
+    <div class="flex flex-col gap-4">
       <div>
-        <label for="pdf" class="mb-1 block text-sm font-medium text-gray-700">Archivo PDF</label>
-      <input
-          id="pdf"
-        bind:this={fileInput}
-        type="file"
-        accept="application/pdf"
-        class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
-        disabled={uploading}
-      />
+        <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF)</label>
+        <input
+          id="pdf-sueldos"
+          bind:this={fileInputSueldos}
+          type="file"
+          accept="application/pdf"
+          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+          disabled={uploading}
+          required
+        />
       </div>
+      <div>
+        <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF)</label>
+        <input
+          id="pdf-fopid"
+          bind:this={fileInputFopid}
+          type="file"
+          accept="application/pdf"
+          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+          disabled={uploading}
+          required
+        />
+      </div>
+      <!--        TEMPORAL: Comentado para testing 
+      <!-- <div>
+        <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia bancaria (PDF)</label>
+        <input
+          id="pdf-transfer"
+          bind:this={fileInputTransfer}
+          type="file"
+          accept="application/pdf"
+          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+          disabled={uploading}
+          required
+        />
+      </div> --> 
     </div>
 
     <div class="flex items-center gap-2">
@@ -129,78 +242,111 @@
       </div>
     {/if}
 
-    {#if result}
+    {#if resultSueldos || resultFopid}
       <div class="my-2 border-t border-gray-200"></div>
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <div class="text-sm text-gray-500">Archivo</div>
-          <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={result.fileName}>{result.fileName}</div>
-          <div class="mt-1 text-sm text-gray-500">{(result.size / 1024).toFixed(1)} KB</div>
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <div class="text-sm text-gray-500">Clasificación</div>
-          <div class="mt-1 text-base font-medium">
-            {#if result.classification === 'comprobante'}
-              <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Comprobante</span>
-            {:else if result.classification === 'listado'}
-              <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800">Listado</span>
-            {:else}
-              <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Desconocido</span>
-            {/if}
+        {#if resultSueldos}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div class="text-sm text-gray-500">Aportes Sueldos</div>
+            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultSueldos.fileName}>{resultSueldos.fileName}</div>
+            <div class="mt-1 text-sm text-gray-500">{(resultSueldos.size / 1024).toFixed(1)} KB</div>
           </div>
-          {#if result.needsOCR}
-            <div class="mt-1 text-sm text-gray-500">Se intentará OCR</div>
-          {/if}
-        </div>
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <div class="text-sm text-gray-500">Estado</div>
-          <div class="mt-1 text-base font-medium">
-            <span class="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-medium text-gray-700">{result.status}</span>
+        {/if}
+        {#if resultFopid}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div class="text-sm text-gray-500">Aportes FOPID</div>
+            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultFopid.fileName}>{resultFopid.fileName}</div>
+            <div class="mt-1 text-sm text-gray-500">{(resultFopid.size / 1024).toFixed(1)} KB</div>
           </div>
-          <div class="mt-1 text-sm text-gray-500">{result.mimeType}</div>
-        </div>
+        {/if}
+        <!-- TEMPORAL: Comentado para testing -->
+        <!-- {#if resultTransfer}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div class="text-sm text-gray-500">Transferencia bancaria</div>
+            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultTransfer.fileName}>{resultTransfer.fileName}</div>
+            <div class="mt-1 text-sm text-gray-500">{(resultTransfer.size / 1024).toFixed(1)} KB</div>
+          </div>
+        {/if} -->
       </div>
-      {#if result.preview?.listado}
+
+      {#if resultSueldos?.preview?.listado}
         <div class="mt-4">
           <AnalysisTable
             title="TOTALES POR CONCEPTO - PERSONAS"
             concept="Apte. Sindical SIDEPP (1%)"
-            personas={result.preview.listado.personas || []}
-            tableData={result.preview.listado.tableData}
+            personas={resultSueldos.preview.listado.personas || []}
+            tableData={resultSueldos.preview.listado.tableData}
           />
         </div>
       {/if}
-      {#if result.checks}
+      {#if resultFopid?.preview?.listado}
+        <div class="mt-4">
+          <AnalysisTable
+            title="TOTALES POR CONCEPTO - PERSONAS (FOPID)"
+            concept="FOPID"
+            personas={resultFopid.preview.listado.personas || []}
+            tableData={resultFopid.preview.listado.tableData}
+          />
+        </div>
+      {/if}
+
+      {#if aportesTotal != null || transferImporte != null}
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div class="rounded-lg border border-gray-200 bg-white p-4">
-            <div class="text-sm text-gray-500">Comparación de totales</div>
-            <div class="mt-2 text-sm">
-              <div>Calculado: <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(result.checks.sumTotal || 0)}</span></div>
-              <div>Declarado en PDF: <span class="font-medium">{result.checks.declaredTotal == null ? '—' : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(result.checks.declaredTotal)}</span></div>
-              <div class="mt-2">Coincide: 
-                {#if result.checks.totalMatches}
-                  <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Sí</span>
-                {:else}
-                  <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">No</span>
-                {/if}
+            <div class="text-sm font-semibold text-gray-700 mb-2">Comparación de Totales</div>
+            <div class="mt-2 text-sm space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Aportes Sueldos:</span>
+                <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultSueldos))}</span>
               </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-600">Aportes FOPID:</span>
+                <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultFopid))}</span>
+              </div>
+              <div class="border-t border-gray-200 pt-2 flex justify-between items-center">
+                <span class="text-gray-700 font-medium">Total Aportes:</span>
+                <span class="font-semibold text-lg">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(aportesTotal ?? 0)}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-700 font-medium">Transferencia Bancaria:</span>
+                <span class="font-semibold text-lg">{transferImporte == null ? '—' : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(transferImporte)}</span>
+              </div>
+              {#if totalsMatch !== null}
+                <div class="mt-3 pt-2 border-t border-gray-200">
+                  <div class="flex justify-between items-center">
+                    <span class="text-gray-700 font-medium">Estado:</span>
+                    {#if totalsMatch}
+                      <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">✓ Coinciden</span>
+                    {:else}
+                      <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-800">✗ No coinciden</span>
+                    {/if}
+                  </div>
+                  {#if !totalsMatch}
+                    <div class="mt-2 text-sm text-red-700 bg-red-50 p-2 rounded">
+                      <span class="font-medium">Diferencia:</span> {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Math.abs((aportesTotal || 0) - (transferImporte || 0)))}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
             </div>
           </div>
-          <div class="rounded-lg border border-gray-200 bg-white p-4">
-            <div class="text-sm text-gray-500">Comparación de período</div>
-            <div class="mt-2 text-sm">
-              <div>Detectado en PDF: <span class="font-medium">{result.checks.detectedPeriod?.raw || `${result.checks.detectedPeriod?.month ?? '—'}/${result.checks.detectedPeriod?.year ?? '—'}`}</span></div>
-              <div>Seleccionado: <span class="font-medium">{result.checks.selectedPeriod ? `${result.checks.selectedPeriod.month?.toString().padStart(2,'0')}/${result.checks.selectedPeriod.year}` : '—'}</span></div>
-              <div class="mt-2">Coincide: 
-                {#if result.checks.periodMatches}
-                  <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Sí</span>
-                {:else}
-                  <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">No</span>
+          {#if resultSueldos?.checks}
+            <div class="rounded-lg border border-gray-200 bg-white p-4">
+              <div class="text-sm text-gray-500">Comparación de período</div>
+              <div class="mt-2 text-sm">
+                <div>Detectado en PDF: <span class="font-medium">{resultSueldos.checks.detectedPeriod?.raw || `${resultSueldos.checks.detectedPeriod?.month ?? '—'}/${resultSueldos.checks.detectedPeriod?.year ?? '—'}`}</span></div>
+                <div>Seleccionado: <span class="font-medium">{resultSueldos.checks.selectedPeriod ? `${resultSueldos.checks.selectedPeriod.month?.toString().padStart(2,'0')}/${resultSueldos.checks.selectedPeriod.year}` : '—'}</span></div>
+                <div class="mt-2">Coincide: 
+                  {#if resultSueldos.checks.periodMatches}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Sí</span>
+                  {:else}
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">No</span>
+                  {/if}
+                </div>
+              </div>
+            </div>
           {/if}
         </div>
-          </div>
-        </div>
-      </div>
       {/if}
     {/if}
   </div>

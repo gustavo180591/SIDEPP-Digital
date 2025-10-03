@@ -47,7 +47,7 @@
             Dashboard
           </a>
           
-          {#if user?.role === 'ADMIN'}
+          <!-- {#if user?.role === 'ADMIN'} -->
             <a 
               href="/dashboard/usuarios" 
               class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {isActive('/dashboard/usuarios') ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-50'}"
@@ -61,16 +61,16 @@
             >
               Instituciones
             </a>
-          {/if}
+          <!-- {/if} -->
           
-          {#if user?.role === 'INTITUTION'}
+          <!-- {#if user?.role === 'INTITUTION'} -->
             <a 
               href="/dashboard/instituciones" 
               class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {isActive('/dashboard/instituciones') ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-50'}"
             >
               Mi Institución
             </a>
-          {/if}
+          <!-- {/if} -->
           
           <a 
             href="/dashboard/upload" 

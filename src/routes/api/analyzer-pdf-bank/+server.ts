@@ -81,6 +81,92 @@ function parseMoneyToNumber(s?: string | null): number | null {
 	return Number.isFinite(n) ? n : null;
 }
 
+// Extraer el importe principal de una transferencia bancaria
+function extractTransferAmount(text: string): number | null {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  
+  console.log('[extractTransferAmount] Iniciando extracción de importe de transferencia...');
+  
+  // Patrón mejorado para montos: acepta formatos con puntos como separadores de miles y coma como decimal
+  const MONEY_RE = /\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/g;
+  
+  let labeledCandidate: number | null = null;
+  let labeledLine: string | null = null;
+
+  // 1) PRIORIDAD ALTA: Buscar líneas con etiquetas específicas de transferencia
+  const HIGH_PRIORITY_LABELS = [
+    /(?:importe|monto)\s*(?:de\s*(?:la\s*)?transferencia)?\s*:?\s*\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/i,
+    /(?:total|monto)\s*(?:acreditado|transferido)?\s*:?\s*\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/i,
+    /(?:operaci[oó]n)\s*(?:por)?\s*:?\s*\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/i
+  ];
+  
+  for (const line of lines) {
+    for (const pattern of HIGH_PRIORITY_LABELS) {
+      const match = line.match(pattern);
+      if (match) {
+        const raw = match[1];
+        const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
+        const val = Number.parseFloat(normalized);
+        if (Number.isFinite(val) && val > 0) {
+          console.log(`[extractTransferAmount] Encontrado con etiqueta de alta prioridad: ${val} (línea: "${line}")`);
+          return val; // Devolver inmediatamente si encontramos con etiqueta de alta prioridad
+        }
+      }
+    }
+  }
+
+  // 2) Buscar líneas con etiquetas típicas de transferencias
+  const COMMON_LABELS = /(importe|monto|total|acreditado|transferencia|operaci[oó]n)/i;
+  
+  for (const line of lines) {
+    if (COMMON_LABELS.test(line)) {
+      for (const m of line.matchAll(MONEY_RE)) {
+        const raw = m[1];
+        const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
+        const val = Number.parseFloat(normalized);
+        if (Number.isFinite(val) && val > 0) {
+          // Preferir el valor más grande en líneas con etiquetas
+          if (labeledCandidate == null || val > labeledCandidate) {
+            labeledCandidate = val;
+            labeledLine = line;
+          }
+        }
+      }
+    }
+  }
+  
+  if (labeledCandidate != null) {
+    console.log(`[extractTransferAmount] Encontrado con etiqueta común: ${labeledCandidate} (línea: "${labeledLine}")`);
+    return labeledCandidate;
+  }
+
+  // 3) Fallback: tomar el mayor importe del documento (mayor a 100 para evitar números pequeños)
+  let maxVal: number | null = null;
+  let maxLine: string | null = null;
+  
+  for (const line of lines) {
+    for (const m of line.matchAll(MONEY_RE)) {
+      const raw = m[1];
+      const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
+      const val = Number.parseFloat(normalized);
+      if (Number.isFinite(val) && val > 100) { // Solo considerar montos mayores a 100
+        if (maxVal == null || val > maxVal) {
+          maxVal = val;
+          maxLine = line;
+        }
+      }
+    }
+  }
+  
+  if (maxVal != null) {
+    console.log(`[extractTransferAmount] Fallback - mayor importe encontrado: ${maxVal} (línea: "${maxLine}")`);
+  } else {
+    console.log('[extractTransferAmount] No se pudo extraer ningún importe de transferencia');
+  }
+  
+  return maxVal;
+}
+
 function detectDeclaredTotal(text: string): number | null {
 	const lines = text.split(/\r?\n/);
 	let candidate: number | null = null;
@@ -483,58 +569,56 @@ async function findMemberByName(
 	const normalize = (s: string) => stripDiacritics(s).toUpperCase().replace(/\s+/g, ' ').trim();
 
 	const name = normalize(fullName);
-	const parts = name.split(' ').filter(Boolean);
-	const first = parts[0] ?? '';
-	const rest = parts.slice(1).join(' ');
+    const parts = name.split(' ').filter(Boolean);
+    const first = parts[0] ?? '';
+    const rest = parts.slice(1).join(' ');
 
 	try {
 		// Intentos directos en DB (baratos)
-		// 0) Coincidencia por fullName (case-insensitive)
-		let m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { equals: fullName, mode: 'insensitive' } } as any });
+        // 0) Coincidencia por fullName (case-insensitive)
+        let m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { equals: fullName, mode: 'insensitive' } } as any });
 		if (m) return { id: m.id };
-		// 1) Igualdad por firstName completo
-		m = await prisma.member.findFirst({ where: { institucionId: institutionId, firstName: fullName } });
-		if (m) return { id: m.id };
-		if (first && rest) {
-			m = await prisma.member.findFirst({
-				where: {
-					institucionId: institutionId,
-					firstName: { contains: first, mode: 'insensitive' },
-					lastName: { contains: rest, mode: 'insensitive' }
-				}
-			});
-			if (m) return { id: m.id };
-		}
-		m = await prisma.member.findFirst({ where: { institucionId: institutionId, lastName: { contains: fullName, mode: 'insensitive' } } });
+        // 1) Búsqueda por tokens dentro de fullName
+        if (first && rest) {
+            m = await prisma.member.findFirst({
+                where: {
+                    institucionId: institutionId,
+                    AND: [
+                        { fullName: { contains: first, mode: 'insensitive' } },
+                        { fullName: { contains: rest, mode: 'insensitive' } }
+                    ]
+                }
+            });
+            if (m) return { id: m.id };
+        }
+        m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { contains: fullName, mode: 'insensitive' } } });
 		if (m) return { id: m.id };
 
 		// Fallback: traer algunos miembros y matchear en memoria con normalización
-		const candidates = await prisma.member.findMany({
-			where: { institucionId: institutionId },
-			select: { id: true, firstName: true, lastName: true },
-			take: 500
-		});
+        const candidates = await prisma.member.findMany({
+            where: { institucionId: institutionId },
+            select: { id: true, fullName: true },
+            take: 500
+        });
 		let best: { id: string; score: number } | null = null;
-		for (const c of candidates) {
-			const fn = normalize(c.firstName ?? '');
-			const ln = normalize(c.lastName ?? '');
-			const full = `${fn} ${ln}`.trim();
+        for (const c of candidates) {
+            const full = normalize(c.fullName ?? '');
 
-			let score = 0;
-			if (full === name) score = 100;
-			else if (full.includes(name) || name.includes(full)) score = 90;
-			else {
-				const tokens = new Set(parts);
-				let hits = 0;
-				for (const t of tokens) {
-					if (t && (fn.includes(t) || ln.includes(t))) hits++;
-				}
-				score = hits * 10;
-				// bonificación si primera palabra matchea el primer nombre o apellido
-				if (first && (fn.startsWith(first) || ln.startsWith(first))) score += 5;
-			}
-			if (!best || score > best.score) best = { id: c.id, score };
-		}
+            let score = 0;
+            if (full === name) score = 100;
+            else if (full.includes(name) || name.includes(full)) score = 90;
+            else {
+                const tokens = new Set(parts);
+                let hits = 0;
+                for (const t of tokens) {
+                    if (t && full.includes(t)) hits++;
+                }
+                score = hits * 10;
+                // bonificación si primera palabra matchea el comienzo del nombre completo
+                if (first && full.startsWith(first)) score += 5;
+            }
+            if (!best || score > best.score) best = { id: c.id, score };
+        }
 		if (best && best.score >= 20) return { id: best.id };
 	} catch (e) {
 		console.warn('[analyzer][member] Búsqueda de miembro falló:', e);
@@ -808,14 +892,12 @@ export const POST: RequestHandler = async ({ request }) => {
                     // Crear miembro si no existe, usando fullName y separando nombre/apellido
 							try {
                         const { firstName, lastName } = splitFullName(p.nombre);
-								const createdMember = await prisma.member.create({
-									data: {
-										institucion: { connect: { id: institution.id } },
-                                firstName,
-                                lastName,
-                                fullName: p.nombre
-									}
-								});
+                                const createdMember = await prisma.member.create({
+                                    data: {
+                                        institucion: { connect: { id: institution.id } },
+                                        fullName: p.nombre
+                                    }
+                                });
 								maybeMember = { id: createdMember.id };
 							} catch (cmErr) {
 								console.warn('[analyzer][member] No se pudo crear miembro:', cmErr);
@@ -894,6 +976,9 @@ export const POST: RequestHandler = async ({ request }) => {
 				};
 			}
 		}
+
+		// Calcular y exponer el importe de transferencia
+		const transferAmount = extractTransferAmount(fullText);
 
 		// Crear PayrollPeriod asociado a la institución y al PdfFile (solo si hay institución y pdfFile creado)
 		try {
@@ -974,7 +1059,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			institution,
 			bufferHash,
 			pdfFileId,
-			members: membersResult
+			members: membersResult,
+			transferAmount
 		}, { status: 201 });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Error desconocido';
