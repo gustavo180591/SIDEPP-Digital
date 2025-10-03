@@ -31,8 +31,6 @@ model Member {
   id                  String             @id @default(cuid())
   numeroOrden         String?
   numeroMatricula     String?
-  firstName           String?
-  lastName            String?
   fullName            String?
   institucionId       String?
   documentoIdentidad  String?
@@ -107,6 +105,7 @@ model BankTransfer {
   periodId      String      @unique
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  bufferHash    String?
   
   period        PayrollPeriod   @relation(fields: [periodId], references: [id])
 
@@ -120,11 +119,17 @@ model PdfFile {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   bufferHash    String?        @unique
+  type          PdfFileType?    
   
   contributionLine ContributionLine[]
   period        PayrollPeriod? @relation(fields: [periodId], references: [id])
 
   @@map("pdf_files")
+}
+
+enum PdfFileType {
+  SUELDO
+  FOPID
 }
 
 model User {
