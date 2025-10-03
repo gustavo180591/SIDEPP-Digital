@@ -399,45 +399,68 @@ function extractPersonas(text: string): Array<{
 	
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		
+
 		// Saltar líneas que son encabezados o secciones especiales
-		if (/^(totales?|personas?|nombre|apellido|legajo|concepto|cantidad|tot\.?\s*rem|periodo|monto\s+del)/i.test(line)) {
+		if (/^(totales?|personas?|nombre|apellido|legajo|concepto|cantidad|tot\.?\s*rem|periodo|monto\s+del|page\s+\d)/i.test(line)) {
 			continue;
 		}
-		
-		// Patrón mejorado: captura números con puntos como separadores decimales
-		// Formato: "NOMBRE  123456.78  2  1234.56"
-		const personaMatch = line.match(/^([a-záéíóúñ\s]+?)\s+([\d.]+)\s+(\d+)\s+([\d.]+)$/i);
 
-		if (personaMatch) {
-			const nombre = personaMatch[1].trim();
-			const totRemStr = personaMatch[2];
-			const legajos = parseInt(personaMatch[3]);
-			const montoStr = personaMatch[4];
+		// Patrón 1: TODO en una línea: "NOMBRE  TOT_REM  CANT_LEG  MONTO"
+		const personaMatch1 = line.match(/^([a-záéíóúñ\s]+?)\s+([\d.]+)\s+(\d+)\s+([\d.]+)$/i);
 
-			// Los números en el PDF usan punto como separador decimal (formato inglés)
-			const totRemunerativo = parseFloat(totRemStr);
-			const montoConcepto = parseFloat(montoStr);
+		if (personaMatch1) {
+			const nombre = personaMatch1[1].trim();
+			const totRemunerativo = parseFloat(personaMatch1[2]);
+			const legajos = parseInt(personaMatch1[3]);
+			const montoConcepto = parseFloat(personaMatch1[4]);
 
-			// Validar que los montos sean razonables
-			if (!Number.isFinite(montoConcepto) || montoConcepto < 0) {
-				console.log(`[extractPersonas] Monto del Concepto inválido para ${nombre}:`, personaMatch[4]);
-				continue;
+			if (Number.isFinite(montoConcepto) && montoConcepto > 0 && Number.isFinite(totRemunerativo) && totRemunerativo > 0) {
+				personas.push({
+					nombre: nombre.toUpperCase(),
+					totRemunerativo,
+					cantidadLegajos: legajos,
+					montoConcepto
+				});
+				console.log(`[extractPersonas] Persona agregada (formato 1): ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 			}
+			continue;
+		}
 
-			if (!Number.isFinite(totRemunerativo) || totRemunerativo < 0) {
-				console.log(`[extractPersonas] Tot Remunerativo inválido para ${nombre}:`, personaMatch[2]);
-				continue;
+		// Patrón 2: Dos líneas - Primera línea: "NOMBRE  CANT_LEG  PARCIAL"
+		//                         Segunda línea: "TOT_REM_COMPLETO"
+		//                         Tercera línea potencial: solo números (ignorar si no encaja)
+		// Ejemplo:
+		//   "cabrera silvio victor 1 237.34"
+		//   "23734.18"
+		const personaMatch2 = line.match(/^([a-záéíóúñ\s]+?)\s+(\d+)\s+([\d.]+)$/i);
+
+		if (personaMatch2 && i + 1 < lines.length) {
+			const nombre = personaMatch2[1].trim();
+			const legajos = parseInt(personaMatch2[2]);
+			const parcial = parseFloat(personaMatch2[3]);
+
+			const nextLine = lines[i + 1];
+			// La siguiente línea debería ser solo un número (el tot remunerativo completo)
+			const totRemMatch = nextLine.match(/^([\d.]+)$/);
+
+			if (totRemMatch) {
+				const totRemunerativo = parseFloat(totRemMatch[1]);
+
+				// El monto del concepto es el parcial de la primera línea
+				// O puede estar en otra parte - por ahora usamos el parcial
+				const montoConcepto = parcial;
+
+				if (Number.isFinite(montoConcepto) && montoConcepto > 0 && Number.isFinite(totRemunerativo) && totRemunerativo > 0) {
+					personas.push({
+						nombre: nombre.toUpperCase(),
+						totRemunerativo,
+						cantidadLegajos: legajos,
+						montoConcepto
+					});
+					console.log(`[extractPersonas] Persona agregada (formato 2): ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
+					i++; // Saltar la siguiente línea ya que la procesamos
+				}
 			}
-
-			personas.push({
-				nombre: nombre.toUpperCase(),
-				totRemunerativo,
-				cantidadLegajos: legajos,
-				montoConcepto: montoConcepto
-			});
-
-			console.log(`[extractPersonas] Persona agregada: ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 		}
 	}
 	
@@ -1003,52 +1026,112 @@ export const POST: RequestHandler = async ({ request }) => {
 					type: pdfType
 				});
 
-				// Extraer concepto del texto
+				// Extraer concepto del texto (concepto general, no el tipo de PDF)
 				const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
-				const concept = conceptoMatch ? conceptoMatch[1].trim() : pdfType; // Usar el tipo si no hay concepto
+				const concept = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
 
 				// Fallback para transferId requerido
 				const fallbackTransferId = bufferHash || savedName;
 
-				// Intentar crear, si ya existe por combinación única, ignorar
+				// Buscar o crear PayrollPeriod usando la restricción única
 				let createdPeriodId: string | null = null;
-				try {
-					const created = await prisma.payrollPeriod.create({
-						data: {
-							institution: { connect: { id: institution.id } },
-							month: useMonth || 1,
-							year: useYear || new Date().getFullYear(),
-							concept: concept,
-							peopleCount: peopleCount ?? undefined,
-							totalAmount: totalAmount,
-							pdfFile: { connect: { id: pdfFileId } },
-							transferId: fallbackTransferId
-						}
-					});
-					createdPeriodId = created.id;
-					console.log('[APORTES][29] ✓ PayrollPeriod creado:', { 
-						id: createdPeriodId, 
-						month: created.month, 
-						year: created.year,
-						concept: created.concept,
-						totalAmount: created.totalAmount
-					});
-				} catch (perr) {
-					console.warn('[APORTES][29] ⚠️ No se pudo crear PayrollPeriod (puede existir):', perr);
-					// Intentar encontrar existente por índice único si aplica
+
+				// Función helper para buscar o crear el período con retry en caso de race condition
+				const getOrCreatePeriod = async (retryCount = 0): Promise<string | null> => {
+					const maxRetries = 3;
+
 					try {
-						const existing = await prisma.payrollPeriod.findFirst({
+						// Primero intentar encontrar el período existente (solo por institución, mes y año)
+						let period = await prisma.payrollPeriod.findFirst({
 							where: {
 								institutionId: institution.id,
 								month: useMonth || 1,
 								year: useYear || new Date().getFullYear()
 							}
 						});
-						if (existing) {
-							createdPeriodId = existing.id;
-							console.log('[APORTES][29] ✓ PayrollPeriod existente encontrado:', existing.id);
+
+						if (period) {
+							console.log('[APORTES][29] ✓ PayrollPeriod existente encontrado:', {
+								id: period.id,
+								month: period.month,
+								year: period.year,
+								concept: period.concept,
+								totalAmountActual: period.totalAmount
+							});
+
+							// Actualizar el período sumando el nuevo monto
+							const currentTotal = period.totalAmount ? parseFloat(period.totalAmount.toString()) : 0;
+							const newTotal = currentTotal + (totalAmountNumber || 0);
+
+							try {
+								await prisma.payrollPeriod.update({
+									where: { id: period.id },
+									data: {
+										totalAmount: newTotal,
+										peopleCount: (period.peopleCount || 0) + (peopleCount || 0)
+									}
+								});
+								console.log('[APORTES][29] ✓ PayrollPeriod actualizado con nuevo total:', {
+									totalAnterior: currentTotal,
+									totalNuevo: newTotal,
+									montoSumado: totalAmountNumber
+								});
+							} catch (updateErr) {
+								console.error('[APORTES][29] ❌ Error actualizando PayrollPeriod:', updateErr);
+							}
+
+							return period.id;
 						}
-					} catch {}
+
+						// Si no existe, intentar crearlo
+						try {
+							period = await prisma.payrollPeriod.create({
+								data: {
+									institution: { connect: { id: institution.id } },
+									month: useMonth || 1,
+									year: useYear || new Date().getFullYear(),
+									concept: concept,
+									peopleCount: peopleCount ?? undefined,
+									totalAmount: totalAmount,
+									transferId: fallbackTransferId
+								}
+							});
+							console.log('[APORTES][29] ✓ PayrollPeriod creado:', {
+								id: period.id,
+								month: period.month,
+								year: period.year,
+								concept: period.concept,
+								totalAmount: period.totalAmount
+							});
+							return period.id;
+						} catch (createErr: any) {
+							// Si falla por constraint único (race condition), reintentar buscando
+							if (createErr?.code === 'P2002' && retryCount < maxRetries) {
+								console.log(`[APORTES][29] Race condition detectada, reintentando búsqueda (${retryCount + 1}/${maxRetries})...`);
+								await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1))); // Backoff exponencial
+								return getOrCreatePeriod(retryCount + 1);
+							}
+							throw createErr;
+						}
+					} catch (err) {
+						console.error('[APORTES][29] ❌ Error al gestionar PayrollPeriod:', err);
+						return null;
+					}
+				};
+
+				createdPeriodId = await getOrCreatePeriod();
+
+				// Asociar el PDF al período
+				if (createdPeriodId && pdfFileId) {
+					try {
+						await prisma.pdfFile.update({
+							where: { id: pdfFileId },
+							data: { periodId: createdPeriodId }
+						});
+						console.log('[APORTES][29] ✓ PDF asociado al período:', { pdfFileId, periodId: createdPeriodId });
+					} catch (updateErr) {
+						console.error('[APORTES][29] ❌ Error asociando PDF:', updateErr);
+					}
 				}
 			}
 		} catch (ppErr) {

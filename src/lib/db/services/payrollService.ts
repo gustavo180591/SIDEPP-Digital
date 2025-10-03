@@ -20,14 +20,17 @@ export class PayrollService {
     const result = await paginate(prisma.payrollPeriod, {
       where,
       include: {
-        pdfFile: true,
+        pdfFiles: true,
         transfer: true
       },
       orderBy: { [sortBy]: sortOrder }
     }, { page, perPage: limit });
 
     // map to pdf-like shape for existing components: { ...pdfFile, period: payroll }
-    const data = (result.data as any[]).map((p) => {
+    // Si un período tiene múltiples PDFs, crear una entrada por cada PDF
+    const data: any[] = [];
+
+    (result.data as any[]).forEach((p) => {
       const period = {
         id: p.id,
         institutionId: p.institutionId,
@@ -40,18 +43,27 @@ export class PayrollService {
         updatedAt: p.updatedAt,
         transfer: p.transfer ? { ...p.transfer, importe: p.transfer.importe != null ? Number(p.transfer.importe) : null } : null
       };
-      const pdfLike = p.pdfFile ?? { id: `no-pdf-${p.id}`, fileName: 'Sin PDF', createdAt: p.createdAt, updatedAt: p.updatedAt, periodId: p.id, bufferHash: null };
-      return { ...pdfLike, period };
+
+      // Si hay PDFs asociados, crear una entrada por cada uno
+      if (p.pdfFiles && p.pdfFiles.length > 0) {
+        p.pdfFiles.forEach((pdf: any) => {
+          data.push({ ...pdf, period });
+        });
+      } else {
+        // Si no hay PDFs, crear una entrada falsa
+        const pdfLike = { id: `no-pdf-${p.id}`, fileName: 'Sin PDF', createdAt: p.createdAt, updatedAt: p.updatedAt, periodId: p.id, bufferHash: null, type: null };
+        data.push({ ...pdfLike, period });
+      }
     });
 
-    return { ...result, data } as PaginatedResult<any>;
+    return { ...result, data, meta: { ...result.meta, total: data.length } } as PaginatedResult<any>;
   }
 
   static async getById(id: string) {
     const p = await prisma.payrollPeriod.findUnique({
       where: { id },
       include: {
-        pdfFile: {
+        pdfFiles: {
           include: { contributionLine: { include: { member: true }, orderBy: { createdAt: 'desc' } } }
         },
         transfer: true
@@ -71,15 +83,17 @@ export class PayrollService {
       transfer: p.transfer ? { ...p.transfer, importe: p.transfer.importe != null ? Number(p.transfer.importe) : null } : null
     };
 
-    const transformedPdf = p.pdfFile ? {
-      id: p.pdfFile.id,
-      fileName: p.pdfFile.fileName,
-      periodId: p.pdfFile.periodId,
-      createdAt: p.pdfFile.createdAt,
-      updatedAt: p.pdfFile.updatedAt,
-      bufferHash: p.pdfFile.bufferHash,
+    // Usar el primer PDF si hay varios
+    const firstPdf = p.pdfFiles && p.pdfFiles[0];
+    const transformedPdf = firstPdf ? {
+      id: firstPdf.id,
+      fileName: firstPdf.fileName,
+      periodId: firstPdf.periodId,
+      createdAt: firstPdf.createdAt,
+      updatedAt: firstPdf.updatedAt,
+      bufferHash: firstPdf.bufferHash,
       period: transformedPeriod,
-      contributionLine: p.pdfFile.contributionLine.map((c) => ({
+      contributionLine: firstPdf.contributionLine.map((c) => ({
         id: c.id,
         memberId: c.memberId,
         name: c.name,
@@ -94,7 +108,7 @@ export class PayrollService {
       }))
     } : null;
 
-    return { ...transformedPeriod, pdfFile: transformedPdf };
+    return { ...transformedPeriod, pdfFile: transformedPdf, pdfFiles: p.pdfFiles };
   }
 }
 

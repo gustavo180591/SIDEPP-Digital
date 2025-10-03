@@ -62,15 +62,14 @@ model PayrollPeriod {
   concept       String?
   peopleCount   Int?
   totalAmount   Decimal?           @db.Decimal(18, 2)
-  pdfFileId    String?            @unique
   transferId   String?
   createdAt     DateTime?           @default(now())
   updatedAt     DateTime?           @updatedAt
   institution   Institution?        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  pdfFile      PdfFile?
-  transfer     BankTransfer?     
+  pdfFiles     PdfFile[]
+  transfer     BankTransfer?
 
-  @@unique([institutionId, month, year, concept], name: "uq_period_institution_month_year_concept")
+  @@unique([institutionId, month, year], name: "uq_period_institution_month_year")
   @@map("payroll_periods")
 }
 
@@ -115,12 +114,12 @@ model BankTransfer {
 model PdfFile {
   id            String         @id @default(cuid())
   fileName      String
-  periodId      String?        @unique
+  periodId      String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   bufferHash    String?        @unique
-  type          PdfFileType?    
-  
+  type          PdfFileType?
+
   contributionLine ContributionLine[]
   period        PayrollPeriod? @relation(fields: [periodId], references: [id])
 
