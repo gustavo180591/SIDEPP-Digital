@@ -60,8 +60,7 @@ export const actions: Actions = {
       const formData = await request.formData();
       
       const memberData = {
-        firstName: formData.get('firstName') as string,
-        lastName: formData.get('lastName') as string,
+        fullName: formData.get('fullName') as string,
         email: formData.get('email') as string,
         numeroOrden: formData.get('numeroOrden') as string,
         numeroMatricula: formData.get('numeroMatricula') as string,
@@ -72,7 +71,7 @@ export const actions: Actions = {
       };
 
       // Validar campos requeridos
-      if (!memberData.firstName || !memberData.lastName || !memberData.documentoIdentidad || 
+      if (!memberData.fullName || !memberData.documentoIdentidad ||
           !memberData.numeroOrden || !memberData.numeroMatricula) {
         return { success: false, message: 'Todos los campos obligatorios deben ser completados' };
       }
@@ -115,8 +114,7 @@ export const actions: Actions = {
       }
 
       const memberData = {
-        firstName: formData.get('firstName') as string,
-        lastName: formData.get('lastName') as string,
+        fullName: formData.get('fullName') as string,
         email: formData.get('email') as string,
         numeroOrden: formData.get('numeroOrden') as string,
         numeroMatricula: formData.get('numeroMatricula') as string,
@@ -126,7 +124,7 @@ export const actions: Actions = {
       };
 
       // Validar campos requeridos
-      if (!memberData.firstName || !memberData.lastName || !memberData.documentoIdentidad || 
+      if (!memberData.fullName || !memberData.documentoIdentidad ||
           !memberData.numeroOrden || !memberData.numeroMatricula) {
         return { success: false, message: 'Todos los campos obligatorios deben ser completados' };
       }

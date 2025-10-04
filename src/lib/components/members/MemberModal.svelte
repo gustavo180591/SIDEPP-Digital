@@ -9,8 +9,7 @@
   export let institutionId: string;
 
   let formData = {
-    firstName: member?.firstName || '',
-    lastName: member?.lastName || '',
+    fullName: member?.fullName || '',
     email: member?.email || '',
     numeroOrden: member?.numeroOrden || '',
     numeroMatricula: member?.numeroMatricula || '',
@@ -22,8 +21,7 @@
   // Reset form data when member changes or modal opens
   $: if (member && modalType === 'edit' && showModal) {
     formData = {
-      firstName: member.firstName || '',
-      lastName: member.lastName || '',
+      fullName: member.fullName || '',
       email: member.email || '',
       numeroOrden: member.numeroOrden || '',
       numeroMatricula: member.numeroMatricula || '',
@@ -37,8 +35,7 @@
   $: if (!showModal || modalType === 'create') {
     if (modalType === 'create') {
       formData = {
-        firstName: '',
-        lastName: '',
+        fullName: '',
         email: '',
         numeroOrden: '',
         numeroMatricula: '',
@@ -51,8 +48,7 @@
 
   function handleClose() {
     formData = {
-      firstName: '',
-      lastName: '',
+      fullName: '',
       email: '',
       numeroOrden: '',
       numeroMatricula: '',
@@ -66,20 +62,12 @@
   // Hacer los campos reactivos para que se actualicen cuando cambie formData
   $: fields = [
     {
-      name: 'firstName',
-      label: 'Nombre',
+      name: 'fullName',
+      label: 'Nombre Completo',
       type: 'text',
-      placeholder: 'Nombre del miembro',
+      placeholder: 'Nombre completo del miembro',
       required: true,
-      value: formData.firstName
-    },
-    {
-      name: 'lastName',
-      label: 'Apellido',
-      type: 'text',
-      placeholder: 'Apellido del miembro',
-      required: true,
-      value: formData.lastName
+      value: formData.fullName
     },
     {
       name: 'email',
@@ -174,6 +162,6 @@
   }}
   fields={modalType !== 'delete' ? fields : []}
   submitLabel={getSubmitLabel()}
-  deleteMessage={member ? `¿Estás seguro de que deseas eliminar a ${member.firstName} ${member.lastName}? Esta acción no se puede deshacer.` : ''}
-  deleteItemName={member ? `${member.firstName} ${member.lastName} (N° Orden: ${member.numeroOrden})` : ''}
+  deleteMessage={member ? `¿Estás seguro de que deseas eliminar a ${member.fullName}? Esta acción no se puede deshacer.` : ''}
+  deleteItemName={member ? `${member.fullName} (N° Orden: ${member.numeroOrden})` : ''}
 />

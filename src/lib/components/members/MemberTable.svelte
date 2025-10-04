@@ -21,7 +21,7 @@
       label: 'Nombre',
       render: (member: Member) => `
         <div class="font-medium text-gray-900">
-          ${member.firstName} ${member.lastName}
+          ${member.fullName || '-'}
         </div>
         <div class="text-xs text-gray-500">
           DNI: ${member.documentoIdentidad || '-'}

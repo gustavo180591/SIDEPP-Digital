@@ -119,7 +119,7 @@
             <div class="ml-4">
               <h3 class="text-lg font-medium text-gray-900">Monto Total</h3>
               <p class="text-2xl font-bold text-green-600">
-                $${Number(data.stats.totalAmount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                ${Number(data.stats.totalAmount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>

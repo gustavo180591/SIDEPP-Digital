@@ -106,7 +106,7 @@
             <div>
               <label class="text-sm font-medium text-gray-500">Monto Total</label>
               <p class="text-gray-900 text-2xl font-bold text-green-600">
-                {formatCurrency(data.payroll.totalAmount || 0)}
+                {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || 0)}
               </p>
             </div>
             <div>
@@ -193,8 +193,8 @@
                     <td>
                       {#if line.member}
                         <div>
-                          <div class="font-medium">{line.member.firstName} {line.member.lastName}</div>
-                          <div class="text-sm text-gray-500">DNI: {line.member.documentoIdentidad}</div>
+                          <div class="font-medium">{line.member.fullName || 'Sin nombre'}</div>
+                          <div class="text-sm text-gray-500">DNI: {line.member.documentoIdentidad || '-'}</div>
                         </div>
                       {:else}
                         <span class="text-gray-500">Sin miembro asignado</span>
