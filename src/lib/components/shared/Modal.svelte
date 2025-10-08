@@ -56,13 +56,36 @@
           {/if}
           <button class="btn btn-ghost" on:click={onClose}>{cancelLabel}</button>
         </div>
-        <form id="delete-form" method="POST" action={formAction} use:enhance>
+        <form
+          id="delete-form"
+          method="POST"
+          action={formAction}
+          use:enhance={() => {
+            return async ({ result, update }) => {
+              if (result.type === 'success' || (result.type === 'failure' && result.data?.success)) {
+                onClose();
+              }
+              await update();
+            };
+          }}
+        >
           {#each Object.entries(formData) as [key, value]}
             <input type="hidden" name={key} value={value} />
           {/each}
         </form>
       {:else}
-        <form method="POST" action={formAction} use:enhance>
+        <form
+          method="POST"
+          action={formAction}
+          use:enhance={() => {
+            return async ({ result, update }) => {
+              if (result.type === 'success' || (result.type === 'failure' && result.data?.success)) {
+                onClose();
+              }
+              await update();
+            };
+          }}
+        >
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {#each fields as field}
               <div class="form-control {field.span === 2 ? 'md:col-span-2' : ''}">

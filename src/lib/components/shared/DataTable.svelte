@@ -98,8 +98,8 @@
                             </svg>
                             {action.label}
                           </a>
-                        {:else}
-                          <button 
+                        {:else if action.onClick}
+                          <button
                             class="btn btn-sm btn-outline {action.color}"
                             on:click={() => action.onClick(item)}
                           >

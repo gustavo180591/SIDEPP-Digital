@@ -136,13 +136,16 @@ async function main() {
   const year = new Date().getFullYear();
   const period1 = await prisma.payrollPeriod.upsert({
     where: {
-      uq_period_institution_month_year_concept: {
-        institutionId: institution1.id, month: 1, year, concept: 'Aporte Sindical SIDEPP (1%)'
+      uq_period_institution_month_year: {
+        institutionId: institution1.id,
+        month: 1,
+        year
       }
     },
-    update: { 
-      peopleCount: 2, 
-      totalAmount: new Prisma.Decimal(9500)
+    update: {
+      peopleCount: 2,
+      totalAmount: new Prisma.Decimal(9500),
+      concept: 'Aporte Sindical SIDEPP (1%)'
     },
     create: {
       institutionId: institution1.id,
@@ -150,21 +153,22 @@ async function main() {
       year,
       concept: 'Aporte Sindical SIDEPP (1%)',
       peopleCount: 2,
-      totalAmount: new Prisma.Decimal(9500),
-      pdfFileId: 'temp1', // Temporal
-      transferId: 'temp1' // Temporal
+      totalAmount: new Prisma.Decimal(9500)
     }
   });
 
   const period2 = await prisma.payrollPeriod.upsert({
     where: {
-      uq_period_institution_month_year_concept: {
-        institutionId: institution2.id, month: 1, year, concept: 'Aporte Sindical SIDEPP (1%)'
+      uq_period_institution_month_year: {
+        institutionId: institution2.id,
+        month: 1,
+        year
       }
     },
-    update: { 
-      peopleCount: 1, 
-      totalAmount: new Prisma.Decimal(2500)
+    update: {
+      peopleCount: 1,
+      totalAmount: new Prisma.Decimal(2500),
+      concept: 'Aporte Sindical SIDEPP (1%)'
     },
     create: {
       institutionId: institution2.id,
@@ -172,9 +176,7 @@ async function main() {
       year,
       concept: 'Aporte Sindical SIDEPP (1%)',
       peopleCount: 1,
-      totalAmount: new Prisma.Decimal(2500),
-      pdfFileId: 'temp2', // Temporal
-      transferId: 'temp2' // Temporal
+      totalAmount: new Prisma.Decimal(2500)
     }
   });
 
@@ -224,22 +226,7 @@ async function main() {
     }
   });
 
-  // 7) Actualizar períodos con los IDs correctos de PDFs y transferencias
-  await prisma.payrollPeriod.update({
-    where: { id: period1.id },
-    data: {
-      pdfFileId: pdfFile1.id,
-      transferId: transfer1.id
-    }
-  });
-
-  await prisma.payrollPeriod.update({
-    where: { id: period2.id },
-    data: {
-      pdfFileId: pdfFile2.id,
-      transferId: transfer2.id
-    }
-  });
+  // 7) Las relaciones ya están establecidas por las FKs en BankTransfer y PdfFile
 
   // 8) Líneas de aporte
   await prisma.contributionLine.createMany({
