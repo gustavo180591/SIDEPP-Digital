@@ -40,10 +40,10 @@
       render: (pdf: PdfFileWithPeriod) => `
         <div class="text-sm">
           <div class="font-medium text-gray-900">
-            ${pdf.period.month.toString().padStart(2, '0')}/${pdf.period.year}
+            ${(pdf.period.month || 0).toString().padStart(2, '0')}/${pdf.period.year || 'N/A'}
           </div>
           <div class="text-gray-500">
-            ${pdf.period.concept || 'Sin concepto'}
+            ${(pdf as any).concept || 'Sin concepto'}
           </div>
         </div>
       `
@@ -93,8 +93,7 @@
   const emptyState = {
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     title: 'No hay comprobantes',
-    description: 'No se han cargado comprobantes para esta institución',
-    action: null
+    description: 'No se han cargado comprobantes para esta institución'
   };
 </script>
 

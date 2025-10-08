@@ -858,18 +858,34 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.log('[APORTES][26.5] ✓ PDF detectado como SUELDO (default)');
 		}
 		
-		// Crear PdfFile en DB con el tipo detectado
+		// Calcular datos de tabla para el PDF
+		console.log('[APORTES][26.8] 📊 Calculando datos para PdfFile...');
+		const tableDataPreview = extractTableData(fullText);
+		const personasPreview = extractPersonas(fullText);
+		const peopleCountForPdf = tableDataPreview.personas ?? personasPreview.length;
+		const totalAmountForPdf = tableDataPreview.montoConcepto ?? personasPreview.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
+
+		// Extraer concepto del texto
+		const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
+		const conceptForPdf = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
+
+		console.log('[APORTES][26.8] Datos calculados:', { concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
+
+		// Crear PdfFile en DB con el tipo detectado y los datos calculados
 		console.log('[APORTES][27] 💾 Creando registro PdfFile en DB con tipo:', pdfType);
 		try {
-			const createdPdf = await prisma.pdfFile.create({ 
-				data: { 
-					fileName: file.name, 
+			const createdPdf = await prisma.pdfFile.create({
+				data: {
+					fileName: file.name,
 					bufferHash,
-					type: pdfType
-				} 
+					type: pdfType,
+					concept: conceptForPdf,
+					peopleCount: peopleCountForPdf || null,
+					totalAmount: Number.isFinite(totalAmountForPdf) ? totalAmountForPdf.toString() : null
+				}
 			});
 			pdfFileId = createdPdf.id;
-			console.log('[APORTES][27] ✓ PdfFile creado:', { id: pdfFileId, fileName: createdPdf.fileName, type: pdfType });
+			console.log('[APORTES][27] ✓ PdfFile creado:', { id: pdfFileId, fileName: createdPdf.fileName, type: pdfType, concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
 		} catch (pdfDbErr) {
 			console.error('[APORTES][27] ❌ Error al crear PdfFile en DB:', pdfDbErr);
 			throw pdfDbErr;
@@ -1010,21 +1026,6 @@ export const POST: RequestHandler = async ({ request }) => {
 					throw new Error(errorMsg);
 				}
 
-				// Calcular personas y total
-				const peopleCount = tableData.personas ?? personas.length;
-				const totalAmountNumber = tableData.montoConcepto ?? personas.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
-				const totalAmount = Number.isFinite(totalAmountNumber) ? totalAmountNumber.toString() : null;
-
-				console.log('[APORTES][29] Datos para PayrollPeriod:', {
-					peopleCount,
-					totalAmount,
-					type: pdfType
-				});
-
-				// Extraer concepto del texto (concepto general, no el tipo de PDF)
-				const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
-				const concept = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
-
 				// Fallback para transferId requerido
 				const fallbackTransferId = bufferHash || savedName;
 
@@ -1049,33 +1050,8 @@ export const POST: RequestHandler = async ({ request }) => {
 							console.log('[APORTES][29] ✓ PayrollPeriod existente encontrado:', {
 								id: period.id,
 								month: period.month,
-								year: period.year,
-								concept: period.concept,
-								totalAmountActual: period.totalAmount
+								year: period.year
 							});
-
-							// Actualizar el período sumando el nuevo monto
-							const currentTotal = period.totalAmount ? parseFloat(period.totalAmount.toString()) : 0;
-							const newTotal = currentTotal + (totalAmountNumber || 0);
-
-							try {
-								await prisma.payrollPeriod.update({
-									where: { id: period.id },
-									data: {
-										totalAmount: newTotal,
-										peopleCount: (period.peopleCount || 0) + (peopleCount || 0)
-									}
-								});
-								console.log('[APORTES][29] ✓ PayrollPeriod actualizado con nuevo total:', {
-									totalAnterior: currentTotal,
-									totalNuevo: newTotal,
-									montoSumado: totalAmountNumber
-								});
-							} catch (updateErr) {
-								console.error('[APORTES][29] ❌ Error actualizando PayrollPeriod:', updateErr);
-								throw updateErr; // Relanzar para que el error se propague
-							}
-
 							return period.id;
 						}
 
@@ -1086,18 +1062,13 @@ export const POST: RequestHandler = async ({ request }) => {
 									institution: { connect: { id: institution.id } },
 									month: useMonth,
 									year: useYear,
-									concept: concept,
-									peopleCount: peopleCount ?? undefined,
-									totalAmount: totalAmount,
 									transferId: fallbackTransferId
 								}
 							});
 							console.log('[APORTES][29] ✓ PayrollPeriod creado:', {
 								id: period.id,
 								month: period.month,
-								year: period.year,
-								concept: period.concept,
-								totalAmount: period.totalAmount
+								year: period.year
 							});
 							return period.id;
 						} catch (createErr: any) {

@@ -142,18 +142,11 @@ async function main() {
         year
       }
     },
-    update: {
-      peopleCount: 2,
-      totalAmount: new Prisma.Decimal(9500),
-      concept: 'Aporte Sindical SIDEPP (1%)'
-    },
+    update: {},
     create: {
       institutionId: institution1.id,
       month: 1,
-      year,
-      concept: 'Aporte Sindical SIDEPP (1%)',
-      peopleCount: 2,
-      totalAmount: new Prisma.Decimal(9500)
+      year
     }
   });
 
@@ -165,33 +158,34 @@ async function main() {
         year
       }
     },
-    update: {
-      peopleCount: 1,
-      totalAmount: new Prisma.Decimal(2500),
-      concept: 'Aporte Sindical SIDEPP (1%)'
-    },
+    update: {},
     create: {
       institutionId: institution2.id,
       month: 1,
-      year,
-      concept: 'Aporte Sindical SIDEPP (1%)',
-      peopleCount: 1,
-      totalAmount: new Prisma.Decimal(2500)
+      year
     }
   });
 
-  // 5) PDFs con IDs correctos de períodos
+  // 5) PDFs con IDs correctos de períodos (ahora con los datos que estaban en PayrollPeriod)
   const pdfFile1 = await prisma.pdfFile.create({
     data: {
       fileName: `listado-enero-${year}.pdf`,
-      periodId: period1.id
+      periodId: period1.id,
+      concept: 'Aporte Sindical SIDEPP (1%)',
+      peopleCount: 2,
+      totalAmount: new Prisma.Decimal(9500),
+      type: 'SUELDO'
     }
   });
 
   const pdfFile2 = await prisma.pdfFile.create({
     data: {
       fileName: `listado-enero-${year}-inst2.pdf`,
-      periodId: period2.id
+      periodId: period2.id,
+      concept: 'Aporte Sindical SIDEPP (1%)',
+      peopleCount: 1,
+      totalAmount: new Prisma.Decimal(2500),
+      type: 'SUELDO'
     }
   });
 

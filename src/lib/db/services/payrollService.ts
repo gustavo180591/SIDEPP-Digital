@@ -31,14 +31,21 @@ export class PayrollService {
     const data: any[] = [];
 
     (result.data as any[]).forEach((p) => {
+      // Calcular totales desde los PDFs asociados
+      const pdfFilesArray = p.pdfFiles || [];
+      const totalPeopleCount = pdfFilesArray.reduce((sum: number, pdf: any) => sum + (pdf.peopleCount || 0), 0);
+      const totalAmount = pdfFilesArray.reduce((sum: number, pdf: any) => {
+        const amount = pdf.totalAmount != null ? Number(pdf.totalAmount) : 0;
+        return sum + amount;
+      }, 0);
+
       const period = {
         id: p.id,
         institutionId: p.institutionId,
         month: p.month,
         year: p.year,
-        concept: p.concept,
-        peopleCount: p.peopleCount,
-        totalAmount: p.totalAmount != null ? Number(p.totalAmount) : null,
+        peopleCount: totalPeopleCount,
+        totalAmount: totalAmount,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         transfer: p.transfer ? { ...p.transfer, importe: p.transfer.importe != null ? Number(p.transfer.importe) : null } : null
@@ -47,11 +54,15 @@ export class PayrollService {
       // Si hay PDFs asociados, crear una entrada por cada uno
       if (p.pdfFiles && p.pdfFiles.length > 0) {
         p.pdfFiles.forEach((pdf: any) => {
-          data.push({ ...pdf, period });
+          const pdfWithNumbers = {
+            ...pdf,
+            totalAmount: pdf.totalAmount != null ? Number(pdf.totalAmount) : null
+          };
+          data.push({ ...pdfWithNumbers, period });
         });
       } else {
         // Si no hay PDFs, crear una entrada falsa
-        const pdfLike = { id: `no-pdf-${p.id}`, fileName: 'Sin PDF', createdAt: p.createdAt, updatedAt: p.updatedAt, periodId: p.id, bufferHash: null, type: null };
+        const pdfLike = { id: `no-pdf-${p.id}`, fileName: 'Sin PDF', createdAt: p.createdAt, updatedAt: p.updatedAt, periodId: p.id, bufferHash: null, type: null, concept: null, peopleCount: null, totalAmount: null };
         data.push({ ...pdfLike, period });
       }
     });
@@ -70,14 +81,22 @@ export class PayrollService {
       }
     });
     if (!p) return null;
+
+    // Calcular totales desde los PDFs asociados
+    const pdfFilesArray = p.pdfFiles || [];
+    const totalPeopleCount = pdfFilesArray.reduce((sum: number, pdf: any) => sum + (pdf.peopleCount || 0), 0);
+    const totalAmount = pdfFilesArray.reduce((sum: number, pdf: any) => {
+      const amount = pdf.totalAmount != null ? Number(pdf.totalAmount) : 0;
+      return sum + amount;
+    }, 0);
+
     const transformedPeriod: any = {
       id: p.id,
       institutionId: p.institutionId,
       month: p.month,
       year: p.year,
-      concept: p.concept,
-      peopleCount: p.peopleCount,
-      totalAmount: p.totalAmount != null ? Number(p.totalAmount) : null,
+      peopleCount: totalPeopleCount,
+      totalAmount: totalAmount,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       transfer: p.transfer ? { ...p.transfer, importe: p.transfer.importe != null ? Number(p.transfer.importe) : null } : null
@@ -117,6 +136,9 @@ export class PayrollService {
       updatedAt: pdf.updatedAt,
       bufferHash: pdf.bufferHash,
       type: pdf.type,
+      concept: pdf.concept,
+      peopleCount: pdf.peopleCount,
+      totalAmount: pdf.totalAmount != null ? Number(pdf.totalAmount) : null,
       contributionLine: pdf.contributionLine.map((c) => ({
         id: c.id,
         memberId: c.memberId,

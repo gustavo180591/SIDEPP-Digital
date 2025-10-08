@@ -26,7 +26,7 @@ async function main() {
   const periods = await prisma.payrollPeriod.findMany({
     include: {
       institution: true,
-      pdfFile: true
+      pdfFiles: true
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -35,10 +35,20 @@ async function main() {
   periods.forEach(period => {
     console.log(`   - Institución: ${period.institution?.name || 'N/A'}`);
     console.log(`     Período: ${period.month}/${period.year}`);
-    console.log(`     Concepto: ${period.concept}`);
-    console.log(`     Personas: ${period.peopleCount}`);
-    console.log(`     Total: $${period.totalAmount}`);
-    console.log(`     PDF asociado: ${period.pdfFile?.fileName || 'N/A'}`);
+
+    // Calcular totales desde los PDFs asociados
+    const totalPeople = period.pdfFiles.reduce((sum, pdf) => sum + (pdf.peopleCount || 0), 0);
+    const totalAmount = period.pdfFiles.reduce((sum, pdf) => {
+      const amount = pdf.totalAmount != null ? Number(pdf.totalAmount) : 0;
+      return sum + amount;
+    }, 0);
+
+    console.log(`     Personas (total de PDFs): ${totalPeople}`);
+    console.log(`     Total (suma de PDFs): $${totalAmount}`);
+    console.log(`     PDFs asociados: ${period.pdfFiles.length}`);
+    period.pdfFiles.forEach(pdf => {
+      console.log(`       • ${pdf.fileName} - Concepto: ${pdf.concept || 'N/A'} - Personas: ${pdf.peopleCount || 0} - Total: $${pdf.totalAmount || 0}`);
+    });
   });
   console.log('');
 

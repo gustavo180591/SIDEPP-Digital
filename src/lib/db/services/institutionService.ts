@@ -9,7 +9,7 @@ import type {
   PaginationParams
 } from '../models';
 
-// Tipo para institución serializable (con totalAmount como number)
+// Tipo para institución serializable
 type SerializableInstitution = Omit<InstitutionWithRelations, 'payrollPeriods'> & {
   payrollPeriods: Array<{
     id: string;
@@ -18,10 +18,6 @@ type SerializableInstitution = Omit<InstitutionWithRelations, 'payrollPeriods'> 
     institutionId: string;
     month: number;
     year: number;
-    concept: string | null;
-    peopleCount: number | null;
-    totalAmount: number | null;
-    pdfFileId: string;
     transferId: string;
   }>;
 };
@@ -44,14 +40,10 @@ export class InstitutionService {
         }
       });
       
-      // Convertir Decimal a number para serialización
       return {
         ...institution,
-        payrollPeriods: institution.payrollPeriods.map(period => ({
-          ...period,
-          totalAmount: period.totalAmount ? Number(period.totalAmount) : null
-        }))
-      };
+        payrollPeriods: institution.payrollPeriods
+      } as SerializableInstitution;
     } catch (error) {
       console.error('Error al crear institución:', error);
       throw new Error('No se pudo crear la institución');
@@ -76,14 +68,10 @@ export class InstitutionService {
         return null;
       }
 
-      // Convertir Decimal a number para serialización
       return {
         ...institution,
-        payrollPeriods: institution.payrollPeriods.map(period => ({
-          ...period,
-          totalAmount: period.totalAmount ? Number(period.totalAmount) : null
-        }))
-      };
+        payrollPeriods: institution.payrollPeriods
+      } as SerializableInstitution;
     } catch (error) {
       console.error('Error al obtener institución:', error);
       throw new Error('No se pudo obtener la institución');
@@ -234,14 +222,10 @@ export class InstitutionService {
         }
       });
       
-      // Convertir Decimal a number para serialización
       return {
         ...institution,
-        payrollPeriods: institution.payrollPeriods.map(period => ({
-          ...period,
-          totalAmount: period.totalAmount ? Number(period.totalAmount) : null
-        }))
-      };
+        payrollPeriods: institution.payrollPeriods
+      } as SerializableInstitution;
     } catch (error) {
       console.error('Error al actualizar institución:', error);
       throw new Error('No se pudo actualizar la institución');

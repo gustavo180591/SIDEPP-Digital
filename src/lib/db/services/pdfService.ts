@@ -28,13 +28,17 @@ export class PdfService {
   private static serializePdf(pdf: any): PdfFileWithPeriod {
     const period = pdf.period ? {
       ...pdf.period,
-      totalAmount: pdf.period.totalAmount != null ? Number(pdf.period.totalAmount) : null,
       transfer: pdf.period.transfer ? {
         ...pdf.period.transfer,
         importe: pdf.period.transfer.importe != null ? Number(pdf.period.transfer.importe) : null
       } : null
     } : null;
-    return { ...pdf, period } as PdfFileWithPeriod;
+
+    return {
+      ...pdf,
+      totalAmount: pdf.totalAmount != null ? Number(pdf.totalAmount) : null,
+      period
+    } as PdfFileWithPeriod;
   }
   /**
    * Obtener PDFs de una institución con búsqueda y paginación
@@ -166,10 +170,12 @@ export class PdfService {
         })
       ]);
 
-      // Obtener el monto total de los períodos de nómina
-      const totalAmountResult = await prisma.payrollPeriod.aggregate({
+      // Obtener el monto total desde los PDFs asociados a períodos de la institución
+      const totalAmountResult = await prisma.pdfFile.aggregate({
         where: {
-          institutionId: institutionId
+          period: {
+            institutionId: institutionId
+          }
         },
         _sum: {
           totalAmount: true

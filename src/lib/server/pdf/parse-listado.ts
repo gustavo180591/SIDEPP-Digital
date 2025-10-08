@@ -319,21 +319,12 @@ export async function parseListado(fileBuffer: Buffer, pdfFile: PdfFile): Promis
       skipDuplicates: true
     });
 
-    // actualizar totales del período sin increment sobre NULL
-    const period = await tx.payrollPeriod.findUnique({
-      where: { id: pdfFile.periodId! },
-      select: { peopleCount: true, totalAmount: true }
-    });
-
-    const newPeople = (period?.peopleCount ?? 0) + contribs.length;
-    const prevTotal = new Prisma.Decimal(period?.totalAmount ?? 0);
-    const newTotal = prevTotal.plus(total);
-
-    await tx.payrollPeriod.update({
-      where: { id: pdfFile.periodId! },
+    // Actualizar los datos del PdfFile con los totales calculados
+    await tx.pdfFile.update({
+      where: { id: pdfFile.id },
       data: {
-        peopleCount: newPeople,
-        totalAmount: newTotal
+        peopleCount: contribs.length,
+        totalAmount: total
       }
     });
   });

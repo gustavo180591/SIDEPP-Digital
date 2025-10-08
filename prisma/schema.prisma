@@ -59,9 +59,6 @@ model PayrollPeriod {
   institutionId String?
   month         Int?
   year          Int?
-  concept       String?
-  peopleCount   Int?
-  totalAmount   Decimal?      @db.Decimal(18, 2)
   transferId    String?
   createdAt     DateTime?     @default(now())
   updatedAt     DateTime?     @updatedAt
@@ -117,10 +114,14 @@ model PdfFile {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   bufferHash       String?            @unique
+  concept       String?
+  peopleCount   Int?
+  totalAmount   Decimal?      @db.Decimal(18, 2)
+  
   type             PdfFileType?
   contributionLine ContributionLine[]
   period           PayrollPeriod?     @relation(fields: [periodId], references: [id])
-
+  
   @@map("pdf_files")
 }
 
@@ -148,6 +149,7 @@ model User {
 enum PdfFileType {
   SUELDO
   FOPID
+  AGUINALDO
 }
 
 enum ContributionStatus {
