@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   try {
   // Obtener el payroll (con pdfFile y contribution lines)
   const payroll = await PayrollService.getById(payrollId);
-    
+  console.log("payroll: ", payroll)
   if (!payroll) {
       throw error(404, 'Comprobante no encontrado');
   }

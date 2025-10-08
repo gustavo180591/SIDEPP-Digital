@@ -3,7 +3,8 @@
 
   let fileInputSueldos: HTMLInputElement | null = null;
   let fileInputFopid: HTMLInputElement | null = null;
-  // let fileInputTransfer: HTMLInputElement | null = null; // TEMPORAL: Comentado para testing
+  let fileInputAguinaldo: HTMLInputElement | null = null;
+  let fileInputTransfer: HTMLInputElement | null = null;
   let uploading = false;
   let selectedMonth: string = '';
   let selectedYear: number | string = '';
@@ -11,6 +12,9 @@
 
   // Computed value para selectedPeriod en formato YYYY-MM
   $: selectedPeriod = selectedMonth && selectedYear ? `${selectedYear}-${selectedMonth}` : '';
+
+  // Mostrar input de Aguinaldo solo en Junio (06) o Diciembre (12)
+  $: showAguinaldo = selectedMonth === '06' || selectedMonth === '12';
   type Checks = {
     sumTotal?: number;
     declaredTotal?: number | null;
@@ -54,7 +58,8 @@
 
   let resultSueldos: AnalyzerResult | null = null;
   let resultFopid: AnalyzerResult | null = null;
-  // let resultTransfer: AnalyzerResult | null = null; // TEMPORAL: Comentado para testing
+  let resultAguinaldo: AnalyzerResult | null = null;
+  let resultTransfer: AnalyzerResult | null = null;
 
   let aportesTotal: number | null = null;
   let transferImporte: number | null = null;
@@ -97,20 +102,35 @@
     errorMessage = null;
     resultSueldos = null;
     resultFopid = null;
-    // resultTransfer = null; // TEMPORAL: Comentado para testing
+    resultAguinaldo = null;
+    resultTransfer = null;
     aportesTotal = null;
     transferImporte = null;
     totalsMatch = null;
 
     const fileSueldos = fileInputSueldos?.files?.[0];
     const fileFopid = fileInputFopid?.files?.[0];
-    // const fileTransfer = fileInputTransfer?.files?.[0]; // TEMPORAL: Comentado para testing
+    const fileAguinaldo = fileInputAguinaldo?.files?.[0];
+    const fileTransfer = fileInputTransfer?.files?.[0];
 
-    // TEMPORAL: Solo validar los dos archivos de aportes
+    // Validar archivos requeridos
     if (!fileSueldos || !fileFopid) {
-      errorMessage = 'Debes subir los dos archivos: Aportes Sueldos y Aportes FOPID.';
+      errorMessage = 'Debes subir los archivos: Aportes Sueldos y Aportes FOPID.';
       return;
     }
+
+    // Validar aguinaldo si es Junio o Diciembre
+    if (showAguinaldo && !fileAguinaldo) {
+      errorMessage = 'Debes subir el archivo de Aportes Aguinaldo para Junio o Diciembre.';
+      return;
+    }
+
+    // Validar transferencia bancaria
+    if (!fileTransfer) {
+      errorMessage = 'Debes subir el archivo de Transferencia Bancaria.';
+      return;
+    }
+
     uploading = true;
     try {
       const makeForm = (file: File) => {
@@ -121,50 +141,67 @@
         return f;
       };
 
-      // TEMPORAL: Solo procesar los dos archivos de aportes
-      const [resSueldos, resFopid] = await Promise.all([
+      // Preparar todas las promesas
+      const promises: Promise<Response>[] = [
         fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileSueldos) }),
-        fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileFopid) })
-      ]);
+        fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileFopid) }),
+        fetch('/api/analyzer-pdf-bank', { method: 'POST', body: makeForm(fileTransfer) })
+      ];
 
-      const [dataSueldos, dataFopid] = await Promise.all([
-        resSueldos.json(),
-        resFopid.json()
-      ]);
-
-      if (!resSueldos.ok) {
-        console.error('Error en Aportes Sueldos:', dataSueldos);
-        throw new Error(dataSueldos?.error || dataSueldos?.message || `Error en Aportes Sueldos (${resSueldos.status})`);
-      }
-      if (!resFopid.ok) {
-        console.error('Error en Aportes FOPID:', dataFopid);
-        throw new Error(dataFopid?.error || dataFopid?.message || `Error en Aportes FOPID (${resFopid.status})`);
+      // Agregar Aguinaldo si corresponde
+      if (showAguinaldo && fileAguinaldo) {
+        promises.splice(2, 0, fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileAguinaldo) }));
       }
 
-      resultSueldos = dataSueldos;
-      resultFopid = dataFopid;
-      // resultTransfer = dataTransfer; // TEMPORAL: Comentado para testing
+      const responses = await Promise.all(promises);
+      const dataArray = await Promise.all(responses.map(r => r.json()));
 
+      // Asignar resultados según orden
+      let idx = 0;
+      resultSueldos = dataArray[idx++];
+      resultFopid = dataArray[idx++];
+      if (showAguinaldo && fileAguinaldo) {
+        resultAguinaldo = dataArray[idx++];
+      }
+      resultTransfer = dataArray[idx++];
+
+      // Validar errores
+      if (!responses[0].ok) {
+        throw new Error(resultSueldos?.error || resultSueldos?.message || 'Error en Aportes Sueldos');
+      }
+      if (!responses[1].ok) {
+        throw new Error(resultFopid?.error || resultFopid?.message || 'Error en Aportes FOPID');
+      }
+      if (showAguinaldo && fileAguinaldo && !responses[2].ok) {
+        throw new Error(resultAguinaldo?.error || resultAguinaldo?.message || 'Error en Aportes Aguinaldo');
+      }
+      const transferResponseIdx = showAguinaldo && fileAguinaldo ? 3 : 2;
+      if (!responses[transferResponseIdx].ok) {
+        throw new Error(resultTransfer?.error || resultTransfer?.message || 'Error en Transferencia Bancaria');
+      }
+
+      // Calcular totales
       const totalSueldos = sumFromResult(resultSueldos);
       const totalFopid = sumFromResult(resultFopid);
-      aportesTotal = totalSueldos + totalFopid;
+      const totalAguinaldo = showAguinaldo ? sumFromResult(resultAguinaldo) : 0;
+      aportesTotal = totalSueldos + totalFopid + totalAguinaldo;
 
       console.log('=== RESUMEN DE TOTALES ===');
       console.log('Total Aportes Sueldos:', totalSueldos);
       console.log('Total Aportes FOPID:', totalFopid);
+      if (showAguinaldo) console.log('Total Aportes Aguinaldo:', totalAguinaldo);
       console.log('SUMA TOTAL APORTES:', aportesTotal);
-      console.log('=========================')
 
-      // TEMPORAL: Comentado para testing
-      // transferImporte = typeof dataTransfer?.transferAmount === 'number' ? dataTransfer.transferAmount : null;
-      // console.log('Importe Transferencia Bancaria:', transferImporte);
-      // 
-      // if (aportesTotal != null && transferImporte != null) {
-      //   const diferencia = Math.abs(aportesTotal - transferImporte);
-      //   totalsMatch = diferencia < 0.5;
-      //   console.log('Diferencia:', diferencia);
-      //   console.log('¿Coinciden?:', totalsMatch ? 'SÍ' : 'NO');
-      // }
+      transferImporte = typeof resultTransfer?.transferAmount === 'number' ? resultTransfer.transferAmount : null;
+      console.log('Importe Transferencia Bancaria:', transferImporte);
+
+      if (aportesTotal != null && transferImporte != null) {
+        const diferencia = Math.abs(aportesTotal - transferImporte);
+        totalsMatch = diferencia < 0.5;
+        console.log('Diferencia:', diferencia);
+        console.log('¿Coinciden?:', totalsMatch ? 'SÍ' : 'NO');
+      }
+      console.log('=========================');
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Error desconocido';
     } finally {
@@ -217,7 +254,7 @@
 
     <div class="flex flex-col gap-4">
       <div>
-        <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF)</label>
+        <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF) <span class="text-red-500">*</span></label>
         <input
           id="pdf-sueldos"
           bind:this={fileInputSueldos}
@@ -229,7 +266,7 @@
         />
       </div>
       <div>
-        <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF)</label>
+        <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF) <span class="text-red-500">*</span></label>
         <input
           id="pdf-fopid"
           bind:this={fileInputFopid}
@@ -240,9 +277,25 @@
           required
         />
       </div>
-      <!--        TEMPORAL: Comentado para testing 
-      <!-- <div>
-        <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia bancaria (PDF)</label>
+      {#if showAguinaldo}
+        <div>
+          <label for="pdf-aguinaldo" class="mb-1 block text-sm font-medium text-gray-700">
+            Aportes Aguinaldo (PDF) <span class="text-red-500">*</span>
+            <span class="text-xs text-gray-500">(Solo Junio/Diciembre)</span>
+          </label>
+          <input
+            id="pdf-aguinaldo"
+            bind:this={fileInputAguinaldo}
+            type="file"
+            accept="application/pdf"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+            disabled={uploading}
+            required
+          />
+        </div>
+      {/if}
+      <div>
+        <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia Bancaria (PDF) <span class="text-red-500">*</span></label>
         <input
           id="pdf-transfer"
           bind:this={fileInputTransfer}
@@ -252,7 +305,7 @@
           disabled={uploading}
           required
         />
-      </div> --> 
+      </div>
     </div>
 
     <div class="flex items-center gap-2">
@@ -276,9 +329,9 @@
       </div>
     {/if}
 
-    {#if resultSueldos || resultFopid}
+    {#if resultSueldos || resultFopid || resultAguinaldo || resultTransfer}
       <div class="my-2 border-t border-gray-200"></div>
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {#if resultSueldos}
           <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div class="text-sm text-gray-500">Aportes Sueldos</div>
@@ -293,14 +346,20 @@
             <div class="mt-1 text-sm text-gray-500">{(resultFopid.size / 1024).toFixed(1)} KB</div>
           </div>
         {/if}
-        <!-- TEMPORAL: Comentado para testing -->
-        <!-- {#if resultTransfer}
+        {#if resultAguinaldo}
           <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div class="text-sm text-gray-500">Transferencia bancaria</div>
+            <div class="text-sm text-gray-500">Aportes Aguinaldo</div>
+            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultAguinaldo.fileName}>{resultAguinaldo.fileName}</div>
+            <div class="mt-1 text-sm text-gray-500">{(resultAguinaldo.size / 1024).toFixed(1)} KB</div>
+          </div>
+        {/if}
+        {#if resultTransfer}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div class="text-sm text-gray-500">Transferencia Bancaria</div>
             <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultTransfer.fileName}>{resultTransfer.fileName}</div>
             <div class="mt-1 text-sm text-gray-500">{(resultTransfer.size / 1024).toFixed(1)} KB</div>
           </div>
-        {/if} -->
+        {/if}
       </div>
 
       {#if resultSueldos?.preview?.listado}
@@ -323,6 +382,16 @@
           />
         </div>
       {/if}
+      {#if resultAguinaldo?.preview?.listado}
+        <div class="mt-4">
+          <AnalysisTable
+            title="TOTALES POR CONCEPTO - PERSONAS (AGUINALDO)"
+            concept="Aguinaldo"
+            personas={resultAguinaldo.preview.listado.personas || []}
+            tableData={resultAguinaldo.preview.listado.tableData}
+          />
+        </div>
+      {/if}
 
       {#if aportesTotal != null || transferImporte != null}
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -337,6 +406,12 @@
                 <span class="text-gray-600">Aportes FOPID:</span>
                 <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultFopid))}</span>
               </div>
+              {#if resultAguinaldo}
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-600">Aportes Aguinaldo:</span>
+                  <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultAguinaldo))}</span>
+                </div>
+              {/if}
               <div class="border-t border-gray-200 pt-2 flex justify-between items-center">
                 <span class="text-gray-700 font-medium">Total Aportes:</span>
                 <span class="font-semibold text-lg">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(aportesTotal ?? 0)}</span>
