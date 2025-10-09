@@ -142,11 +142,11 @@ export class MemberService {
 
   static async existsByNumeroMatricula(numeroMatricula: string, institutionId: string, excludeId?: string): Promise<boolean> {
     try {
-      const where: any = { 
+      const where: any = {
         numeroMatricula,
         institucionId: institutionId
       };
-      
+
       if (excludeId) {
         where.id = { not: excludeId };
       }
@@ -156,6 +156,62 @@ export class MemberService {
     } catch (error) {
       console.error('Error al verificar número de matrícula:', error);
       throw new Error('No se pudo verificar el número de matrícula');
+    }
+  }
+
+  static async getAll(options: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    institutionId?: string;
+  }) {
+    try {
+      const { search = '', page = 1, limit = 10, institutionId } = options;
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        deletedAt: null
+      };
+
+      if (institutionId) {
+        where.institucionId = institutionId;
+      }
+
+      if (search) {
+        where.OR = [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { documentoIdentidad: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { numeroOrden: { contains: search, mode: 'insensitive' } },
+          { numeroMatricula: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const [members, total] = await Promise.all([
+        prisma.member.findMany({
+          where,
+          include: {
+            institucion: true
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit
+        }),
+        prisma.member.count({ where })
+      ]);
+
+      return {
+        data: members,
+        meta: {
+          total,
+          currentPage: page,
+          lastPage: Math.ceil(total / limit),
+          perPage: limit
+        }
+      };
+    } catch (error) {
+      console.error('Error al obtener miembros:', error);
+      throw new Error('No se pudieron obtener los miembros');
     }
   }
 }

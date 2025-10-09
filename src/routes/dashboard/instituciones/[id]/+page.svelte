@@ -68,6 +68,11 @@
     selectedMember = member;
     showMemberDeleteModal = true;
   }
+
+  // Función para ver detalle del miembro
+  function viewMemberDetail(member: Member) {
+    goto(`/dashboard/instituciones/${data.institution.id}/${member.id}`);
+  }
   
   // Función para cerrar modales
   function closeModals() {
@@ -238,8 +243,8 @@
         />
         
         <!-- Tabla de miembros -->
-        <MemberTable 
-          members={data.members || []} 
+        <MemberTable
+          members={data.members || []}
           pagination={data.pagination || {
             currentPage: 1,
             totalPages: 1,
@@ -248,6 +253,7 @@
           }}
           {buildUrl}
           {goto}
+          onView={viewMemberDetail}
           onEdit={openMemberEditModal}
           onDelete={openMemberDeleteModal}
         />

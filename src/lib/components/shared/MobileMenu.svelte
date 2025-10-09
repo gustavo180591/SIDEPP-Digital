@@ -42,12 +42,20 @@
           Usuarios
         </a>
         
-        <a 
-          href="/dashboard/instituciones" 
+        <a
+          href="/dashboard/instituciones"
           on:click={closeMenu}
           class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/instituciones') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Instituciones
+        </a>
+
+        <a
+          href="/dashboard/afiliados"
+          on:click={closeMenu}
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/afiliados') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+        >
+          Afiliados
         </a>
       {/if}
       
