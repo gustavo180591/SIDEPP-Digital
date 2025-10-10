@@ -10,6 +10,8 @@ import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
+// Importar analyzer de PDFs mejorado
+import { parseListadoPDFCompleto } from '$lib/utils/analyzer-pdf-aportes.js';
 
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
@@ -641,7 +643,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log('[APORTES][8] Ruta:', savedPath);
 		await writeFile(savedPath, buffer);
 		console.log('[APORTES][8] ✓ Archivo guardado exitosamente');
-		
+
 		// Registrar en índice de hashes
 		console.log('[APORTES][9] Registrando en índice de hashes...');
 		hashIndex[bufferHash] = { fileName: file.name, savedName, savedPath };
@@ -650,6 +652,26 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// NOTE: El PdfFile se creará más adelante una vez detectemos el tipo (FOPID/SUELDO)
 		let pdfFileId: string | null = null;
+
+		// ============================================================================
+		// NUEVO: Usar analyzer mejorado de pdf2json
+		// ============================================================================
+		console.log('[APORTES][10] 🚀 Usando analyzer mejorado con pdf2json...');
+		let analyzerResult: any = null;
+		try {
+			analyzerResult = await parseListadoPDFCompleto(savedPath);
+			console.log('[APORTES][10] ✓ Analyzer ejecutado exitosamente');
+			console.log('[APORTES][10] Tipo detectado:', analyzerResult.tipo);
+			console.log('[APORTES][10] Empresa:', analyzerResult.empresa);
+			console.log('[APORTES][10] Concepto:', analyzerResult.concepto);
+			console.log('[APORTES][10] Periodo:', analyzerResult.periodo);
+			console.log('[APORTES][10] Total páginas:', analyzerResult.metadata?.totalPaginas);
+			console.log('[APORTES][10] Total personas:', analyzerResult.totalesGenerales?.totalRegistros);
+			console.log('[APORTES][10] Monto total:', analyzerResult.totalesGenerales?.montoTotal);
+		} catch (analyzerErr) {
+			console.warn('[APORTES][10] ⚠️ Error en analyzer mejorado, continuando con método legacy:', analyzerErr);
+		}
+		// ============================================================================
 
 		// 1) Intentar pdfjs-dist legacy (por líneas)
 		console.log('[APORTES][11] Extrayendo texto del PDF con PDF.js...');
@@ -786,8 +808,15 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log('[APORTES][21] Detectando institución por CUIT...');
 		let institution: { id: string; name: string | null; cuit: string | null; address?: string | null } | undefined = undefined;
 		try {
-			const instCuitDigits = extractInstitutionCuit(fullText);
-			console.log('[APORTES][21] CUIT extraído (crudo):', instCuitDigits);
+			// Priorizar datos del analyzer mejorado si están disponibles
+			let instCuitDigits: string | null = null;
+			if (analyzerResult && analyzerResult.empresa && analyzerResult.empresa.cuit) {
+				console.log('[APORTES][21] ✓ Usando CUIT del analyzer mejorado:', analyzerResult.empresa.cuit);
+				instCuitDigits = analyzerResult.empresa.cuit.replace(/\D/g, '');
+			} else {
+				instCuitDigits = extractInstitutionCuit(fullText);
+				console.log('[APORTES][21] CUIT extraído (crudo - método legacy):', instCuitDigits);
+			}
 			const instCuit = formatCuit(instCuitDigits);
 			console.log('[APORTES][21] CUIT normalizado:', instCuit);
 			
@@ -841,9 +870,33 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log('[APORTES][25] Datos de tabla extraídos:', tableData);
 
 		// Extraer filas individuales de personas
-		console.log('[APORTES][26] 👥 Extrayendo personas con extractPersonas...');
-		const personas = extractPersonas(fullText);
-		console.log('[APORTES][26] Total de personas extraídas:', personas.length);
+		console.log('[APORTES][26] 👥 Extrayendo personas...');
+
+		// Priorizar datos del analyzer mejorado si están disponibles
+		let personas: Array<{
+			nombre: string;
+			totRemunerativo: number;
+			cantidadLegajos: number;
+			montoConcepto: number;
+		}> = [];
+
+		if (analyzerResult && analyzerResult.paginas && analyzerResult.paginas.length > 0) {
+			console.log('[APORTES][26] ✓ Usando personas del analyzer mejorado');
+			// Combinar personas de todas las páginas
+			personas = analyzerResult.paginas.flatMap((pagina: any) =>
+				pagina.personas.map((p: any) => ({
+					nombre: p.nombre,
+					totRemunerativo: p.totalRemunerativo,
+					cantidadLegajos: p.cantidadLegajos,
+					montoConcepto: p.montoConcepto
+				}))
+			);
+			console.log('[APORTES][26] Total de personas del analyzer:', personas.length);
+		} else {
+			console.log('[APORTES][26] Usando extractPersonas (método legacy)...');
+			personas = extractPersonas(fullText);
+			console.log('[APORTES][26] Total de personas extraídas (legacy):', personas.length);
+		}
 		
 		// Detectar tipo de PDF (FOPID o SUELDO)
 		console.log('[APORTES][26.5] 🔍 Detectando tipo de PDF...');
@@ -865,9 +918,16 @@ export const POST: RequestHandler = async ({ request }) => {
 		const peopleCountForPdf = tableDataPreview.personas ?? personasPreview.length;
 		const totalAmountForPdf = tableDataPreview.montoConcepto ?? personasPreview.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
 
-		// Extraer concepto del texto
-		const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
-		const conceptForPdf = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
+		// Extraer concepto del texto - priorizar analyzer mejorado
+		let conceptForPdf = 'Aporte Sindical SIDEPP (1%)'; // default
+		if (analyzerResult && analyzerResult.concepto) {
+			conceptForPdf = analyzerResult.concepto;
+			console.log('[APORTES][26.8] ✓ Concepto del analyzer mejorado:', conceptForPdf);
+		} else {
+			const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
+			conceptForPdf = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
+			console.log('[APORTES][26.8] Concepto del método legacy:', conceptForPdf);
+		}
 
 		console.log('[APORTES][26.8] Datos calculados:', { concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
 
@@ -1010,14 +1070,34 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log('[APORTES][29] 💾 Creando PayrollPeriod...');
 		try {
 			if (institution && pdfFileId) {
-				// Determinar período a usar: seleccionado por UI o detectado del texto
+				// Determinar período a usar: seleccionado por UI, del analyzer mejorado, o detectado del texto
 				const detected = detectPeriod(fullText);
 				const selected = parseSelectedPeriod(selectedPeriodRaw);
-				const useYear = selected?.year ?? detected.year ?? null;
-				const useMonth = selected?.month ?? detected.month ?? null;
 
-				console.log('[APORTES][29] Período detectado:', detected);
-				console.log('[APORTES][29] Período seleccionado:', selected);
+				// Intentar extraer período del analyzer mejorado
+				let analyzerPeriod: { month: number | null; year: number | null } = { month: null, year: null };
+				if (analyzerResult && analyzerResult.periodo) {
+					console.log('[APORTES][29] Período del analyzer:', analyzerResult.periodo);
+					// Parsear formato "Noviembre 2024" o similar
+					const periodoMatch = analyzerResult.periodo.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})/i);
+					if (periodoMatch) {
+						const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+						const mesNombre = periodoMatch[1].toLowerCase();
+						const mesIdx = meses.indexOf(mesNombre);
+						analyzerPeriod = {
+							month: mesIdx >= 0 ? mesIdx + 1 : null,
+							year: parseInt(periodoMatch[2])
+						};
+					}
+				}
+
+				// Prioridad: seleccionado > analyzer > detectado
+				const useYear = selected?.year ?? analyzerPeriod.year ?? detected.year ?? null;
+				const useMonth = selected?.month ?? analyzerPeriod.month ?? detected.month ?? null;
+
+				console.log('[APORTES][29] Período detectado (legacy):', detected);
+				console.log('[APORTES][29] Período analyzer:', analyzerPeriod);
+				console.log('[APORTES][29] Período seleccionado (UI):', selected);
 				console.log('[APORTES][29] Usando:', { year: useYear, month: useMonth });
 
 				if (!useYear || !useMonth) {

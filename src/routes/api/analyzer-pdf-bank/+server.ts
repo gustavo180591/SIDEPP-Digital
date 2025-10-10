@@ -10,6 +10,8 @@ import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
+// Importar analyzer de transferencias mejorado
+import { parseTransferenciaPDFCompleto } from '$lib/utils/analyzer-pdf-transferencia.js';
 
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
@@ -698,6 +700,25 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.error('[analyzer][pdfFile] Error al crear PdfFile en DB:', pdfDbErr);
 		}
 
+		// ============================================================================
+		// NUEVO: Usar analyzer mejorado de pdf2json para transferencias
+		// ============================================================================
+		console.log('[BANK][10] 🚀 Usando analyzer mejorado con pdf2json...');
+		let analyzerResult: any = null;
+		try {
+			analyzerResult = await parseTransferenciaPDFCompleto(savedPath);
+			console.log('[BANK][10] ✓ Analyzer ejecutado exitosamente');
+			console.log('[BANK][10] Tipo detectado:', analyzerResult.tipo);
+			console.log('[BANK][10] CBU:', analyzerResult.transferencia?.cbu);
+			console.log('[BANK][10] Importe:', analyzerResult.transferencia?.importe);
+			console.log('[BANK][10] Fecha:', analyzerResult.transferencia?.fechaHora);
+			console.log('[BANK][10] Beneficiario:', analyzerResult.beneficiario?.nombre);
+			console.log('[BANK][10] CUIT Beneficiario:', analyzerResult.beneficiario?.cuit);
+		} catch (analyzerErr) {
+			console.warn('[BANK][10] ⚠️ Error en analyzer mejorado, continuando con método legacy:', analyzerErr);
+		}
+		// ============================================================================
+
 		// 1) Intentar pdfjs-dist legacy (por líneas)
 		
 		let extractedText = await extractTextWithPdfJs(buffer);
@@ -978,7 +999,16 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Calcular y exponer el importe de transferencia
-		const transferAmount = extractTransferAmount(fullText);
+		// Priorizar datos del analyzer mejorado
+		let transferAmount: number | null = null;
+		if (analyzerResult && analyzerResult.transferencia && analyzerResult.transferencia.importe) {
+			const importeStr = analyzerResult.transferencia.importe.replace(/\./g, '').replace(',', '.');
+			transferAmount = parseFloat(importeStr);
+			console.log('[BANK][transfer] ✓ Importe del analyzer mejorado:', transferAmount);
+		} else {
+			transferAmount = extractTransferAmount(fullText);
+			console.log('[BANK][transfer] Importe del método legacy:', transferAmount);
+		}
 
 		// Crear PayrollPeriod asociado a la institución y al PdfFile (solo si hay institución y pdfFile creado)
 		try {
@@ -1014,10 +1044,6 @@ export const POST: RequestHandler = async ({ request }) => {
 							institution: { connect: { id: institution.id } },
 							month: useMonth,
 							year: useYear,
-							concept: null,
-							peopleCount: peopleCount ?? undefined,
-							totalAmount: totalAmount,
-							pdfFile: { connect: { id: pdfFileId } },
 							transferId: fallbackTransferId
 						}
 					});
