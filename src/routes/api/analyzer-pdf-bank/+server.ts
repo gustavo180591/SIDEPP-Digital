@@ -562,70 +562,32 @@ function splitFullName(fullName: string): { firstName: string; lastName: string 
     return { firstName, lastName };
 }
 
-// Buscar un miembro existente por nombre dentro de la institución (heurística simple)
+// Buscar un miembro existente por nombre dentro de la institución
 async function findMemberByName(
-	institutionId: string,
-	fullName: string
+    institutionId: string,
+    fullName: string
 ): Promise<{ id: string } | null> {
-	const stripDiacritics = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}+/gu, '');
-	const normalize = (s: string) => stripDiacritics(s).toUpperCase().replace(/\s+/g, ' ').trim();
-
-	const name = normalize(fullName);
-    const parts = name.split(' ').filter(Boolean);
-    const first = parts[0] ?? '';
-    const rest = parts.slice(1).join(' ');
-
 	try {
-		// Intentos directos en DB (baratos)
-        // 0) Coincidencia por fullName (case-insensitive)
-        let m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { equals: fullName, mode: 'insensitive' } } as any });
-		if (m) return { id: m.id };
-        // 1) Búsqueda por tokens dentro de fullName
-        if (first && rest) {
-            m = await prisma.member.findFirst({
-                where: {
-                    institucionId: institutionId,
-                    AND: [
-                        { fullName: { contains: first, mode: 'insensitive' } },
-                        { fullName: { contains: rest, mode: 'insensitive' } }
-                    ]
-                }
-            });
-            if (m) return { id: m.id };
-        }
-        m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { contains: fullName, mode: 'insensitive' } } });
-		if (m) return { id: m.id };
+		// Búsqueda exacta por fullName (case-insensitive)
+		// Esto previene duplicados cuando el nombre es exactamente igual
+        const m = await prisma.member.findFirst({
+			where: {
+				institucionId: institutionId,
+				fullName: { equals: fullName, mode: 'insensitive' }
+			}
+		});
 
-		// Fallback: traer algunos miembros y matchear en memoria con normalización
-        const candidates = await prisma.member.findMany({
-            where: { institucionId: institutionId },
-            select: { id: true, fullName: true },
-            take: 500
-        });
-		let best: { id: string; score: number } | null = null;
-        for (const c of candidates) {
-            const full = normalize(c.fullName ?? '');
+		if (m) {
+			console.log(`[findMemberByName] ✓ Miembro encontrado: ${m.id} para nombre "${fullName}"`);
+			return { id: m.id };
+		}
 
-            let score = 0;
-            if (full === name) score = 100;
-            else if (full.includes(name) || name.includes(full)) score = 90;
-            else {
-                const tokens = new Set(parts);
-                let hits = 0;
-                for (const t of tokens) {
-                    if (t && full.includes(t)) hits++;
-                }
-                score = hits * 10;
-                // bonificación si primera palabra matchea el comienzo del nombre completo
-                if (first && full.startsWith(first)) score += 5;
-            }
-            if (!best || score > best.score) best = { id: c.id, score };
-        }
-		if (best && best.score >= 20) return { id: best.id };
+		console.log(`[findMemberByName] ✗ No se encontró miembro para nombre "${fullName}"`);
+		return null;
 	} catch (e) {
-		console.warn('[analyzer][member] Búsqueda de miembro falló:', e);
+		console.warn('[findMemberByName] Error en búsqueda:', e);
+		return null;
 	}
-	return null;
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -680,24 +642,37 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'El archivo no parece ser un PDF válido' }, { status: 400 });
 		}
 
+		console.log('\n\n========================================');
+		console.log('🚀 [BANK] INICIO DE PROCESAMIENTO');
+		console.log('========================================\n');
+
 		const timestamp = Date.now();
 		const ext = file.name.split('.').pop() || 'pdf';
 		const savedName = `${timestamp}.${ext}`;
 		const savedPath = join(ANALYZER_DIR, savedName);
 
+		console.log('[BANK][1] Guardando archivo...');
+		console.log('[BANK][1] Nombre:', file.name);
+		console.log('[BANK][1] Ruta:', savedPath);
 		await writeFile(savedPath, buffer);
+		console.log('[BANK][1] ✓ Archivo guardado exitosamente');
+
 		// Registrar en índice de hashes
+		console.log('[BANK][2] Registrando en índice de hashes...');
 		hashIndex[bufferHash] = { fileName: file.name, savedName, savedPath };
 		await saveHashIndex(hashIndex);
+		console.log('[BANK][2] ✓ Registrado en índice');
 
 		// Crear PdfFile en DB temprano (sin periodId aún)
+		console.log('[BANK][3] 💾 Creando registro PdfFile en DB...');
 		let pdfFileId: string | null = null;
 		try {
 			const createdPdf = await prisma.pdfFile.create({ data: { fileName: file.name, bufferHash } });
 			pdfFileId = createdPdf.id;
-			console.log('[analyzer][pdfFile] Creado en DB:', { id: pdfFileId, fileName: createdPdf.fileName });
+			console.log('[BANK][3] ✓ PdfFile creado en DB:', { id: pdfFileId, fileName: createdPdf.fileName });
 		} catch (pdfDbErr) {
-			console.error('[analyzer][pdfFile] Error al crear PdfFile en DB:', pdfDbErr);
+			console.error('[BANK][3] ❌ Error al crear PdfFile en DB:', pdfDbErr);
+			throw pdfDbErr; // Relanzar para que se capture en el catch principal
 		}
 
 		// ============================================================================
@@ -848,46 +823,82 @@ export const POST: RequestHandler = async ({ request }) => {
 			.filter((r) => r.cuit || r.importe || r.nombre);
 
 		
-		// Detectar institución por CUIT de cabecera (solo lookup; no crear ni actualizar)
+		// Detectar institución por CUIT del ordenante (prioridad: analyzer, fallback: texto)
+		console.log('[BANK][institution] 🔍 Detectando institución...');
 		try {
-			const instCuitDigits = extractInstitutionCuit(fullText);
-			console.log('[analyzer][institution] CUIT extraído (crudo):', instCuitDigits);
-			const instCuit = formatCuit(instCuitDigits);
-			console.log('[analyzer][institution] CUIT normalizado:', instCuit);
-			if (!instCuit) {
-				console.log('[analyzer][institution] No se pudo determinar CUIT institucional desde el PDF');
+			let instCuitDigits: string | null = null;
+
+			// PRIORIDAD 1: Usar CUIT del analyzer (ordenante)
+			if (analyzerResult && analyzerResult.ordenante && analyzerResult.ordenante.cuit) {
+				instCuitDigits = analyzerResult.ordenante.cuit.replace(/\D/g, ''); // Quitar guiones
+				console.log('[BANK][institution] ✓ CUIT del analyzer (ordenante):', analyzerResult.ordenante.cuit, '→', instCuitDigits);
+			} else {
+				// FALLBACK: Extraer del texto
+				instCuitDigits = extractInstitutionCuit(fullText);
+				console.log('[BANK][institution] CUIT del texto (fallback):', instCuitDigits);
+			}
+
+			if (!instCuitDigits || instCuitDigits.length !== 11) {
+				console.error('[BANK][institution] ❌ No se pudo determinar CUIT institucional');
 				return json({
 					status: 'error',
 					message: 'No se pudo detectar el CUIT de la institución en el PDF.',
 					details: { hint: 'Verifique el documento o cargue la institución manualmente.' }
 				}, { status: 400 });
-			} else {
-				try {
-					await prisma.$connect();
-					console.log('[analyzer][institution] Conexión a DB OK');
-				} catch (dbConnErr) {
-					console.error('[analyzer][institution] Error conectando a DB:', dbConnErr);
-				}
+			}
 
-				try {
-					const existing = await prisma.institution.findUnique({ where: { cuit: instCuit } });
-					if (existing) {
-						console.log('[analyzer][institution] Institución encontrada por CUIT:', { id: existing.id, cuit: existing.cuit, name: existing.name, address: existing.address });
-						institution = { id: existing.id, name: existing.name ?? null, cuit: existing.cuit ?? null, address: existing.address ?? null };
+			// Normalizar CUIT a formato con guiones: XX-XXXXXXXX-X
+			const instCuit = formatCuit(instCuitDigits);
+			console.log('[BANK][institution] CUIT normalizado (con guiones):', instCuit);
+
+			// Buscar institución por CUIT (con guiones)
+			try {
+				const existing = await prisma.institution.findUnique({ where: { cuit: instCuit ?? undefined } });
+				if (existing) {
+					console.log('[BANK][institution] ✓ Institución encontrada:', {
+						id: existing.id,
+						cuit: existing.cuit,
+						name: existing.name
+					});
+					institution = {
+						id: existing.id,
+						name: existing.name ?? null,
+						cuit: existing.cuit ?? null,
+						address: existing.address ?? null
+					};
+				} else {
+					// Intentar buscar sin guiones como fallback
+					console.log('[BANK][institution] No encontrado con guiones, intentando sin guiones:', instCuitDigits);
+					const existingNoHyphens = await prisma.institution.findUnique({ where: { cuit: instCuitDigits } });
+
+					if (existingNoHyphens) {
+						console.log('[BANK][institution] ✓ Institución encontrada (sin guiones):', {
+							id: existingNoHyphens.id,
+							cuit: existingNoHyphens.cuit,
+							name: existingNoHyphens.name
+						});
+						institution = {
+							id: existingNoHyphens.id,
+							name: existingNoHyphens.name ?? null,
+							cuit: existingNoHyphens.cuit ?? null,
+							address: existingNoHyphens.address ?? null
+						};
 					} else {
+						console.error('[BANK][institution] ❌ No existe institución con CUIT:', instCuit, 'ni', instCuitDigits);
 						return json({
 							status: 'error',
 							message: 'No existe una institución con ese CUIT. Debe cargarla en Instituciones.',
-							details: { cuit: instCuit }
+							details: { cuit: instCuit, cuitSinGuiones: instCuitDigits }
 						}, { status: 404 });
 					}
-				} catch (dbErr) {
-					console.error('[analyzer][institution] Error consultando institución:', dbErr);
 				}
+			} catch (dbErr) {
+				console.error('[BANK][institution] ❌ Error consultando institución:', dbErr);
+				throw dbErr;
 			}
 		} catch (e) {
-			// No bloquear el análisis si falla DB
-			console.warn('[analyzer] No se pudo asegurar institución por CUIT (catch exterior):', e);
+			console.error('[BANK][institution] ❌ Error general detectando institución:', e);
+			throw e;
 		}
 
 		if (rows.length > 0) {
@@ -1048,9 +1059,9 @@ export const POST: RequestHandler = async ({ request }) => {
 						}
 					});
 					createdPeriodId = created.id;
-					console.log('[analyzer][period] PayrollPeriod creado:', { id: createdPeriodId, month: created.month, year: created.year });
-				} catch (perr) {
-					console.warn('[analyzer][period] No se pudo crear PayrollPeriod (puede existir):', perr);
+					console.log('[BANK][period] ✓ PayrollPeriod creado:', { id: createdPeriodId, month: created.month, year: created.year });
+				} catch (perr: any) {
+					console.warn('[BANK][period] ⚠️ No se pudo crear PayrollPeriod (puede existir):', perr?.message);
 					// Intentar encontrar existente por índice único si aplica
 					try {
 						const existing = await prisma.payrollPeriod.findFirst({
@@ -1060,16 +1071,98 @@ export const POST: RequestHandler = async ({ request }) => {
 								year: useYear
 							}
 						});
-						if (existing) createdPeriodId = existing.id;
+						if (existing) {
+							createdPeriodId = existing.id;
+							console.log('[BANK][period] ✓ PayrollPeriod existente encontrado:', { id: createdPeriodId });
+						}
 					} catch {}
 				}
-				// No necesario forzar relación inversa si el FK está en PayrollPeriod
+
+				// Asociar el PdfFile al PayrollPeriod
+				if (createdPeriodId && pdfFileId) {
+					try {
+						await prisma.pdfFile.update({
+							where: { id: pdfFileId },
+							data: { periodId: createdPeriodId }
+						});
+						console.log('[BANK][period] ✓ PDF asociado al período:', { pdfFileId, periodId: createdPeriodId });
+					} catch (updateErr) {
+						console.error('[BANK][period] ❌ Error asociando PDF al período:', updateErr);
+					}
+				}
+
+				// Crear BankTransfer si tenemos datos del analyzer y un período válido
+				if (createdPeriodId && analyzerResult && analyzerResult.transferencia) {
+					try {
+						// Verificar si ya existe un BankTransfer para este período
+						const existingTransfer = await prisma.bankTransfer.findUnique({
+							where: { periodId: createdPeriodId }
+						});
+
+						if (!existingTransfer) {
+							// Parsear importe
+							let importeDecimal = 0;
+							if (analyzerResult.transferencia.importe) {
+								const importeStr = analyzerResult.transferencia.importe.replace(/\./g, '').replace(',', '.');
+								importeDecimal = parseFloat(importeStr) || 0;
+							}
+
+							// Parsear fecha
+							let fechaTransfer: Date | null = null;
+							if (analyzerResult.transferencia.fechaHora) {
+								// Intentar parsear la fecha (formato esperado: "DD/MM/YYYY HH:mm" o similar)
+								const fechaMatch = analyzerResult.transferencia.fechaHora.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+								if (fechaMatch) {
+									const [, day, month, year, hour, minute] = fechaMatch;
+									fechaTransfer = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+								}
+							}
+
+							// Crear el BankTransfer
+							const bankTransfer = await prisma.bankTransfer.create({
+								data: {
+									period: { connect: { id: createdPeriodId } },
+									datetime: fechaTransfer,
+									reference: analyzerResult.transferencia.referencia || null,
+									operationNo: analyzerResult.transferencia.numeroOperacion || null,
+									cbuDestino: analyzerResult.transferencia.cbu || null,
+									cuentaOrigen: analyzerResult.transferencia.cuentaOrigen || null,
+									importe: importeDecimal,
+									cuitOrdenante: analyzerResult.ordenante?.cuit || null,
+									cuitBenef: analyzerResult.beneficiario?.cuit || null,
+									titular: analyzerResult.transferencia.titular || analyzerResult.beneficiario?.nombre || null,
+									bufferHash: bufferHash
+								}
+							});
+
+							console.log('[BANK][transfer] ✓ BankTransfer creado:', {
+								id: bankTransfer.id,
+								importe: importeDecimal,
+								cbu: bankTransfer.cbuDestino,
+								periodId: createdPeriodId
+							});
+						} else {
+							console.log('[BANK][transfer] ℹ️ BankTransfer ya existe para este período:', existingTransfer.id);
+						}
+					} catch (transferErr) {
+						console.error('[BANK][transfer] ❌ Error creando BankTransfer:', transferErr);
+					}
+				} else {
+					if (!createdPeriodId) {
+						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: falta periodId');
+					} else if (!analyzerResult || !analyzerResult.transferencia) {
+						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: faltan datos del analyzer');
+					}
+				}
 			}
 		} catch (ppErr) {
-			console.warn('[analyzer][period] Error general creando PayrollPeriod:', ppErr);
+			console.error('[BANK][period] ❌ Error general creando PayrollPeriod y BankTransfer:', ppErr);
+			// NO silenciar el error - continuar pero reportar
 		}
 
-		
+		console.log('\n========================================');
+		console.log('✓ [BANK] PROCESAMIENTO COMPLETADO');
+		console.log('========================================\n');
 
 		return json({
 			fileName: file.name,
@@ -1089,8 +1182,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			transferAmount
 		}, { status: 201 });
 	} catch (err) {
+		console.error('\n========================================');
+		console.error('❌ [BANK] ERROR EN PROCESAMIENTO');
+		console.error('========================================');
 		const message = err instanceof Error ? err.message : 'Error desconocido';
-		console.error('[analyzer] error:', message);
+		console.error('[BANK] Error:', message);
+		console.error('[BANK] Stack:', err instanceof Error ? err.stack : 'No stack trace');
+		console.error('========================================\n');
 		return json({ error: 'Error al procesar el archivo', details: message }, { status: 500 });
 	}
 };

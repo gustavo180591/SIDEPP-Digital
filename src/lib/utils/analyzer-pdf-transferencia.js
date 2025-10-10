@@ -1,4 +1,4 @@
-const PDFParser = require('pdf2json');
+import PDFParser from 'pdf2json';
 
 /**
  * Parsea un PDF de tipo "Transferencia a terceros banco Macro"
@@ -42,7 +42,7 @@ function parseTransferenciaPDF(text, filename) {
     resultado.transferencia.cbu = cbuMatch[1];
   }
 
-  const numeroOpMatch = textoCompleto.match(/Número de Operación[|\s]+(\d+)/i);
+  const numeroOpMatch = textoCompleto.match(/Nï¿½mero de Operaciï¿½n[|\s]+(\d+)/i);
   if (numeroOpMatch) {
     resultado.transferencia.numeroOperacion = numeroOpMatch[1];
   }
@@ -67,7 +67,7 @@ function parseTransferenciaPDF(text, filename) {
     resultado.transferencia.banco = bancoMatch[1].trim();
   }
 
-  const tipoOpMatch = textoCompleto.match(/Tipo de operación[|\s]+(\w+)/i);
+  const tipoOpMatch = textoCompleto.match(/Tipo de operaciï¿½n[|\s]+(\w+)/i);
   if (tipoOpMatch) {
     resultado.transferencia.tipoOperacion = tipoOpMatch[1];
   }
@@ -99,7 +99,7 @@ function parseTransferenciaPDF(text, filename) {
     resultado.ordenante.domicilio = domOrdenanteMatch[0];
   }
 
-  const cuitOrdenanteMatch = textoCompleto.match(/IVA\s+RI:\s+CUIT\s+N°\s+(\d{2}-\d{8}-\d)/);
+  const cuitOrdenanteMatch = textoCompleto.match(/IVA\s+RI:\s+CUIT\s+Nï¿½\s+(\d{2}-\d{8}-\d)/);
   if (cuitOrdenanteMatch) {
     resultado.ordenante.cuit = cuitOrdenanteMatch[1];
   }
@@ -207,7 +207,7 @@ async function parseTransferenciaPDFCompleto(pdfPath) {
           }
 
           // Extraer numero de operacion
-          if (!resultado.transferencia.numeroOperacion && textoLineaCompleto.includes('Operación')) {
+          if (!resultado.transferencia.numeroOperacion && textoLineaCompleto.includes('Operaciï¿½n')) {
             const numMatch = textoLineaCompleto.match(/(\d{9})/);
             if (numMatch) {
               resultado.transferencia.numeroOperacion = numMatch[1];
@@ -247,8 +247,8 @@ async function parseTransferenciaPDFCompleto(pdfPath) {
           }
 
           // Extraer tipo operacion
-          if (!resultado.transferencia.tipoOperacion && textoLineaCompleto.includes('Tipo de operación')) {
-            const tipoMatch = textoLineaCompleto.match(/Tipo de operación\s+(\w+)/);
+          if (!resultado.transferencia.tipoOperacion && textoLineaCompleto.includes('Tipo de operaciï¿½n')) {
+            const tipoMatch = textoLineaCompleto.match(/Tipo de operaciï¿½n\s+(\w+)/);
             if (tipoMatch) {
               resultado.transferencia.tipoOperacion = tipoMatch[1];
             }
@@ -312,7 +312,7 @@ async function parseTransferenciaPDFCompleto(pdfPath) {
 
           // Extraer CUIT ordenante
           if (!resultado.ordenante.cuit && textoLineaCompleto.includes('IVA RI')) {
-            const cuitOrdMatch = textoLineaCompleto.match(/CUIT\s+N°\s+(\d{2}-\d{8}-\d)/);
+            const cuitOrdMatch = textoLineaCompleto.match(/CUIT\s+Nï¿½\s+(\d{2}-\d{8}-\d)/);
             if (cuitOrdMatch) {
               resultado.ordenante.cuit = cuitOrdMatch[1];
             }
@@ -335,7 +335,7 @@ async function parseTransferenciaPDFCompleto(pdfPath) {
   });
 }
 
-module.exports = {
+export {
   parseTransferenciaPDF,
   parseTransferenciaPDFCompleto
 };

@@ -487,70 +487,32 @@ function splitFullName(fullName: string): { firstName: string; lastName: string 
     return { firstName, lastName };
 }
 
-// Buscar un miembro existente por nombre dentro de la institución (heurística simple)
+// Buscar un miembro existente por nombre dentro de la institución
 async function findMemberByName(
     institutionId: string,
     fullName: string
 ): Promise<{ id: string } | null> {
-	const stripDiacritics = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}+/gu, '');
-	const normalize = (s: string) => stripDiacritics(s).toUpperCase().replace(/\s+/g, ' ').trim();
-
-	const name = normalize(fullName);
-    const parts = name.split(' ').filter(Boolean);
-    const first = parts[0] ?? '';
-    const rest = parts.slice(1).join(' ');
-
 	try {
-		// Intentos directos en DB (baratos)
-        // 0) Coincidencia por fullName (case-insensitive)
-        let m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { equals: fullName, mode: 'insensitive' } } as any });
-		if (m) return { id: m.id };
-        // 1) Búsqueda por tokens dentro de fullName
-        if (first && rest) {
-            m = await prisma.member.findFirst({
-                where: {
-                    institucionId: institutionId,
-                    AND: [
-                        { fullName: { contains: first, mode: 'insensitive' } },
-                        { fullName: { contains: rest, mode: 'insensitive' } }
-                    ]
-                }
-            });
-            if (m) return { id: m.id };
-        }
-        m = await prisma.member.findFirst({ where: { institucionId: institutionId, fullName: { contains: fullName, mode: 'insensitive' } } });
-		if (m) return { id: m.id };
+		// Búsqueda exacta por fullName (case-insensitive)
+		// Esto previene duplicados cuando el nombre es exactamente igual
+        const m = await prisma.member.findFirst({
+			where: {
+				institucionId: institutionId,
+				fullName: { equals: fullName, mode: 'insensitive' }
+			}
+		});
 
-		// Fallback: traer algunos miembros y matchear en memoria con normalización
-        const candidates = await prisma.member.findMany({
-            where: { institucionId: institutionId },
-            select: { id: true, fullName: true },
-            take: 500
-        });
-        let best: { id: string; score: number } | null = null;
-        for (const c of candidates) {
-            const full = normalize(c.fullName ?? '');
+		if (m) {
+			console.log(`[findMemberByName] ✓ Miembro encontrado: ${m.id} para nombre "${fullName}"`);
+			return { id: m.id };
+		}
 
-            let score = 0;
-            if (full === name) score = 100;
-            else if (full.includes(name) || name.includes(full)) score = 90;
-            else {
-                const tokens = new Set(parts);
-                let hits = 0;
-                for (const t of tokens) {
-                    if (t && full.includes(t)) hits++;
-                }
-                score = hits * 10;
-                // bonificación si primera palabra matchea el comienzo del nombre completo
-                if (first && full.startsWith(first)) score += 5;
-            }
-            if (!best || score > best.score) best = { id: c.id, score };
-        }
-        if (best && best.score >= 20) return { id: best.id };
+		console.log(`[findMemberByName] ✗ No se encontró miembro para nombre "${fullName}"`);
+		return null;
 	} catch (e) {
-		console.warn('[analyzer][member] Búsqueda de miembro falló:', e);
+		console.warn('[findMemberByName] Error en búsqueda:', e);
+		return null;
 	}
-	return null;
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -961,25 +923,55 @@ export const POST: RequestHandler = async ({ request }) => {
 				for (const p of personas) {
 					const nombreUpperCase = p.nombre.toUpperCase();
 					console.log(`[APORTES][28] Procesando persona: ${nombreUpperCase}`);
-					
+
 					// Buscar miembro por nombre (case-insensitive) dentro de la institución
 					let member = await findMemberByName(institution.id, nombreUpperCase);
-					
+
 					if (!member) {
 						// Crear miembro si no existe
-						console.log(`[APORTES][28]   -> Miembro no encontrado, creando nuevo: ${nombreUpperCase}`);
-						try {
-							const createdMember = await prisma.member.create({
-								data: {
-									institucion: { connect: { id: institution.id } },
-									fullName: nombreUpperCase
+						console.log(`[APORTES][28]   -> Miembro no encontrado, intentando crear: ${nombreUpperCase}`);
+
+						// Intentar crear hasta 3 veces para manejar race conditions
+						let createAttempts = 0;
+						const maxCreateAttempts = 3;
+
+						while (!member && createAttempts < maxCreateAttempts) {
+							createAttempts++;
+							try {
+								const createdMember = await prisma.member.create({
+									data: {
+										institucion: { connect: { id: institution.id } },
+										fullName: nombreUpperCase
+									}
+								});
+								member = { id: createdMember.id };
+								membersCreated++;
+								console.log(`[APORTES][28]   -> ✓ Miembro creado exitosamente: ${createdMember.id}`);
+							} catch (cmErr: any) {
+								// Manejar race condition (unique constraint violation)
+								if (cmErr?.code === 'P2002') {
+									console.log(`[APORTES][28]   -> Race condition detectada (intento ${createAttempts}/${maxCreateAttempts}), buscando miembro existente...`);
+
+									// Esperar un poco antes de reintentar buscar
+									await new Promise(resolve => setTimeout(resolve, 50 * createAttempts));
+
+									// Buscar nuevamente el miembro que otro proceso pudo haber creado
+									member = await findMemberByName(institution.id, nombreUpperCase);
+
+									if (member) {
+										membersFound++;
+										console.log(`[APORTES][28]   -> ✓ Miembro encontrado tras race condition: ${member.id}`);
+										break; // Salir del loop, miembro encontrado
+									} else if (createAttempts >= maxCreateAttempts) {
+										console.error(`[APORTES][28]   -> ❌ No se pudo crear ni encontrar miembro tras ${maxCreateAttempts} intentos: ${nombreUpperCase}`);
+										throw cmErr;
+									}
+								} else {
+									// Otro tipo de error, no reintentar
+									console.error(`[APORTES][28]   -> ❌ Error creando miembro:`, cmErr);
+									throw cmErr;
 								}
-							});
-							member = { id: createdMember.id };
-							membersCreated++;
-							console.log(`[APORTES][28]   -> ✓ Miembro creado: ${createdMember.id}`);
-						} catch (cmErr) {
-							console.warn(`[APORTES][28]   -> ❌ Error creando miembro:`, cmErr);
+							}
 						}
 					} else {
 						membersFound++;

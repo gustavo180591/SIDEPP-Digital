@@ -50,7 +50,7 @@ model Member {
   contributions       ContributionLine[]
   institucion         Institution?       @relation(fields: [institucionId], references: [id])
 
-  @@unique([documentoIdentidad, institucionId], name: "unique_documento_institution")
+  @@unique([fullName, documentoIdentidad, institucionId], name: "unique_fullname_documento_institution")
   @@map("members")
 }
 

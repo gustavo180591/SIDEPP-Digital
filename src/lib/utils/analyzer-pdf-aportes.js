@@ -1,4 +1,4 @@
-const PDFParser = require('pdf2json');
+import PDFParser from 'pdf2json';
 
 /**
  * Parsea un PDF de tipo "Listado de Aportes" (TOTALES POR CONCEPTO - PERSONAS)
@@ -261,7 +261,7 @@ async function parseListadoPDFCompleto(pdfPath) {
   });
 }
 
-module.exports = {
+export {
   parseListadoPDF,
   parseListadoPDFCompleto
 };
