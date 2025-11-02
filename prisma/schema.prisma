@@ -159,6 +159,7 @@ enum PdfFileType {
   SUELDO
   FOPID
   AGUINALDO
+  COMPROBANTE
 }
 
 enum ContributionStatus {

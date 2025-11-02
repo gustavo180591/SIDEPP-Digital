@@ -104,6 +104,16 @@
             </svg>
             Afiliados
           </a>
+
+          <a
+            href="/dashboard/upload"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard/upload') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v0a2 2 0 002 2h12a2 2 0 002-2v0M12 12v9m0-9l-3.75-3.75M12 12l3.75-3.75M16 5h2a2 2 0 012 2v0a2 2 0 01-2 2h-2M8 5H6a2 2 0 00-2 2v0a2 2 0 002 2h2" />
+            </svg>
+            Subir Aportes
+          </a>  
         </div>
       </div>
 

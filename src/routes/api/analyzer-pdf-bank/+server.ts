@@ -676,7 +676,14 @@ export const POST: RequestHandler = async (event) => {
 		console.log('[BANK][3] 💾 Creando registro PdfFile en DB...');
 		let pdfFileId: string | null = null;
 		try {
-			const createdPdf = await prisma.pdfFile.create({ data: { fileName: file.name, bufferHash } });
+			const createdPdf = await prisma.pdfFile.create({
+			data: {
+				fileName: file.name,
+				bufferHash,
+				type: 'COMPROBANTE',
+				concept: 'Transferencia Bancaria'
+			}
+		});
 			pdfFileId = createdPdf.id;
 			console.log('[BANK][3] ✓ PdfFile creado en DB:', { id: pdfFileId, fileName: createdPdf.fileName });
 		} catch (pdfDbErr) {
@@ -1057,14 +1064,18 @@ export const POST: RequestHandler = async (event) => {
 					} catch {}
 				}
 
-				// Asociar el PdfFile al PayrollPeriod
+				// Asociar el PdfFile al PayrollPeriod y actualizar con datos calculados
 				if (createdPeriodId && pdfFileId) {
 					try {
 						await prisma.pdfFile.update({
 							where: { id: pdfFileId },
-							data: { periodId: createdPeriodId }
+							data: {
+								periodId: createdPeriodId,
+								peopleCount: peopleCount,
+								totalAmount: totalAmount
+							}
 						});
-						console.log('[BANK][period] ✓ PDF asociado al período:', { pdfFileId, periodId: createdPeriodId });
+						console.log('[BANK][period] ✓ PDF asociado al período y actualizado:', { pdfFileId, periodId: createdPeriodId, peopleCount, totalAmount });
 					} catch (updateErr) {
 						console.error('[BANK][period] ❌ Error asociando PDF al período:', updateErr);
 					}
@@ -1086,6 +1097,22 @@ export const POST: RequestHandler = async (event) => {
 								importeDecimal = parseFloat(importeStr) || 0;
 							}
 
+							// Parsear importeATransferir si existe
+							let importeATransferirDecimal = null;
+							if (analyzerResult.operacion?.importeATransferir) {
+								const str = String(analyzerResult.operacion.importeATransferir).replace(/\./g, '').replace(',', '.');
+								const parsed = parseFloat(str);
+								importeATransferirDecimal = !isNaN(parsed) ? parsed : null;
+							}
+
+							// Parsear importeTotal si existe
+							let importeTotalDecimal = null;
+							if (analyzerResult.operacion?.importeTotal) {
+								const str = String(analyzerResult.operacion.importeTotal).replace(/\./g, '').replace(',', '.');
+								const parsed = parseFloat(str);
+								importeTotalDecimal = !isNaN(parsed) ? parsed : null;
+							}
+
 							// Parsear fecha
 							let fechaTransfer: Date | null = null;
 							if (analyzerResult.transferencia.fechaHora) {
@@ -1097,6 +1124,16 @@ export const POST: RequestHandler = async (event) => {
 								}
 							}
 
+							// Logging de diagnóstico antes de guardar
+							console.log('[BANK][DEBUG] Datos a guardar en BankTransfer:', {
+								importe: importeDecimal,
+								importeATransferir: importeATransferirDecimal,
+								importeTotal: importeTotalDecimal,
+								cbuDestino: analyzerResult.transferencia?.cbu,
+								cuitBenef: analyzerResult.beneficiario?.cuit,
+								titular: analyzerResult.beneficiario?.nombre
+							});
+
 							// Crear el BankTransfer con manejo de race conditions
 							try {
 								const bankTransfer = await prisma.bankTransfer.create({
@@ -1105,18 +1142,18 @@ export const POST: RequestHandler = async (event) => {
 										datetime: fechaTransfer,
 										reference: analyzerResult.nroReferencia || null,
 										operationNo: analyzerResult.nroOperacion || null,
-										cbuDestino: analyzerResult.operacion?.cbuDestino || null,
-										cuentaOrigen: analyzerResult.operacion?.cuentaOrigen || null,
+										cbuDestino: analyzerResult.transferencia?.cbu || null,
+										cuentaOrigen: analyzerResult.transferencia?.cuentaOrigen || null,
 										importe: importeDecimal,
 										cuitOrdenante: analyzerResult.ordenante?.cuit || null,
-										cuitBenef: analyzerResult.operacion?.cuit || null,
-										titular: analyzerResult.operacion?.titular || null,
+										cuitBenef: analyzerResult.beneficiario?.cuit || null,
+										titular: analyzerResult.beneficiario?.nombre || null,
 										bufferHash: bufferHash,
 										// Nuevos campos del analyzer
-										banco: analyzerResult.operacion?.banco || null,
-										tipoOperacion: analyzerResult.operacion?.tipoOperacion || null,
-										importeATransferir: analyzerResult.operacion?.importeATransferir || null,
-										importeTotal: analyzerResult.operacion?.importeTotal || null,
+										banco: analyzerResult.transferencia?.banco || analyzerResult.operacion?.banco || null,
+										tipoOperacion: analyzerResult.transferencia?.tipoOperacion || analyzerResult.operacion?.tipoOperacion || null,
+										importeATransferir: importeATransferirDecimal,
+										importeTotal: importeTotalDecimal,
 										ordenanteNombre: analyzerResult.ordenante?.nombre || null,
 										ordenanteDomicilio: analyzerResult.ordenante?.domicilio || null
 									}

@@ -963,6 +963,7 @@ export const POST: RequestHandler = async (event) => {
 				for (const p of personas) {
 					const nombreUpperCase = p.nombre.toUpperCase();
 					console.log(`[APORTES][28] Procesando persona: ${nombreUpperCase}`);
+					console.log(`[APORTES][28]   -> Datos: cantidadLegajos=${p.cantidadLegajos} (${typeof p.cantidadLegajos}), montoConcepto=${p.montoConcepto} (${typeof p.montoConcepto}), totRemunerativo=${p.totRemunerativo} (${typeof p.totRemunerativo})`);
 
 					// Buscar miembro por nombre (case-insensitive) dentro de la institución
 					let member = await findMemberByName(institution.id, nombreUpperCase);
@@ -1018,19 +1019,34 @@ export const POST: RequestHandler = async (event) => {
 						console.log(`[APORTES][28]   -> ✓ Miembro encontrado: ${member.id}`);
 					}
 					
-					// Crear ContributionLine
+					// Crear ContributionLine (con verificación de duplicados)
 					try {
-						await prisma.contributionLine.create({
-							data: {
-								name: nombreUpperCase,
-								quantity: Number.isFinite(p.cantidadLegajos) ? p.cantidadLegajos : null,
-								conceptAmount: Number.isFinite(p.montoConcepto) ? p.montoConcepto.toString() : null,
-								totalRem: Number.isFinite(p.totRemunerativo) ? p.totRemunerativo.toString() : null,
-								pdfFile: { connect: { id: pdfFileId } },
-								...(member ? { member: { connect: { id: member.id } } } : {})
+						// Verificar si ya existe una ContributionLine para este miembro en este PDF
+						const existingContribution = await prisma.contributionLine.findFirst({
+							where: {
+								pdfFileId: pdfFileId,
+								memberId: member?.id
 							}
 						});
-						console.log(`[APORTES][28]   -> ✓ ContributionLine creada para ${nombreUpperCase}`);
+
+						if (existingContribution) {
+							console.log(`[APORTES][28]   -> ⏭️  ContributionLine ya existe para ${nombreUpperCase}, saltando...`);
+						} else {
+							// Crear ContributionLine solo si NO existe
+							await prisma.contributionLine.create({
+								data: {
+									name: nombreUpperCase,
+									quantity: p.cantidadLegajos != null ?
+											(typeof p.cantidadLegajos === 'number' ? p.cantidadLegajos : parseInt(String(p.cantidadLegajos)))
+											: null,
+									conceptAmount: p.montoConcepto != null ? String(p.montoConcepto) : null,
+									totalRem: p.totRemunerativo != null ? String(p.totRemunerativo) : null,
+									pdfFile: { connect: { id: pdfFileId } },
+									...(member ? { member: { connect: { id: member.id } } } : {})
+								}
+							});
+							console.log(`[APORTES][28]   -> ✓ ContributionLine creada para ${nombreUpperCase}`);
+						}
 					} catch (clErr) {
 						console.error(`[APORTES][28]   -> ❌ Error creando ContributionLine:`, clErr);
 					}
