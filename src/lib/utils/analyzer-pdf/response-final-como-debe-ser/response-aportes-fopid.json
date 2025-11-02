@@ -1,0 +1,54 @@
+{
+  "tipo": "LISTADO_APORTES",
+  "archivo": "0205 - Listado.pdf",
+  "escuela": {
+    "nombre": "EFA SAN BONIFACIO",
+    "direccion": "Ruta Nac. 14 Km 1200",
+    "cuit": "30-64012797-6"
+  },
+  "fecha": "11/25/2024",
+  "periodo": "FOPID",
+  "concepto": "Apte. Sindical SIDEPP (1%)",
+  "personas": [
+    {
+      "nombre": "CABRERA  SILVIO VICTOR",
+      "totalRemunerativo": 2285254.37,
+      "cantidadLegajos": 2,
+      "montoConcepto": 22852.54
+    },
+    {
+      "nombre": "CANTERO  EDUARDO DEMETRIO",
+      "totalRemunerativo": 131590.9,
+      "montoConcepto": 1315.91,
+      "cantidadLegajos": 1
+    },
+    {
+      "nombre": "LIQUE  PATRICIA ELIZABETH",
+      "totalRemunerativo": 1335925.47,
+      "cantidadLegajos": 3,
+      "montoConcepto": 13359.25
+    },
+    {
+      "nombre": "MARTINEZ  CRISTOBAL DAMIAN",
+      "totalRemunerativo": 832591.64,
+      "cantidadLegajos": 1,
+      "montoConcepto": 8325.92
+    },
+    {
+      "nombre": "PEREYRA  GUSTAVO FABIAN",
+      "totalRemunerativo": 1297809.01,
+      "cantidadLegajos": 1,
+      "montoConcepto": 12978.09
+    },
+    {
+      "nombre": "WOLENBERG  CRISTINA RAQUEL",
+      "totalRemunerativo": 1420733.18,
+      "cantidadLegajos": 2,
+      "montoConcepto": 14207.33
+    }
+  ],
+  "totales": {
+    "cantidadPersonas": 6,
+    "montoTotal": 73039.04
+  }
+}
