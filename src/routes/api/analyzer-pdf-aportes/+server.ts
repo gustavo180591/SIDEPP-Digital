@@ -12,7 +12,7 @@ import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
 // Importar analyzer de PDFs mejorado
-import { parseListadoPDFCompleto } from '$lib/utils/analyzer-pdf-aportes.js';
+import { parseListadoPDFCompleto } from '$lib/utils/analyzer-pdf/analyzer-pdf-aportes.js';
 // Importar utilidades de CUIT (formatCuit ya existe localmente en este archivo)
 import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
 

@@ -13,6 +13,7 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"db:seed": "ts-node --esm prisma/seed.ts",
+		"db:push": "prisma db push",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright test"
