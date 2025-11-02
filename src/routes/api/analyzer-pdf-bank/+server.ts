@@ -13,6 +13,8 @@ import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
 // Importar analyzer de transferencias mejorado
 import { parseTransferenciaPDFCompleto } from '$lib/utils/analyzer-pdf-transferencia.js';
+// Importar utilidades de CUIT
+import { normalizeCuit, formatCuit } from '$lib/utils/cuit-utils.js';
 
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
@@ -912,54 +914,20 @@ export const POST: RequestHandler = async (event) => {
 			
 		}
 
-		// Extraer datos específicos de tabla
-		
-		const tableData = extractTableData(fullText);
-		
+		// NOTA: Los PDFs de transferencias bancarias NO deben crear ContributionLines
+		// Las ContributionLines solo se crean desde PDFs de aportes
+		// Esta sección ha sido removida para evitar datos incorrectos en la base de datos
 
-		// Extraer filas individuales de personas
-		
+		console.log('[BANK][info] ℹ️  Las transferencias bancarias no generan ContributionLines');
+
+		// Datos de tabla y personas solo se usan para el preview en respuesta, no para persistencia
+		const tableData = extractTableData(fullText);
 		const personas = extractPersonas(fullText);
-		// Persistir ContributionLine por cada persona asociada al PdfFile
-		try {
-			if (pdfFileId && personas.length > 0) {
-				for (const p of personas) {
-					let memberConnect: { connect: { id: string } } | undefined = undefined;
-					if (institution) {
-						let maybeMember = await findMemberByName(institution.id, p.nombre);
-						if (!maybeMember) {
-                    // Crear miembro si no existe, usando fullName y separando nombre/apellido
-							try {
-                        const { firstName, lastName } = splitFullName(p.nombre);
-                                const createdMember = await prisma.member.create({
-                                    data: {
-                                        institucion: { connect: { id: institution.id } },
-                                        fullName: p.nombre
-                                    }
-                                });
-								maybeMember = { id: createdMember.id };
-							} catch (cmErr) {
-								console.warn('[analyzer][member] No se pudo crear miembro:', cmErr);
-							}
-						}
-						if (maybeMember) memberConnect = { connect: { id: maybeMember.id } };
-					}
-					await prisma.contributionLine.create({
-						data: {
-							name: p.nombre,
-							quantity: Number.isFinite(p.cantidadLegajos) ? p.cantidadLegajos : null,
-							conceptAmount: Number.isFinite(p.montoConcepto) ? String(p.montoConcepto) : null,
-							totalRem: Number.isFinite(p.totRemunerativo) ? String(p.totRemunerativo) : null,
-							pdfFile: { connect: { id: pdfFileId } },
-							...(memberConnect ? { member: memberConnect } : {})
-						}
-					});
-				}
-			}
-		} catch (persistErr) {
-			console.warn('[analyzer][contrib] Error creando ContributionLine:', persistErr);
-		}
-		
+		console.log('[BANK][info] Datos extraídos solo para preview:', {
+			tableDataKeys: Object.keys(tableData).length,
+			personasCount: personas.length
+		});
+
 
 		if (rows.length > 0) {
 			
@@ -1129,29 +1097,55 @@ export const POST: RequestHandler = async (event) => {
 								}
 							}
 
-							// Crear el BankTransfer
-							const bankTransfer = await prisma.bankTransfer.create({
-								data: {
-									period: { connect: { id: createdPeriodId } },
-									datetime: fechaTransfer,
-									reference: analyzerResult.transferencia.referencia || null,
-									operationNo: analyzerResult.transferencia.numeroOperacion || null,
-									cbuDestino: analyzerResult.transferencia.cbu || null,
-									cuentaOrigen: analyzerResult.transferencia.cuentaOrigen || null,
-									importe: importeDecimal,
-									cuitOrdenante: analyzerResult.ordenante?.cuit || null,
-									cuitBenef: analyzerResult.beneficiario?.cuit || null,
-									titular: analyzerResult.transferencia.titular || analyzerResult.beneficiario?.nombre || null,
-									bufferHash: bufferHash
-								}
-							});
+							// Crear el BankTransfer con manejo de race conditions
+							try {
+								const bankTransfer = await prisma.bankTransfer.create({
+									data: {
+										period: { connect: { id: createdPeriodId } },
+										datetime: fechaTransfer,
+										reference: analyzerResult.nroReferencia || null,
+										operationNo: analyzerResult.nroOperacion || null,
+										cbuDestino: analyzerResult.operacion?.cbuDestino || null,
+										cuentaOrigen: analyzerResult.operacion?.cuentaOrigen || null,
+										importe: importeDecimal,
+										cuitOrdenante: analyzerResult.ordenante?.cuit || null,
+										cuitBenef: analyzerResult.operacion?.cuit || null,
+										titular: analyzerResult.operacion?.titular || null,
+										bufferHash: bufferHash,
+										// Nuevos campos del analyzer
+										banco: analyzerResult.operacion?.banco || null,
+										tipoOperacion: analyzerResult.operacion?.tipoOperacion || null,
+										importeATransferir: analyzerResult.operacion?.importeATransferir || null,
+										importeTotal: analyzerResult.operacion?.importeTotal || null,
+										ordenanteNombre: analyzerResult.ordenante?.nombre || null,
+										ordenanteDomicilio: analyzerResult.ordenante?.domicilio || null
+									}
+								});
 
-							console.log('[BANK][transfer] ✓ BankTransfer creado:', {
-								id: bankTransfer.id,
-								importe: importeDecimal,
-								cbu: bankTransfer.cbuDestino,
-								periodId: createdPeriodId
-							});
+								console.log('[BANK][transfer] ✓ BankTransfer creado con datos completos del analyzer:', {
+									id: bankTransfer.id,
+									importe: importeDecimal,
+									cbu: bankTransfer.cbuDestino,
+									banco: bankTransfer.banco,
+									ordenante: bankTransfer.ordenanteNombre,
+									periodId: createdPeriodId
+								});
+							} catch (createErr: any) {
+								// Manejar race condition (P2002 = unique constraint violation)
+								if (createErr?.code === 'P2002') {
+									console.warn('[BANK][transfer] ⚠️ Race condition detectada - BankTransfer ya existe (creado concurrentemente)');
+									// Buscar el registro existente
+									const raceTransfer = await prisma.bankTransfer.findUnique({
+										where: { periodId: createdPeriodId }
+									});
+									if (raceTransfer) {
+										console.log('[BANK][transfer] ✓ BankTransfer existente encontrado:', raceTransfer.id);
+									}
+								} else {
+									// Re-lanzar otros errores
+									throw createErr;
+								}
+							}
 						} else {
 							console.log('[BANK][transfer] ℹ️ BankTransfer ya existe para este período:', existingTransfer.id);
 						}

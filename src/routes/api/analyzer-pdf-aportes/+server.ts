@@ -13,6 +13,8 @@ import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
 // Importar analyzer de PDFs mejorado
 import { parseListadoPDFCompleto } from '$lib/utils/analyzer-pdf-aportes.js';
+// Importar utilidades de CUIT (formatCuit ya existe localmente en este archivo)
+import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
 
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
@@ -833,10 +835,15 @@ export const POST: RequestHandler = async (event) => {
 			console.log('[APORTES][24] Rows detectados con extractLineData:', rows.length);
 		}
 
-		// Extraer datos específicos de tabla
-		console.log('[APORTES][25] 📊 Extrayendo datos de tabla con extractTableData...');
-		const tableData = extractTableData(fullText);
-		console.log('[APORTES][25] Datos de tabla extraídos:', tableData);
+		// Extraer datos específicos de tabla (solo si el analyzer falló)
+		let tableData: any = {};
+		if (!analyzerResult || !analyzerResult.totalesGenerales) {
+			console.log('[APORTES][25] 📊 Extrayendo datos de tabla con extractTableData (método legacy)...');
+			tableData = extractTableData(fullText);
+			console.log('[APORTES][25] Datos de tabla extraídos:', tableData);
+		} else {
+			console.log('[APORTES][25] ⏩ Saltando extractTableData - usando datos del analyzer');
+		}
 
 		// Extraer filas individuales de personas
 		console.log('[APORTES][26] 👥 Extrayendo personas...');
@@ -882,10 +889,24 @@ export const POST: RequestHandler = async (event) => {
 		
 		// Calcular datos de tabla para el PDF
 		console.log('[APORTES][26.8] 📊 Calculando datos para PdfFile...');
-		const tableDataPreview = extractTableData(fullText);
-		const personasPreview = extractPersonas(fullText);
-		const peopleCountForPdf = tableDataPreview.personas ?? personasPreview.length;
-		const totalAmountForPdf = tableDataPreview.montoConcepto ?? personasPreview.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
+
+		let peopleCountForPdf: number | null = null;
+		let totalAmountForPdf: number | null = null;
+
+		// Prioridad 1: Usar datos del analyzer si están disponibles
+		if (analyzerResult && analyzerResult.totalesGenerales) {
+			peopleCountForPdf = analyzerResult.totalesGenerales.totalRegistros ?? analyzerResult.totalesGenerales.cantidadPersonas;
+			totalAmountForPdf = analyzerResult.totalesGenerales.montoTotal;
+			console.log('[APORTES][26.8] ✓ Usando totales del analyzer:', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
+		} else {
+			// Fallback: Método legacy
+			console.log('[APORTES][26.8] Calculando con métodos legacy...');
+			const tableDataPreview = extractTableData(fullText);
+			const personasPreview = extractPersonas(fullText);
+			peopleCountForPdf = tableDataPreview.personas ?? personasPreview.length;
+			totalAmountForPdf = tableDataPreview.montoConcepto ?? personasPreview.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
+			console.log('[APORTES][26.8] Totales calculados (legacy):', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
+		}
 
 		// Extraer concepto del texto - priorizar analyzer mejorado
 		let conceptForPdf = 'Aporte Sindical SIDEPP (1%)'; // default
@@ -903,6 +924,17 @@ export const POST: RequestHandler = async (event) => {
 		// Crear PdfFile en DB con el tipo detectado y los datos calculados
 		console.log('[APORTES][27] 💾 Creando registro PdfFile en DB con tipo:', pdfType);
 		try {
+			// Preparar metadata si el analyzer tiene datos
+			let pdfMetadata: any = null;
+			if (analyzerResult && analyzerResult.metadata) {
+				pdfMetadata = {
+					creator: analyzerResult.metadata.creator,
+					creationDate: analyzerResult.metadata.creationDate,
+					totalPaginas: analyzerResult.metadata.totalPaginas
+				};
+				console.log('[APORTES][27] ℹ️  Guardando metadata del PDF:', pdfMetadata);
+			}
+
 			const createdPdf = await prisma.pdfFile.create({
 				data: {
 					fileName: file.name,
@@ -910,11 +942,12 @@ export const POST: RequestHandler = async (event) => {
 					type: pdfType,
 					concept: conceptForPdf,
 					peopleCount: peopleCountForPdf || null,
-					totalAmount: Number.isFinite(totalAmountForPdf) ? totalAmountForPdf.toString() : null
+					totalAmount: Number.isFinite(totalAmountForPdf) ? totalAmountForPdf.toString() : null,
+					metadata: pdfMetadata
 				}
 			});
 			pdfFileId = createdPdf.id;
-			console.log('[APORTES][27] ✓ PdfFile creado:', { id: pdfFileId, fileName: createdPdf.fileName, type: pdfType, concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
+			console.log('[APORTES][27] ✓ PdfFile creado:', { id: pdfFileId, fileName: createdPdf.fileName, type: pdfType, concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf, hasMetadata: !!pdfMetadata });
 		} catch (pdfDbErr) {
 			console.error('[APORTES][27] ❌ Error al crear PdfFile en DB:', pdfDbErr);
 			throw pdfDbErr;
@@ -1004,11 +1037,41 @@ export const POST: RequestHandler = async (event) => {
 				}
 				
 				console.log(`[APORTES][28] ✓ Resumen: ${membersFound} miembros encontrados, ${membersCreated} miembros creados, ${personas.length} contribution lines creadas`);
+
+				// Validar totales: comparar suma de ContributionLines vs totales del analyzer
+				if (analyzerResult && analyzerResult.totalesGenerales && personas.length > 0) {
+					console.log('[APORTES][28.5] 🔍 Validando totales...');
+
+					const totalCalculado = personas.reduce((sum, p) => {
+						return sum + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0);
+					}, 0);
+
+					const totalAnalyzer = analyzerResult.totalesGenerales.montoTotal;
+					const diferencia = Math.abs(totalCalculado - totalAnalyzer);
+					const porcentajeDiferencia = (diferencia / totalAnalyzer) * 100;
+
+					console.log('[APORTES][28.5] Totales comparados:', {
+						totalCalculado: totalCalculado.toFixed(2),
+						totalAnalyzer: totalAnalyzer.toFixed(2),
+						diferencia: diferencia.toFixed(2),
+						porcentajeDiferencia: porcentajeDiferencia.toFixed(2) + '%'
+					});
+
+					if (diferencia > 0.5) {
+						if (porcentajeDiferencia > 1) {
+							console.warn(`[APORTES][28.5] ⚠️ ADVERTENCIA: Discrepancia significativa (${porcentajeDiferencia.toFixed(2)}%) entre totales`);
+						} else {
+							console.log('[APORTES][28.5] ℹ️  Diferencia menor aceptable (probablemente redondeo)');
+						}
+					} else {
+						console.log('[APORTES][28.5] ✓ Totales coinciden correctamente');
+					}
+				}
 			}
 		} catch (persistErr) {
 			console.error('[APORTES][28] ❌ Error en proceso de guardado:', persistErr);
 		}
-		
+
 
 		if (rows.length > 0) {
 			
@@ -1077,16 +1140,40 @@ export const POST: RequestHandler = async (event) => {
 				let analyzerPeriod: { month: number | null; year: number | null } = { month: null, year: null };
 				if (analyzerResult && analyzerResult.periodo) {
 					console.log('[APORTES][29] Período del analyzer:', analyzerResult.periodo);
-					// Parsear formato "Noviembre 2024" o similar
-					const periodoMatch = analyzerResult.periodo.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})/i);
-					if (periodoMatch) {
-						const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-						const mesNombre = periodoMatch[1].toLowerCase();
-						const mesIdx = meses.indexOf(mesNombre);
-						analyzerPeriod = {
-							month: mesIdx >= 0 ? mesIdx + 1 : null,
-							year: parseInt(periodoMatch[2])
-						};
+
+					// El analyzer puede retornar:
+					// 1. Formato "MM/YYYY" (ej: "11/2024")
+					// 2. Formato "FOPID" (periodo especial)
+					// 3. Formato "Noviembre 2024" (legacy, menos común)
+
+					if (analyzerResult.periodo === 'FOPID') {
+						// FOPID no tiene mes/año específico, dejar null para que use detected o selected
+						console.log('[APORTES][29] Período FOPID detectado, usando período seleccionado o detectado');
+					} else {
+						// Intentar formato MM/YYYY primero
+						const mmYyyyMatch = analyzerResult.periodo.match(/^(\d{1,2})\/(\d{4})$/);
+						if (mmYyyyMatch) {
+							analyzerPeriod = {
+								month: parseInt(mmYyyyMatch[1]),
+								year: parseInt(mmYyyyMatch[2])
+							};
+							console.log('[APORTES][29] Período parseado (MM/YYYY):', analyzerPeriod);
+						} else {
+							// Fallback: intentar formato "Noviembre 2024"
+							const periodoMatch = analyzerResult.periodo.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})/i);
+							if (periodoMatch) {
+								const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+								const mesNombre = periodoMatch[1].toLowerCase();
+								const mesIdx = meses.indexOf(mesNombre);
+								analyzerPeriod = {
+									month: mesIdx >= 0 ? mesIdx + 1 : null,
+									year: parseInt(periodoMatch[2])
+								};
+								console.log('[APORTES][29] Período parseado (texto):', analyzerPeriod);
+							} else {
+								console.warn('[APORTES][29] ⚠️ Formato de período no reconocido del analyzer:', analyzerResult.periodo);
+							}
+						}
 					}
 				}
 

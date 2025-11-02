@@ -89,21 +89,28 @@ model ContributionLine {
 }
 
 model BankTransfer {
-  id            String        @id @default(cuid())
-  datetime      DateTime?
-  reference     String?
-  operationNo   String?
-  cbuDestino    String?
-  cuentaOrigen  String?
-  importe       Decimal       @db.Decimal(18, 2)
-  cuitOrdenante String?
-  cuitBenef     String?
-  titular       String?
-  periodId      String        @unique
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  bufferHash    String?
-  period        PayrollPeriod @relation(fields: [periodId], references: [id])
+  id                 String        @id @default(cuid())
+  datetime           DateTime?
+  reference          String?
+  operationNo        String?
+  cbuDestino         String?
+  cuentaOrigen       String?
+  importe            Decimal       @db.Decimal(18, 2)
+  cuitOrdenante      String?
+  cuitBenef          String?
+  titular            String?
+  periodId           String        @unique
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  bufferHash         String?
+  // Nuevos campos del analyzer
+  banco              String?
+  tipoOperacion      String?
+  importeATransferir Decimal?      @db.Decimal(18, 2)
+  importeTotal       Decimal?      @db.Decimal(18, 2)
+  ordenanteNombre    String?
+  ordenanteDomicilio String?
+  period             PayrollPeriod @relation(fields: [periodId], references: [id])
 
   @@map("bank_transfers")
 }
@@ -115,14 +122,15 @@ model PdfFile {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   bufferHash       String?            @unique
-  concept       String?
-  peopleCount   Int?
-  totalAmount   Decimal?      @db.Decimal(18, 2)
-  
+  concept          String?
+  peopleCount      Int?
+  totalAmount      Decimal?           @db.Decimal(18, 2)
   type             PdfFileType?
+  // Metadata del PDF (creator, creationDate, totalPaginas, etc.)
+  metadata         Json?
   contributionLine ContributionLine[]
   period           PayrollPeriod?     @relation(fields: [periodId], references: [id])
-  
+
   @@map("pdf_files")
 }
 
