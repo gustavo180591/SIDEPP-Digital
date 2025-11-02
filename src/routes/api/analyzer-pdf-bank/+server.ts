@@ -700,9 +700,9 @@ export const POST: RequestHandler = async (event) => {
 			analyzerResult = await parseTransferenciaPDFCompleto(savedPath);
 			console.log('[BANK][10] ✓ Analyzer ejecutado exitosamente');
 			console.log('[BANK][10] Tipo detectado:', analyzerResult.tipo);
-			console.log('[BANK][10] CBU:', analyzerResult.transferencia?.cbu);
-			console.log('[BANK][10] Importe:', analyzerResult.transferencia?.importe);
-			console.log('[BANK][10] Fecha:', analyzerResult.transferencia?.fechaHora);
+			console.log('[BANK][10] CBU Destino:', analyzerResult.operacion?.cbuDestino);
+			console.log('[BANK][10] Importe:', analyzerResult.operacion?.importe);
+			console.log('[BANK][10] Cuenta Origen:', analyzerResult.operacion?.cuentaOrigen);
 			console.log('[BANK][10] Beneficiario:', analyzerResult.beneficiario?.nombre);
 			console.log('[BANK][10] CUIT Beneficiario:', analyzerResult.beneficiario?.cuit);
 		} catch (analyzerErr) {
@@ -994,8 +994,8 @@ export const POST: RequestHandler = async (event) => {
 		// Calcular y exponer el importe de transferencia
 		// Priorizar datos del analyzer mejorado
 		let transferAmount: number | null = null;
-		if (analyzerResult && analyzerResult.transferencia && analyzerResult.transferencia.importe) {
-			const importeStr = analyzerResult.transferencia.importe.replace(/\./g, '').replace(',', '.');
+		if (analyzerResult && analyzerResult.operacion && analyzerResult.operacion.importe) {
+			const importeStr = String(analyzerResult.operacion.importe).replace(/\./g, '').replace(',', '.');
 			transferAmount = parseFloat(importeStr);
 			console.log('[BANK][transfer] ✓ Importe del analyzer mejorado:', transferAmount);
 		} else {
@@ -1025,10 +1025,23 @@ export const POST: RequestHandler = async (event) => {
 				}
 
 				// Calcular personas y total
-				const table = extractTableData(fullText);
-				const peopleCount = table.personas ?? (Array.isArray(personas) ? personas.length : undefined) ?? null;
-				const totalAmountNumber = table.montoConcepto ?? (Array.isArray(personas) ? personas.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0) : 0);
-				const totalAmount = Number.isFinite(totalAmountNumber) ? String(totalAmountNumber) : null;
+				let totalAmountNumber = 0;
+				let peopleCount = null;
+
+				// Para comprobantes bancarios, usar el importe de la transferencia
+				if (analyzerResult && analyzerResult.operacion && analyzerResult.operacion.importe) {
+					const importeStr = String(analyzerResult.operacion.importe).replace(/\./g, '').replace(',', '.');
+					totalAmountNumber = parseFloat(importeStr) || 0;
+					peopleCount = null; // Los comprobantes no tienen peopleCount
+					console.log('[BANK][total] ✓ Usando importe de transferencia:', totalAmountNumber);
+				} else {
+					// Para listados de aportes (fallback, aunque este endpoint es para comprobantes)
+					const table = extractTableData(fullText);
+					peopleCount = table.personas ?? (Array.isArray(personas) ? personas.length : undefined) ?? null;
+					totalAmountNumber = table.montoConcepto ?? (Array.isArray(personas) ? personas.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0) : 0);
+				}
+
+				const totalAmount = Number.isFinite(totalAmountNumber) && totalAmountNumber > 0 ? String(totalAmountNumber) : null;
 
 				// Fallback para transferId requerido
 				const fallbackTransferId = bufferHash || savedName;
@@ -1082,7 +1095,7 @@ export const POST: RequestHandler = async (event) => {
 				}
 
 				// Crear BankTransfer si tenemos datos del analyzer y un período válido
-				if (createdPeriodId && analyzerResult && analyzerResult.transferencia) {
+				if (createdPeriodId && analyzerResult && analyzerResult.operacion) {
 					try {
 						// Verificar si ya existe un BankTransfer para este período
 						const existingTransfer = await prisma.bankTransfer.findUnique({
@@ -1092,8 +1105,8 @@ export const POST: RequestHandler = async (event) => {
 						if (!existingTransfer) {
 							// Parsear importe
 							let importeDecimal = 0;
-							if (analyzerResult.transferencia.importe) {
-								const importeStr = analyzerResult.transferencia.importe.replace(/\./g, '').replace(',', '.');
+							if (analyzerResult.operacion.importe) {
+								const importeStr = String(analyzerResult.operacion.importe).replace(/\./g, '').replace(',', '.');
 								importeDecimal = parseFloat(importeStr) || 0;
 							}
 
@@ -1113,11 +1126,13 @@ export const POST: RequestHandler = async (event) => {
 								importeTotalDecimal = !isNaN(parsed) ? parsed : null;
 							}
 
-							// Parsear fecha
+							// Parsear fecha (desde operacion.fechaHora o desde fecha + hora separados)
 							let fechaTransfer: Date | null = null;
-							if (analyzerResult.transferencia.fechaHora) {
+							const fechaHoraStr = analyzerResult.operacion?.fechaHora ||
+							                     (analyzerResult.fecha && analyzerResult.hora ? `${analyzerResult.fecha} ${analyzerResult.hora}` : null);
+							if (fechaHoraStr) {
 								// Intentar parsear la fecha (formato esperado: "DD/MM/YYYY HH:mm" o similar)
-								const fechaMatch = analyzerResult.transferencia.fechaHora.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+								const fechaMatch = fechaHoraStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
 								if (fechaMatch) {
 									const [, day, month, year, hour, minute] = fechaMatch;
 									fechaTransfer = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
@@ -1129,7 +1144,7 @@ export const POST: RequestHandler = async (event) => {
 								importe: importeDecimal,
 								importeATransferir: importeATransferirDecimal,
 								importeTotal: importeTotalDecimal,
-								cbuDestino: analyzerResult.transferencia?.cbu,
+								cbuDestino: analyzerResult.operacion?.cbuDestino,
 								cuitBenef: analyzerResult.beneficiario?.cuit,
 								titular: analyzerResult.beneficiario?.nombre
 							});
@@ -1142,16 +1157,16 @@ export const POST: RequestHandler = async (event) => {
 										datetime: fechaTransfer,
 										reference: analyzerResult.nroReferencia || null,
 										operationNo: analyzerResult.nroOperacion || null,
-										cbuDestino: analyzerResult.transferencia?.cbu || null,
-										cuentaOrigen: analyzerResult.transferencia?.cuentaOrigen || null,
+										cbuDestino: analyzerResult.operacion?.cbuDestino || null,
+										cuentaOrigen: analyzerResult.operacion?.cuentaOrigen || null,
 										importe: importeDecimal,
 										cuitOrdenante: analyzerResult.ordenante?.cuit || null,
 										cuitBenef: analyzerResult.beneficiario?.cuit || null,
 										titular: analyzerResult.beneficiario?.nombre || null,
 										bufferHash: bufferHash,
 										// Nuevos campos del analyzer
-										banco: analyzerResult.transferencia?.banco || analyzerResult.operacion?.banco || null,
-										tipoOperacion: analyzerResult.transferencia?.tipoOperacion || analyzerResult.operacion?.tipoOperacion || null,
+										banco: analyzerResult.operacion?.banco || null,
+										tipoOperacion: analyzerResult.operacion?.tipoOperacion || null,
 										importeATransferir: importeATransferirDecimal,
 										importeTotal: importeTotalDecimal,
 										ordenanteNombre: analyzerResult.ordenante?.nombre || null,
@@ -1192,8 +1207,10 @@ export const POST: RequestHandler = async (event) => {
 				} else {
 					if (!createdPeriodId) {
 						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: falta periodId');
-					} else if (!analyzerResult || !analyzerResult.transferencia) {
-						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: faltan datos del analyzer');
+					} else if (!analyzerResult || !analyzerResult.operacion) {
+						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: faltan datos del analyzer (analyzerResult.operacion)');
+						console.log('[BANK][transfer] DEBUG - analyzerResult:', analyzerResult ? 'existe' : 'null');
+						console.log('[BANK][transfer] DEBUG - analyzerResult.operacion:', analyzerResult?.operacion ? 'existe' : 'null');
 					}
 				}
 			}
