@@ -4,6 +4,7 @@ import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
+import { requireAuth } from '$lib/server/auth/middleware';
 // No necesitamos importar File ya que usamos el tipo nativo de SvelteKit
 
 // Importar configuración centralizada
@@ -18,8 +19,14 @@ console.log(`📁 Usando directorio de subidas: ${UPLOAD_DIR}`);
 /**
  * Obtiene la lista de archivos PDF subidos
  */
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async (event) => {
   console.log('🔍 [GET] /api/files - Iniciando solicitud');
+
+  // Requerir autenticación
+  const auth = await requireAuth(event);
+  if (auth.error) {
+    return json({ error: auth.error }, { status: auth.status || 401 });
+  }
   
   try {
     // 1. Verificar conexión a la base de datos
@@ -121,12 +128,18 @@ export const GET: RequestHandler = async () => {
   }
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async (event) => {
   console.log('📤 [POST] /api/files - Iniciando subida de archivo');
-  
+
+  // Requerir autenticación
+  const auth = await requireAuth(event);
+  if (auth.error) {
+    return json({ error: auth.error }, { status: auth.status || 401 });
+  }
+
   try {
     // Verificar que la solicitud sea un FormData
-    const contentType = request.headers.get('content-type');
+    const contentType = event.request.headers.get('content-type');
     if (!contentType || !contentType.includes('multipart/form-data')) {
       console.error('❌ Content-Type no es multipart/form-data');
       return json(
@@ -155,7 +168,7 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     // Obtener el archivo del formulario
-    const formData = await request.formData();
+    const formData = await event.request.formData();
     const file = formData.get('file') as File;
     
     if (!file) {

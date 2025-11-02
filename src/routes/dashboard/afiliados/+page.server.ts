@@ -1,10 +1,15 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { MemberService } from '$lib/db/services/memberService';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ url, locals }) => {
+  // Validar que el usuario estÃ© autenticado
+  if (!locals.user) {
+    throw redirect(303, '/login');
+  }
+
   try {
-    // Obtener parámetros de búsqueda y paginación
+    // Obtener parÃ¡metros de bÃºsqueda y paginaciÃ³n
     const search = url.searchParams.get('search') || '';
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');

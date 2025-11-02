@@ -3,9 +3,14 @@ import { InstitutionService } from '$lib/db/services/institutionService';
 import { MemberService } from '$lib/db/services/memberService';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, locals }) => {
+  // Validar que el usuario esté autenticado
+  if (!locals.user) {
+    throw redirect(303, '/login');
+  }
+
   const institutionId = params.id;
-  
+
   if (!institutionId) {
     throw error(400, 'ID de institución requerido');
   }

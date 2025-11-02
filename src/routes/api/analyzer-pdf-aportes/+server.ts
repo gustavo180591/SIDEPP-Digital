@@ -4,6 +4,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { CONFIG } from '$lib/server/config';
+import { requireAuth } from '$lib/server/auth/middleware';
 // pdfParse se importa dinámicamente para evitar problemas de cliente
 import { ocrPdfFirstPage } from '$lib/server/pdf/ocr';
 import { extractLineData } from '$lib/server/pdf/parse-listado';
@@ -515,20 +516,26 @@ async function findMemberByName(
 	}
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async (event) => {
+	// Requerir autenticación
+	const auth = await requireAuth(event);
+	if (auth.error) {
+		return json({ error: auth.error }, { status: auth.status || 401 });
+	}
+
 	try {
 		console.log('\n\n========================================');
 		console.log('🚀 [APORTES] INICIO DE PROCESAMIENTO');
 		console.log('========================================\n');
 		
-		const contentType = request.headers.get('content-type');
+		const contentType = event.request.headers.get('content-type');
 		console.log('[APORTES][1] Content-Type:', contentType);
 		
 		if (!contentType || !contentType.includes('multipart/form-data')) {
 			return json({ error: 'Se esperaba multipart/form-data' }, { status: 400 });
 		}
 
-		const formData = await request.formData();
+		const formData = await event.request.formData();
 		const file = formData.get('file') as File | null;
 		const selectedPeriodRaw = (formData.get('selectedPeriod') as string | null) ?? null;
 		const allowOCR = String(formData.get('allowOCR') ?? 'true') === 'true';

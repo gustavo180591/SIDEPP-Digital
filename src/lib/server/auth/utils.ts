@@ -1,12 +1,11 @@
 import { prisma } from '$lib/server/db';
-import { randomBytes } from 'crypto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '$env/dynamic/private';
 
 export const SALT_ROUNDS = 10;
 const JWT_SECRET = env.JWT_SECRET || 'your-secret-key-change-in-production';
-const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 días
+const JWT_EXPIRES_IN = '7d';
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
@@ -16,78 +15,71 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
+export function generateToken(userId: string, email: string, role: string, institutionId?: string | null): string {
+  return jwt.sign(
+    {
+      userId,
+      email,
+      role,
+      institutionId
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
 }
 
-export async function verifyToken(token: string): Promise<{ userId: string } | null> {
+export async function verifyToken(token: string): Promise<{
+  userId: string;
+  email: string;
+  role: string;
+  institutionId?: string | null;
+} | null> {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      userId: string;
+      email: string;
+      role: string;
+      institutionId?: string | null;
+    };
     return decoded;
   } catch {
     return null;
   }
 }
 
-export async function createSession(userId: string, userAgent?: string, ipAddress?: string) {
-  const token = randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + SESSION_DURATION);
-  
-  const session = await prisma.session.create({
-    data: {
-      userId,
-      token,
-      expiresAt,
-      userAgent: userAgent || null,
-      ipAddress: ipAddress || null,
-    },
-  });
-
-  return {
-    token,
-    expiresAt,
-    sessionId: session.id,
-  };
-}
-
-export async function validateSession(token: string): Promise<{
+export async function validateUser(userId: string): Promise<{
   id: string;
   email: string;
   name: string | null;
-  role: 'ADMIN' | 'OPERATOR' | 'VIEWER';
+  role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+  institutionId: string | null;
 } | null> {
-  const session = await prisma.session.findUnique({
-    where: { token },
-    include: { user: true },
-  });
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        institutionId: true,
+        isActive: true
+      }
+    });
 
-  if (!session || new Date() > session.expiresAt) {
+    if (!user || !user.isActive) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      institutionId: user.institutionId
+    };
+  } catch (error) {
+    console.error('Error validating user:', error);
     return null;
   }
-
-  // Actualizar la última actividad
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { lastActivityAt: new Date() },
-  });
-
-  // Asegurarse de que el tipo de retorno coincida exactamente
-  return {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    role: session.user.role as 'ADMIN' | 'OPERATOR' | 'VIEWER',
-  };
-}
-
-export async function invalidateSession(token: string) {
-  await prisma.session.deleteMany({
-    where: { token },
-  });
-}
-
-export async function invalidateAllSessions(userId: string) {
-  await prisma.session.deleteMany({
-    where: { userId },
-  });
 }

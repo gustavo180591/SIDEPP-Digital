@@ -3,7 +3,17 @@ import type { InstitutionFilters, PaginationParams } from '$lib/db/models';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 
-export const load: ServerLoad = async ({ url }: { url: URL }) => {
+export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any }) => {
+  // Validar que el usuario esté autenticado
+  if (!locals.user) {
+    throw redirect(303, '/login');
+  }
+
+  // Validar que sea ADMIN (solo admins pueden ver instituciones)
+  if (locals.user.role !== 'ADMIN') {
+    throw redirect(303, '/unauthorized');
+  }
+
   try {
     // Obtener parámetros de la URL
     const searchParams = url.searchParams;

@@ -4,6 +4,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { CONFIG } from '$lib/server/config';
+import { requireAuth } from '$lib/server/auth/middleware';
 // pdfParse se importa dinámicamente para evitar problemas de cliente
 import { ocrPdfFirstPage } from '$lib/server/pdf/ocr';
 import { extractLineData } from '$lib/server/pdf/parse-listado';
@@ -590,14 +591,20 @@ async function findMemberByName(
 	}
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async (event) => {
+	// Requerir autenticación
+	const auth = await requireAuth(event);
+	if (auth.error) {
+		return json({ error: auth.error }, { status: auth.status || 401 });
+	}
+
 	try {
-		const contentType = request.headers.get('content-type');
+		const contentType = event.request.headers.get('content-type');
 		if (!contentType || !contentType.includes('multipart/form-data')) {
 			return json({ error: 'Se esperaba multipart/form-data' }, { status: 400 });
 		}
 
-		const formData = await request.formData();
+		const formData = await event.request.formData();
 		const file = formData.get('file') as File | null;
 		const selectedPeriodRaw = (formData.get('selectedPeriod') as string | null) ?? null;
 		const allowOCR = String(formData.get('allowOCR') ?? 'true') === 'true';
@@ -1022,6 +1029,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// Crear PayrollPeriod asociado a la institución y al PdfFile (solo si hay institución y pdfFile creado)
+		console.log('[BANK][payroll] 📋 Iniciando creación de PayrollPeriod...');
+		console.log('[BANK][payroll] institution:', institution ? `✓ ${institution.id}` : '❌ null');
+		console.log('[BANK][payroll] pdfFileId:', pdfFileId ? `✓ ${pdfFileId}` : '❌ null');
+
 		try {
 			if (institution && pdfFileId) {
 				// Determinar período a usar: seleccionado por UI o detectado del texto
