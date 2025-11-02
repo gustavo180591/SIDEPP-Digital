@@ -210,10 +210,19 @@
   }
 </script>
 
-<form class="rounded-lg border border-gray-200 bg-white shadow-md" on:submit|preventDefault={onSubmit}>
+<form class="bg-white shadow-xl rounded-xl border border-gray-100" on:submit|preventDefault={onSubmit}>
   <div class="p-6 space-y-4">
-    <h2 class="text-lg font-semibold">Analizador de PDF</h2>
-    <p class="text-sm text-gray-600">Sube un PDF y lo clasificamos como comprobante o listado.</p>
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+        </svg>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold text-gray-900">Analizador de PDF</h2>
+        <p class="text-sm text-gray-600">Sube un PDF y lo clasificamos como comprobante o listado.</p>
+      </div>
+    </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
@@ -313,50 +322,62 @@
       <label for="allowocr" class="text-sm text-gray-700">Permitir OCR si es necesario</label>
     </div>
 
-    <div class="flex justify-end">
-      <button class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed" disabled={uploading}>
+    <div class="flex justify-end pt-4 border-t border-gray-200">
+      <button class="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100" disabled={uploading}>
         {#if uploading}
+          <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
           Subiendo...
         {:else}
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+          </svg>
           Subir y analizar
         {/if}
       </button>
     </div>
 
     {#if errorMessage}
-      <div class="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-        <span>{errorMessage}</span>
+      <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>{errorMessage}</span>
+        </div>
       </div>
     {/if}
 
-    {#if resultSueldos || resultFopid || resultAguinaldo || resultTransfer}
-      <div class="my-2 border-t border-gray-200"></div>
+      {#if resultSueldos || resultFopid || resultAguinaldo || resultTransfer}
+      <div class="my-4 border-t border-gray-200 pt-4"></div>
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {#if resultSueldos}
-          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div class="text-sm text-gray-500">Aportes Sueldos</div>
-            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultSueldos.fileName}>{resultSueldos.fileName}</div>
+          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm font-semibold text-gray-600 mb-2">Aportes Sueldos</div>
+            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultSueldos.fileName}>{resultSueldos.fileName}</div>
             <div class="mt-1 text-sm text-gray-500">{(resultSueldos.size / 1024).toFixed(1)} KB</div>
           </div>
         {/if}
         {#if resultFopid}
-          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div class="text-sm text-gray-500">Aportes FOPID</div>
-            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultFopid.fileName}>{resultFopid.fileName}</div>
+          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm font-semibold text-gray-600 mb-2">Aportes FOPID</div>
+            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultFopid.fileName}>{resultFopid.fileName}</div>
             <div class="mt-1 text-sm text-gray-500">{(resultFopid.size / 1024).toFixed(1)} KB</div>
           </div>
         {/if}
         {#if resultAguinaldo}
-          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div class="text-sm text-gray-500">Aportes Aguinaldo</div>
-            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultAguinaldo.fileName}>{resultAguinaldo.fileName}</div>
+          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm font-semibold text-gray-600 mb-2">Aportes Aguinaldo</div>
+            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultAguinaldo.fileName}>{resultAguinaldo.fileName}</div>
             <div class="mt-1 text-sm text-gray-500">{(resultAguinaldo.size / 1024).toFixed(1)} KB</div>
           </div>
         {/if}
         {#if resultTransfer}
-          <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div class="text-sm text-gray-500">Transferencia Bancaria</div>
-            <div class="mt-1 text-base font-medium truncate max-w-[22rem]" title={resultTransfer.fileName}>{resultTransfer.fileName}</div>
+          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm font-semibold text-gray-600 mb-2">Transferencia Bancaria</div>
+            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultTransfer.fileName}>{resultTransfer.fileName}</div>
             <div class="mt-1 text-sm text-gray-500">{(resultTransfer.size / 1024).toFixed(1)} KB</div>
           </div>
         {/if}
@@ -394,8 +415,9 @@
       {/if}
 
       {#if aportesTotal != null || transferImporte != null}
-        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div class="rounded-lg border border-gray-200 bg-white p-4">
+        <div class="mt-6 border-t border-gray-200 pt-4">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-6">
             <div class="text-sm font-semibold text-gray-700 mb-2">Comparación de Totales</div>
             <div class="mt-2 text-sm space-y-2">
               <div class="flex justify-between items-center">
@@ -440,7 +462,7 @@
             </div>
           </div>
           {#if resultSueldos?.checks}
-            <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-6">
               <div class="text-sm text-gray-500">Comparación de período</div>
               <div class="mt-2 text-sm">
                 <div>Detectado en PDF: <span class="font-medium">{resultSueldos.checks.detectedPeriod?.raw || `${resultSueldos.checks.detectedPeriod?.month ?? '—'}/${resultSueldos.checks.detectedPeriod?.year ?? '—'}`}</span></div>
@@ -455,6 +477,7 @@
               </div>
             </div>
           {/if}
+          </div>
         </div>
       {/if}
     {/if}

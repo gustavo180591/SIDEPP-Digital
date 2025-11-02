@@ -115,12 +115,11 @@
   <title>{data.institution.name} - SIDEPP Digital</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-  <div class="container mx-auto p-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Header con navegación -->
     <div class="flex items-center gap-4 mb-6">
-      <a href="/dashboard/instituciones" class="btn btn-ghost btn-sm">
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <a href="/dashboard/instituciones" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:shadow-md transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
         Volver a Instituciones
@@ -136,22 +135,22 @@
     />
 
     <!-- Acciones -->
-    <div class="flex gap-2 mb-6">
-      <button class="btn btn-primary" on:click={openEditModal}>
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex flex-wrap gap-3 mb-6">
+      <button class="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105" on:click={openEditModal}>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
         </svg>
         Editar Institución
       </button>
-      <button class="btn btn-error text-white" on:click={openDeleteModal}>
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <button class="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105" on:click={openDeleteModal}>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
         </svg>
         Eliminar Institución
       </button>
-      <button class="btn btn-success text-white" on:click={openViewComprobantesModal}>
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+      <button class="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105" on:click={openViewComprobantesModal}>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
         Ver Comprobantes
       </button>
@@ -159,9 +158,8 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Información de la Institución -->
-      <div class="card bg-white shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-xl mb-4">Información General</h2>
+      <div class="bg-white shadow-xl rounded-xl border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Información General</h2>
           <div class="space-y-3">
             <div>
               <label class="text-sm font-medium text-gray-500">Nombre</label>
@@ -190,13 +188,11 @@
               <p class="text-gray-900">{data.institution.country || 'Argentina'}</p>
             </div>
           </div>
-        </div>
       </div>
 
       <!-- Información del Responsable -->
-      <div class="card bg-white shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-xl mb-4">Responsable</h2>
+      <div class="bg-white shadow-xl rounded-xl border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Responsable</h2>
           <div class="space-y-3">
             <div>
               <label class="text-sm font-medium text-gray-500">Nombre</label>
@@ -217,22 +213,20 @@
               <p class="text-gray-900">{data.institution.responsiblePhone || 'No especificado'}</p>
             </div>
           </div>
-        </div>
       </div>
     </div>
 
     <!-- Lista de Miembros -->
-    <div class="card bg-white shadow-sm mt-6">
-      <div class="card-body">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="card-title text-xl">Miembros de la Institución</h2>
-          <button class="btn btn-primary btn-sm" on:click={openMemberModal}>
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Agregar Miembro
-          </button>
-        </div>
+    <div class="bg-white shadow-xl rounded-xl border border-gray-100 p-6 mt-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-900">Miembros de la Institución</h2>
+        <button class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg transition-all" on:click={openMemberModal}>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          Agregar Miembro
+        </button>
+      </div>
         
         <!-- Buscador de miembros -->
         <SearchBox 
@@ -257,9 +251,7 @@
           onEdit={openMemberEditModal}
           onDelete={openMemberDeleteModal}
         />
-      </div>
     </div>
-  </div>
 </div>
 
 <!-- Modales de Institución -->

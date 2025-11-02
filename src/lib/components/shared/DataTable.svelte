@@ -33,7 +33,7 @@
   export let loading: boolean = false;
 </script>
 
-<div class="card bg-white shadow-lg border-0">
+<div class="card bg-white shadow-xl rounded-xl border border-gray-100">
   <div class="card-body p-0">
     {#if loading}
       <div class="flex justify-center items-center py-12">
@@ -74,7 +74,7 @@
           </thead>
           <tbody class="divide-y divide-gray-200">
             {#each data as item, index}
-              <tr class="hover:bg-gray-50 transition-colors duration-200 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+              <tr class="hover:bg-blue-50 transition-all duration-200 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
                 {#each columns as column}
                   <td class="px-4 py-3">
                     {#if column.render}
@@ -124,9 +124,9 @@
 
 <!-- Paginación -->
 {#if pagination && pagination.totalPages > 1}
-  <div class="flex justify-center items-center gap-3 p-4 bg-gray-50">
-    <button 
-      class="btn btn-sm btn-outline {pagination.currentPage === 1 ? 'btn-disabled' : ''}"
+  <div class="flex justify-center items-center gap-3 p-5 bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-b-xl border-t border-gray-200">
+    <button
+      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
       disabled={pagination.currentPage === 1}
       on:click={() => {
         const url = buildUrl({ page: String(pagination.currentPage - 1) });
@@ -138,14 +138,14 @@
       </svg>
       Anterior
     </button>
-    
-    <div class="flex gap-1">
+
+    <div class="flex gap-2">
       {#each Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
         const pageNum = Math.max(1, Math.min(pagination.totalPages - 4, pagination.currentPage - 2)) + i;
         return pageNum;
       }) as pageNum}
-        <button 
-          class="btn btn-sm {pageNum === pagination.currentPage ? 'btn-primary' : 'btn-outline'}"
+        <button
+          class="w-10 h-10 text-sm font-medium rounded-lg transition-all {pageNum === pagination.currentPage ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'}"
           on:click={() => {
             const url = buildUrl({ page: String(pageNum) });
             goto(url);
@@ -155,9 +155,9 @@
         </button>
       {/each}
     </div>
-    
-    <button 
-      class="btn btn-sm btn-outline {pagination.currentPage === pagination.totalPages ? 'btn-disabled' : ''}"
+
+    <button
+      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
       disabled={pagination.currentPage === pagination.totalPages}
       on:click={() => {
         const url = buildUrl({ page: String(pagination.currentPage + 1) });

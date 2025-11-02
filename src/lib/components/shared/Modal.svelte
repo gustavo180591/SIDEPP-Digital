@@ -25,37 +25,56 @@
 </script>
 
 {#if showModal}
-  <div class="modal modal-open">
-    <div class="modal-box max-w-2xl">
-      <h3 class="font-bold text-lg mb-4">{title}</h3>
+  <div class="fixed inset-0 z-50 overflow-y-auto animate-fade-in">
+    <!-- Backdrop with blur -->
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" on:click={onClose}></div>
+
+    <!-- Modal container -->
+    <div class="flex min-h-screen items-center justify-center p-4">
+      <div class="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full animate-slide-in-up border border-gray-200">
+        <div class="p-6">
+          <h3 class="font-bold text-2xl mb-6 text-gray-900">{title}</h3>
       
-      {#if type === 'delete'}
-        <div class="py-4">
-          <p class="text-gray-600 mb-4">
-            {deleteMessage || `¿Estás seguro de que deseas eliminar ${deleteItemName}?`}
-          </p>
-          <p class="text-sm text-red-600">
-            Esta acción no se puede deshacer.
-          </p>
-        </div>
-        <div class="modal-action">
-          {#if onDelete}
-            <button class="btn btn-error" on:click={onDelete}>
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-              Eliminar
-            </button>
-          {:else}
-            <button class="btn btn-error" form="delete-form">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-              Eliminar
-            </button>
-          {/if}
-          <button class="btn btn-ghost" on:click={onClose}>{cancelLabel}</button>
-        </div>
+          {#if type === 'delete'}
+            <div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+              <div class="flex items-start gap-3">
+                <div class="flex-shrink-0">
+                  <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-6.928-12.5a2 2 0 00-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-gray-800 font-medium mb-2">
+                    {deleteMessage || `¿Estás seguro de que deseas eliminar ${deleteItemName}?`}
+                  </p>
+                  <p class="text-sm text-red-700 font-medium">
+                    Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-3">
+              <button class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all" on:click={onClose}>
+                {cancelLabel}
+              </button>
+              {#if onDelete}
+                <button class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all flex items-center gap-2" on:click={onDelete}>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                  Eliminar
+                </button>
+              {:else}
+                <button class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all flex items-center gap-2" form="delete-form">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                  Eliminar
+                </button>
+              {/if}
+            </div>
         <form
           id="delete-form"
           method="POST"
@@ -121,28 +140,32 @@
             {/each}
           </div>
           
-          <div class="modal-action">
-            <button class="btn btn-primary" type="submit">
+          <div class="flex justify-end gap-3 mt-6">
+            <button class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all" type="button" on:click={onClose}>
+              {cancelLabel}
+            </button>
+            <button class="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all flex items-center gap-2" type="submit">
               {#if type === 'create'}
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 {submitLabel}
               {:else}
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                 </svg>
                 {submitLabel}
               {/if}
             </button>
-            <button class="btn btn-ghost" type="button" on:click={onClose}>{cancelLabel}</button>
           </div>
           
           {#each Object.entries(formData) as [key, value]}
             <input type="hidden" name={key} value={value} />
           {/each}
         </form>
-      {/if}
+          {/if}
+        </div>
+      </div>
     </div>
   </div>
 {/if}

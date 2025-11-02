@@ -64,54 +64,52 @@
   <title>Gestión de Instituciones - SIDEPP Digital</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-  <div class="container mx-auto p-6">
-    <!-- Header -->
-    <PageHeader 
-      title="Instituciones"
-      description="Gestiona las instituciones del sistema"
-      actionLabel="Nueva Institución"
-      onAction={() => showCreateModal = true}
-    />
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <!-- Header -->
+  <PageHeader 
+    title="Instituciones"
+    description="Gestiona las instituciones del sistema"
+    actionLabel="Nueva Institución"
+    onAction={() => showCreateModal = true}
+  />
 
-    <!-- Buscador -->
-    <SearchBox 
-      bind:searchTerm 
-      onSearch={handleSearch}
-      placeholder="Buscar por nombre o CUIT..."
-      label="Buscar institución"
-    />
+  <!-- Buscador -->
+  <SearchBox 
+    bind:searchTerm 
+    onSearch={handleSearch}
+    placeholder="Buscar por nombre o CUIT..."
+    label="Buscar institución"
+  />
 
-    <!-- Tabla de instituciones -->
-    <InstitutionTable 
-      institutions={data.institutions} 
-      pagination={data.pagination}
-      {buildUrl}
-      {goto}
-      onEdit={openEditModal} 
-      onDelete={openDeleteModal} 
-    />
+  <!-- Tabla de instituciones -->
+  <InstitutionTable 
+    institutions={data.institutions} 
+    pagination={data.pagination}
+    {buildUrl}
+    {goto}
+    onEdit={openEditModal} 
+    onDelete={openDeleteModal} 
+  />
 
-    <!-- Modales -->
-    <InstitutionModal 
-      showModal={showCreateModal}
-      modalType="create"
-      institution={null}
-      onClose={closeModals}
-    />
-    
-    <InstitutionModal 
-      showModal={showEditModal}
-      modalType="edit"
-      institution={selectedInstitution}
-      onClose={closeModals}
-    />
-    
-    <InstitutionModal 
-      showModal={showDeleteModal}
-      modalType="delete"
-      institution={selectedInstitution}
-      onClose={closeModals}
-    />
-  </div>
+  <!-- Modales -->
+  <InstitutionModal 
+    showModal={showCreateModal}
+    modalType="create"
+    institution={null}
+    onClose={closeModals}
+  />
+  
+  <InstitutionModal 
+    showModal={showEditModal}
+    modalType="edit"
+    institution={selectedInstitution}
+    onClose={closeModals}
+  />
+  
+  <InstitutionModal 
+    showModal={showDeleteModal}
+    modalType="delete"
+    institution={selectedInstitution}
+    onClose={closeModals}
+  />
 </div>

@@ -64,54 +64,52 @@
   <title>Gestión de Usuarios - SIDEPP Digital</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-  <div class="container mx-auto p-6">
-    <!-- Header -->
-    <PageHeader 
-      title="Usuarios"
-      description="Gestiona los usuarios del sistema"
-      actionLabel="Nuevo Usuario"
-      onAction={() => showCreateModal = true}
-    />
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <!-- Header -->
+  <PageHeader 
+    title="Usuarios"
+    description="Gestiona los usuarios del sistema"
+    actionLabel="Nuevo Usuario"
+    onAction={() => showCreateModal = true}
+  />
 
-    <!-- Buscador -->
-    <SearchBox 
-      bind:searchTerm 
-      onSearch={handleSearch}
-      placeholder="Buscar por nombre o email..."
-      label="Buscar usuario"
-    />
+  <!-- Buscador -->
+  <SearchBox 
+    bind:searchTerm 
+    onSearch={handleSearch}
+    placeholder="Buscar por nombre o email..."
+    label="Buscar usuario"
+  />
 
-    <!-- Tabla de usuarios -->
-    <UserTable 
-      users={data.users} 
-      pagination={data.pagination}
-      {buildUrl}
-      {goto}
-      onEdit={openEditModal} 
-      onDelete={openDeleteModal} 
-    />
+  <!-- Tabla de usuarios -->
+  <UserTable 
+    users={data.users} 
+    pagination={data.pagination}
+    {buildUrl}
+    {goto}
+    onEdit={openEditModal} 
+    onDelete={openDeleteModal} 
+  />
 
-    <!-- Modales -->
-    <UserModal 
-      showModal={showCreateModal}
-      modalType="create"
-      user={null}
-      onClose={closeModals}
-    />
-    
-    <UserModal 
-      showModal={showEditModal}
-      modalType="edit"
-      user={selectedUser}
-      onClose={closeModals}
-    />
-    
-    <UserModal 
-      showModal={showDeleteModal}
-      modalType="delete"
-      user={selectedUser}
-      onClose={closeModals}
-    />
-  </div>
+  <!-- Modales -->
+  <UserModal 
+    showModal={showCreateModal}
+    modalType="create"
+    user={null}
+    onClose={closeModals}
+  />
+  
+  <UserModal 
+    showModal={showEditModal}
+    modalType="edit"
+    user={selectedUser}
+    onClose={closeModals}
+  />
+  
+  <UserModal 
+    showModal={showDeleteModal}
+    modalType="delete"
+    user={selectedUser}
+    onClose={closeModals}
+  />
 </div>

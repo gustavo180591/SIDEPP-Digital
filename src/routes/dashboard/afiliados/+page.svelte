@@ -161,8 +161,7 @@
   <title>Afiliados - SIDEPP Digital</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-  <div class="container mx-auto p-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Header -->
     <PageHeader
       title="Afiliados"
@@ -173,7 +172,7 @@
 
     <!-- Estad�sticas -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <div class="card bg-white shadow-sm">
+      <div class="card bg-white shadow-sm p-4 rounded-2xl">
         <div class="card-body">
           <div class="flex items-center justify-between">
             <div>
@@ -189,7 +188,7 @@
         </div>
       </div>
 
-      <div class="card bg-white shadow-sm">
+      <div class="card bg-white shadow-sm p-4 rounded-2xl">
         <div class="card-body">
           <div class="flex items-center justify-between">
             <div>
@@ -207,7 +206,7 @@
         </div>
       </div>
 
-      <div class="card bg-white shadow-sm">
+      <div class="card bg-white shadow-sm p-4 rounded-2xl">
         <div class="card-body">
           <div class="flex items-center justify-between">
             <div>
@@ -227,10 +226,10 @@
     </div>
 
     <!-- Tabla de afiliados -->
-    <div class="card bg-white shadow-sm">
-      <div class="card-body">
+    <div class="bg-white shadow-xl rounded-xl border border-gray-100">
+      <div class="p-6">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="card-title text-xl">Listado de Afiliados</h2>
+          <h2 class="text-xl font-bold text-gray-900">Listado de Afiliados</h2>
         </div>
 
         <!-- Buscador -->
@@ -254,5 +253,4 @@
         />
       </div>
     </div>
-  </div>
 </div>
