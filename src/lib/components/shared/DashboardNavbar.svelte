@@ -3,15 +3,18 @@
   import { goto } from '$app/navigation';
   import MobileMenu from './MobileMenu.svelte';
 
-  export let user: {
-    id: string;
-    email: string;
-    name?: string | null;
-    role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
-    institutionId?: string | null;
-  } | null;
+  // Definir props usando Svelte 5 $props()
+  let { user }: {
+    user: {
+      id: string;
+      email: string;
+      name?: string | null;
+      role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+      institutionId?: string | null;
+    } | null
+  } = $props();
 
-  let mobileMenuOpen = false;
+  let mobileMenuOpen = $state(false);
 
   function handleLogout() {
     goto('/logout');
@@ -21,9 +24,17 @@
     mobileMenuOpen = !mobileMenuOpen;
   }
 
+  // Variable reactiva para rastrear el path actual (Svelte 5 runes)
+  let currentPath = $derived($page.url.pathname);
+
   // Función para determinar si un enlace está activo
   function isActive(path: string) {
-    return $page.url.pathname === path || $page.url.pathname.startsWith(path + '/');
+    if (path === '/dashboard') {
+      // Para el dashboard principal, solo coincidencia exacta
+      return currentPath === '/dashboard';
+    }
+    // Para sub-rutas, coincidir con la ruta y cualquier sub-ruta
+    return currentPath === path || currentPath.startsWith(path + '/');
   }
 
   // Obtener iniciales del usuario para el avatar
@@ -64,7 +75,7 @@
         <div class="hidden md:ml-8 md:flex md:space-x-1">
           <a
             href="/dashboard"
-            class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard') && !isActive('/dashboard/usuarios') && !isActive('/dashboard/instituciones') && !isActive('/dashboard/afiliados') && !isActive('/dashboard/upload') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />

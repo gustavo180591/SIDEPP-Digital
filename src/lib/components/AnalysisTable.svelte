@@ -53,12 +53,6 @@
           <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 border-r border-gray-200">
             Personas
           </th>
-          <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 border-r border-gray-200">
-            Tot Remunerativo
-          </th>
-          <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 border-r border-gray-200">
-            Cantidad Legajos
-          </th>
           <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
             Monto del Concepto
           </th>
@@ -68,14 +62,13 @@
         {#if personas.length > 0}
           {#each personas as persona}
             <tr class="hover:bg-gray-50">
-              <td class="px-4 py-3 text-sm font-medium text-gray-900 border-r border-gray-200">
-                {persona.nombre}
-              </td>
-              <td class="px-4 py-3 text-right text-sm font-mono text-gray-700 border-r border-gray-200">
-                {formatNumber(persona.totRemunerativo)}
-              </td>
-              <td class="px-4 py-3 text-center text-sm font-medium text-gray-700 border-r border-gray-200">
-                {persona.cantidadLegajos}
+              <td class="px-4 py-3 text-sm border-r border-gray-200">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-gray-900">{persona.nombre}</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {persona.cantidadLegajos} {persona.cantidadLegajos === 1 ? 'legajo' : 'legajos'}
+                  </span>
+                </div>
               </td>
               <td class="px-4 py-3 text-right text-sm font-mono text-gray-700">
                 {formatNumber(persona.montoConcepto)}
@@ -84,7 +77,7 @@
           {/each}
         {:else}
           <tr>
-            <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500">
+            <td colspan="2" class="px-4 py-6 text-center text-sm text-gray-500">
               No se detectaron personas en el PDF
             </td>
           </tr>
@@ -106,11 +99,7 @@
 
   <!-- Información adicional si está disponible -->
   {#if tableData}
-    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-      <div class="rounded-lg border border-gray-200 bg-white p-3">
-        <div class="text-xs text-gray-500">Total Remunerativo</div>
-        <div class="text-sm font-medium">{currency(totalRemunerativo)}</div>
-      </div>
+    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
       <div class="rounded-lg border border-gray-200 bg-white p-3">
         <div class="text-xs text-gray-500">Total Legajos</div>
         <div class="text-sm font-medium">{totalLegajos}</div>

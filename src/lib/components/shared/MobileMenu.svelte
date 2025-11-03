@@ -1,21 +1,31 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  
-  export let user: {
-    id: string;
-    email: string;
-    name?: string | null;
-    role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
-    institutionId?: string | null;
-  } | null;
-  
-  export let isOpen = false;
-  
+
+  // Definir props usando Svelte 5 $props()
+  let { user, isOpen = false }: {
+    user: {
+      id: string;
+      email: string;
+      name?: string | null;
+      role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+      institutionId?: string | null;
+    } | null;
+    isOpen?: boolean;
+  } = $props();
+
+  // Variable reactiva para rastrear el path actual (Svelte 5 runes)
+  let currentPath = $derived($page.url.pathname);
+
   // Función para determinar si un enlace está activo
   function isActive(path: string) {
-    return $page.url.pathname === path;
+    if (path === '/dashboard') {
+      // Para el dashboard principal, solo coincidencia exacta
+      return currentPath === '/dashboard';
+    }
+    // Para sub-rutas, coincidir con la ruta y cualquier sub-ruta
+    return currentPath === path || currentPath.startsWith(path + '/');
   }
-  
+
   function closeMenu() {
     isOpen = false;
   }
