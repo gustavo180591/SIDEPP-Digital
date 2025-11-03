@@ -30,8 +30,18 @@ export const load: PageServerLoad = async ({ params, url }) => {
       throw error(404, 'Comprobante no encontrado');
   }
 
+  // Validar que tenga institutionId
+  if (!payroll.institutionId) {
+    throw error(400, 'El período de nómina no tiene institución asociada');
+  }
+
+  // Validar que tenga al menos un PDF
+  if (!payroll.pdfFile) {
+    throw error(404, 'No hay archivos PDF asociados a este período de nómina');
+  }
+
   // Usar la institución del payroll para garantizar consistencia
-  const institutionIdFromPayroll: string = payroll.institutionId as string;
+  const institutionIdFromPayroll: string = payroll.institutionId;
   const institution = await InstitutionService.getById(institutionIdFromPayroll);
   if (!institution) {
     throw error(404, 'Institución no encontrada');

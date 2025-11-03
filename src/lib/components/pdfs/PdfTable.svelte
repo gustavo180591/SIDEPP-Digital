@@ -37,16 +37,22 @@
     {
       key: 'period',
       label: 'Período',
-      render: (pdf: PdfFileWithPeriod) => `
-        <div class="text-sm">
-          <div class="font-medium text-gray-900">
-            ${(pdf.period.month || 0).toString().padStart(2, '0')}/${pdf.period.year || 'N/A'}
+      render: (pdf: PdfFileWithPeriod) => {
+        const month = pdf?.period?.month ?? 0;
+        const year = pdf?.period?.year ?? 0;
+        const concept = (pdf as any)?.concept ?? 'Sin concepto';
+
+        return `
+          <div class="text-sm">
+            <div class="font-medium text-gray-900">
+              ${month.toString().padStart(2, '0')}/${year || 'N/A'}
+            </div>
+            <div class="text-gray-500">
+              ${concept}
+            </div>
           </div>
-          <div class="text-gray-500">
-            ${(pdf as any).concept || 'Sin concepto'}
-          </div>
-        </div>
-      `
+        `;
+      }
     },
 
     
@@ -54,7 +60,7 @@
       key: 'transfer',
       label: 'Transferencia',
       render: (pdf: PdfFileWithPeriod) => {
-        if (pdf.period.transfer) {
+        if (pdf?.period?.transfer) {
           return `
             <div class="text-sm">
               <div class="font-medium text-green-600">Completada</div>
@@ -71,7 +77,7 @@
       key: 'status',
       label: 'Estado',
       render: (pdf: PdfFileWithPeriod) => {
-        const hasTransfer = !!pdf.period.transfer;
+        const hasTransfer = !!pdf?.period?.transfer;
         return `
           <span class="badge ${hasTransfer ? 'badge-success' : 'badge-warning'}">
             ${hasTransfer ? 'Procesado' : 'Pendiente'}

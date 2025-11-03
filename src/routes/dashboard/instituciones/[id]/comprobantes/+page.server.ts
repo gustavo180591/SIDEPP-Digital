@@ -26,8 +26,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');
 
-    // Obtener los payrolls (mapeados a pdf-like para la tabla)
-    const pdfs = await PayrollService.getByInstitution(institutionId, {
+    // Obtener los PDFs asociados a la institución
+    const pdfs = await PdfService.getByInstitution(institutionId, {
       search,
       year,
       month
@@ -39,9 +39,19 @@ export const load: PageServerLoad = async ({ params, url }) => {
     // Obtener estadísticas
     const stats = await PdfService.getStats(institutionId);
 
+    // Serializar los Decimals a números para evitar errores de SvelteKit
+    const serialize = (obj: any) => {
+      return JSON.parse(JSON.stringify(obj, (key, value) => {
+        if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'Decimal') {
+          return Number(value);
+        }
+        return value;
+      }));
+    };
+
     return {
       institution,
-      pdfs: pdfs.data,
+      pdfs: serialize(pdfs.data),
       pagination: {
         currentPage: pdfs.meta.currentPage,
         totalPages: pdfs.meta.lastPage,
@@ -51,7 +61,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
       search,
       year,
       month,
-      stats
+      stats: serialize(stats)
     };
   } catch (err) {
     console.error('Error al cargar comprobantes:', err);

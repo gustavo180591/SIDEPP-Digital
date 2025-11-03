@@ -113,6 +113,12 @@
     const fileAguinaldo = fileInputAguinaldo?.files?.[0];
     const fileTransfer = fileInputTransfer?.files?.[0];
 
+    // Validar período (mes y año requeridos)
+    if (!selectedMonth || !selectedYear) {
+      errorMessage = 'Debes seleccionar el mes y año del período.';
+      return;
+    }
+
     // Validar archivos requeridos
     if (!fileSueldos || !fileFopid) {
       errorMessage = 'Debes subir los archivos: Aportes Sueldos y Aportes FOPID.';
@@ -226,14 +232,15 @@
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
-        <label for="period" class="mb-1 block text-sm font-medium text-gray-700">Mes/Año</label>
+        <label for="period" class="mb-1 block text-sm font-medium text-gray-700">Mes/Año <span class="text-red-500">*</span></label>
         <div class="grid grid-cols-2 gap-2">
           <select
             id="month"
             bind:value={selectedMonth}
+            required
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           >
-            <option value="">Mes</option>
+            <option value="">Seleccionar mes</option>
             <option value="01">Enero</option>
             <option value="02">Febrero</option>
             <option value="03">Marzo</option>
@@ -247,15 +254,17 @@
             <option value="11">Noviembre</option>
             <option value="12">Diciembre</option>
           </select>
-          <input
+          <select
             id="year"
-            type="number"
-            placeholder="Año"
             bind:value={selectedYear}
-            min="2000"
-            max="2099"
+            required
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          />
+          >
+            <option value="">Seleccionar año</option>
+            {#each Array.from({ length: 31 }, (_, i) => 2010 + i) as year}
+              <option value={year}>{year}</option>
+            {/each}
+          </select>
         </div>
       </div>
       <div></div>

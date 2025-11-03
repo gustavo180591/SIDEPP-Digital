@@ -32,7 +32,7 @@
 </script>
 
 <svelte:head>
-  <title>Detalles del Comprobante - {data.institution.name} - SIDEPP Digital</title>
+  <title>Detalles del Comprobante - {data.institution?.name || 'Institución'} - SIDEPP Digital</title>
 </svelte:head>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -45,13 +45,13 @@
         </svg>
         Volver a Instituciones
       </a>
-      <a href="/dashboard/instituciones/{data.institution.id}" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones/{data.institution?.id}" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
         Ver Institución
       </a>
-      <a href="/dashboard/instituciones/{data.institution.id}/comprobantes" class="btn btn-ghost btn-sm">
+      <a href="/dashboard/instituciones/{data.institution?.id}/comprobantes" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
@@ -74,21 +74,21 @@
           <div class="space-y-3">
             <div>
               <label class="text-sm font-medium text-gray-500">Nombre del Archivo</label>
-              <p class="text-gray-900 font-mono">{data.pdfFile.fileName}</p>
+              <p class="text-gray-900 font-mono">{data.pdfFile?.fileName || 'Sin nombre'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Fecha de Subida</label>
-              <p class="text-gray-900">{formatDate(data.pdfFile.createdAt)}</p>
+              <p class="text-gray-900">{data.pdfFile?.createdAt ? formatDate(data.pdfFile.createdAt) : 'No especificada'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Período</label>
               <p class="text-gray-900">
-                {data.payroll.month.toString().padStart(2, '0')}/{data.payroll.year}
+                {(data.payroll?.month || 0).toString().padStart(2, '0')}/{data.payroll?.year || 0}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Concepto</label>
-              <p class="text-gray-900">{data.payroll.concept || 'Sin concepto'}</p>
+              <p class="text-gray-900">{data.pdfFile?.concept || data.payroll?.concept || 'Sin concepto'}</p>
             </div>
           </div>
         </div>
@@ -101,19 +101,19 @@
           <div class="space-y-3">
             <div>
               <label class="text-sm font-medium text-gray-500">Cantidad de Personas</label>
-              <p class="text-gray-900 text-2xl font-bold">{data.payroll.peopleCount || 0}</p>
+              <p class="text-gray-900 text-2xl font-bold">{data.pdfFile?.peopleCount || data.payroll?.peopleCount || 0}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Monto Total</label>
               <p class="text-gray-900 text-2xl font-bold text-green-600">
-                {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || 0)}
+                {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || data.pdfFile?.totalAmount || 0)}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Estado de Transferencia</label>
               <div class="mt-1">
-                {#key data.payroll.transfer}
-                  {#if data.payroll.transfer}
+                {#key data.payroll?.transfer}
+                  {#if data.payroll?.transfer}
                     <span class="badge {getTransferStatus(data.payroll.transfer).class}">
                       {getTransferStatus(data.payroll.transfer).text}
                     </span>
@@ -131,7 +131,7 @@
     </div>
 
     <!-- Información de Transferencia Bancaria -->
-    {#if data.payroll.transfer}
+    {#if data.payroll?.transfer}
       <div class="card bg-white shadow-sm mb-6">
         <div class="card-body">
           <h2 class="card-title text-xl mb-4">Transferencia Bancaria</h2>
@@ -139,30 +139,30 @@
             <div>
               <label class="text-sm font-medium text-gray-500">Fecha de Transferencia</label>
               <p class="text-gray-900">
-                {data.payroll.transfer.datetime ? formatDate(data.payroll.transfer.datetime) : 'No especificada'}
+                {data.payroll.transfer?.datetime ? formatDate(data.payroll.transfer.datetime) : 'No especificada'}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Número de Operación</label>
-              <p class="text-gray-900 font-mono">{data.payroll.transfer.operationNo || 'No especificado'}</p>
+              <p class="text-gray-900 font-mono">{data.payroll.transfer?.operationNo || 'No especificado'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Referencia</label>
-              <p class="text-gray-900">{data.payroll.transfer.reference || 'No especificada'}</p>
+              <p class="text-gray-900">{data.payroll.transfer?.reference || 'No especificada'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Importe</label>
               <p class="text-gray-900 text-xl font-bold text-green-600">
-                {formatCurrency(data.payroll.transfer.importe)}
+                {formatCurrency(data.payroll.transfer?.importe || 0)}
               </p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">CBU Destino</label>
-              <p class="text-gray-900 font-mono">{data.payroll.transfer.cbuDestino || 'No especificado'}</p>
+              <p class="text-gray-900 font-mono">{data.payroll.transfer?.cbuDestino || 'No especificado'}</p>
             </div>
             <div>
               <label class="text-sm font-medium text-gray-500">Titular</label>
-              <p class="text-gray-900">{data.payroll.transfer.titular || 'No especificado'}</p>
+              <p class="text-gray-900">{data.payroll.transfer?.titular || 'No especificado'}</p>
             </div>
           </div>
         </div>

@@ -541,15 +541,23 @@ export const POST: RequestHandler = async (event) => {
 		const file = formData.get('file') as File | null;
 		const selectedPeriodRaw = (formData.get('selectedPeriod') as string | null) ?? null;
 		const allowOCR = String(formData.get('allowOCR') ?? 'true') === 'true';
-		
+
 		console.log('[APORTES][2] Archivo recibido:', file?.name);
 		console.log('[APORTES][2] Tamaño:', file?.size, 'bytes');
 		console.log('[APORTES][2] Tipo:', file?.type);
 		console.log('[APORTES][2] Período seleccionado:', selectedPeriodRaw);
 		console.log('[APORTES][2] Permitir OCR:', allowOCR);
-		
+
 		if (!file) {
 			return json({ error: 'No se proporcionó ningún archivo' }, { status: 400 });
+		}
+
+		// Validar que se haya proporcionado el período
+		if (!selectedPeriodRaw || selectedPeriodRaw.trim() === '') {
+			return json({
+				error: 'Debe seleccionar el mes y año del período antes de subir el archivo',
+				message: 'Período requerido'
+			}, { status: 400 });
 		}
 
 		if (file.size > MAX_FILE_SIZE) {
@@ -1203,7 +1211,10 @@ export const POST: RequestHandler = async (event) => {
 				console.log('[APORTES][29] Usando:', { year: useYear, month: useMonth });
 
 				if (!useYear || !useMonth) {
-					const errorMsg = 'No se pudo determinar el período (mes/año). Seleccione un período o verifique el PDF.';
+					const errorMsg = `No se pudo determinar el período (mes/año).
+						Período seleccionado: ${selected ? `${selected.month}/${selected.year}` : 'ninguno'}
+						Período detectado en PDF: ${detected.year && detected.month ? `${detected.month}/${detected.year}` : 'ninguno'}
+						Por favor, seleccione el mes y año en el formulario.`;
 					console.error('[APORTES][29] ❌', errorMsg);
 					throw new Error(errorMsg);
 				}
