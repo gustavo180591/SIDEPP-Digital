@@ -995,8 +995,7 @@ export const POST: RequestHandler = async (event) => {
 		// Priorizar datos del analyzer mejorado
 		let transferAmount: number | null = null;
 		if (analyzerResult && analyzerResult.operacion && analyzerResult.operacion.importe) {
-			const importeStr = String(analyzerResult.operacion.importe).replace(/\./g, '').replace(',', '.');
-			transferAmount = parseFloat(importeStr);
+			transferAmount = Number(analyzerResult.operacion.importe);
 			console.log('[BANK][transfer] ✓ Importe del analyzer mejorado:', transferAmount);
 		} else {
 			transferAmount = extractTransferAmount(fullText);
@@ -1030,8 +1029,7 @@ export const POST: RequestHandler = async (event) => {
 
 				// Para comprobantes bancarios, usar el importe de la transferencia
 				if (analyzerResult && analyzerResult.operacion && analyzerResult.operacion.importe) {
-					const importeStr = String(analyzerResult.operacion.importe).replace(/\./g, '').replace(',', '.');
-					totalAmountNumber = parseFloat(importeStr) || 0;
+					totalAmountNumber = Number(analyzerResult.operacion.importe) || 0;
 					peopleCount = null; // Los comprobantes no tienen peopleCount
 					console.log('[BANK][total] ✓ Usando importe de transferencia:', totalAmountNumber);
 				} else {
@@ -1106,24 +1104,19 @@ export const POST: RequestHandler = async (event) => {
 							// Parsear importe
 							let importeDecimal = 0;
 							if (analyzerResult.operacion.importe) {
-								const importeStr = String(analyzerResult.operacion.importe).replace(/\./g, '').replace(',', '.');
-								importeDecimal = parseFloat(importeStr) || 0;
+								importeDecimal = Number(analyzerResult.operacion.importe) || 0;
 							}
 
 							// Parsear importeATransferir si existe
 							let importeATransferirDecimal = null;
 							if (analyzerResult.operacion?.importeATransferir) {
-								const str = String(analyzerResult.operacion.importeATransferir).replace(/\./g, '').replace(',', '.');
-								const parsed = parseFloat(str);
-								importeATransferirDecimal = !isNaN(parsed) ? parsed : null;
+								importeATransferirDecimal = Number(analyzerResult.operacion.importeATransferir) || null;
 							}
 
 							// Parsear importeTotal si existe
 							let importeTotalDecimal = null;
 							if (analyzerResult.operacion?.importeTotal) {
-								const str = String(analyzerResult.operacion.importeTotal).replace(/\./g, '').replace(',', '.');
-								const parsed = parseFloat(str);
-								importeTotalDecimal = !isNaN(parsed) ? parsed : null;
+								importeTotalDecimal = Number(analyzerResult.operacion.importeTotal) || null;
 							}
 
 							// Parsear fecha (desde operacion.fechaHora o desde fecha + hora separados)
