@@ -9,6 +9,7 @@ declare global {
         name?: string | null;
         role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
         institutionId?: string | null;
+        institutionName?: string | null;
       };
     }
 

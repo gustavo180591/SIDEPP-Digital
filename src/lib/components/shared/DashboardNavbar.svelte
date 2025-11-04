@@ -11,6 +11,7 @@
       name?: string | null;
       role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
       institutionId?: string | null;
+      institutionName?: string | null;
     } | null
   } = $props();
 
@@ -153,6 +154,9 @@
             <div class="flex flex-col">
               <span class="text-sm font-semibold text-gray-900">{user?.name || user?.email}</span>
               <span class="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase()}</span>
+              {#if user?.institutionName}
+                <span class="text-xs text-blue-600 font-medium">{user.institutionName}</span>
+              {/if}
             </div>
           </div>
         </div>

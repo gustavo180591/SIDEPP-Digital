@@ -53,6 +53,7 @@ export async function validateUser(userId: string): Promise<{
   name: string | null;
   role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
   institutionId: string | null;
+  institutionName: string | null;
 } | null> {
   try {
     const user = await prisma.user.findUnique({
@@ -63,7 +64,12 @@ export async function validateUser(userId: string): Promise<{
         name: true,
         role: true,
         institutionId: true,
-        isActive: true
+        isActive: true,
+        institution: {
+          select: {
+            name: true
+          }
+        }
       }
     });
 
@@ -76,7 +82,8 @@ export async function validateUser(userId: string): Promise<{
       email: user.email,
       name: user.name,
       role: user.role,
-      institutionId: user.institutionId
+      institutionId: user.institutionId,
+      institutionName: user.institution?.name || null
     };
   } catch (error) {
     console.error('Error validating user:', error);

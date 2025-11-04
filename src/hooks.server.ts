@@ -33,7 +33,8 @@ const auth: Handle = async ({ event, resolve }) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        institutionId: user.institutionId
+        institutionId: user.institutionId,
+        institutionName: user.institutionName
       };
     } else {
       // Usuario no existe o está inactivo

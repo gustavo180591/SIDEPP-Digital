@@ -9,6 +9,7 @@
       name?: string | null;
       role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
       institutionId?: string | null;
+      institutionName?: string | null;
     } | null;
     isOpen?: boolean;
   } = $props();
@@ -104,6 +105,11 @@
             <div class="text-sm font-medium text-gray-500">
               {user?.role}
             </div>
+            {#if user?.institutionName}
+              <div class="text-sm font-medium text-blue-600">
+                {user.institutionName}
+              </div>
+            {/if}
           </div>
         </div>
       </div>
