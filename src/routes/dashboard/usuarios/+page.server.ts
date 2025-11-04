@@ -1,4 +1,5 @@
 import { UserService } from '$lib/db/services/userService';
+import { InstitutionService } from '$lib/db/services/institutionService';
 import type { UserFilters, PaginationParams } from '$lib/db/models';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
@@ -44,9 +45,14 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
 
     // Obtener usuarios
     const result = await UserService.findMany(filters, pagination);
+
+    // Obtener instituciones para el dropdown
+    const institutionsResult = await InstitutionService.findMany({}, { page: 1, limit: 100 });
+
     console.log(result);
     return {
       users: result.data,
+      institutions: institutionsResult.data,
       pagination: {
         currentPage: result.meta.currentPage,
         totalPages: result.meta.lastPage,
@@ -59,6 +65,7 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
     console.error('Error al cargar usuarios:', error);
     return {
       users: [],
+      institutions: [],
       pagination: {
         currentPage: 1,
         totalPages: 0,

@@ -92,24 +92,27 @@
   />
 
   <!-- Modales -->
-  <UserModal 
+  <UserModal
     showModal={showCreateModal}
     modalType="create"
     user={null}
+    institutions={data.institutions}
     onClose={closeModals}
   />
-  
-  <UserModal 
+
+  <UserModal
     showModal={showEditModal}
     modalType="edit"
     user={selectedUser}
+    institutions={data.institutions}
     onClose={closeModals}
   />
-  
-  <UserModal 
+
+  <UserModal
     showModal={showDeleteModal}
     modalType="delete"
     user={selectedUser}
+    institutions={data.institutions}
     onClose={closeModals}
   />
 </div>

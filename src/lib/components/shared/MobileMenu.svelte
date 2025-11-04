@@ -44,14 +44,14 @@
       </a>
       
       {#if user?.role === 'ADMIN'}
-        <a 
-          href="/dashboard/usuarios" 
+        <a
+          href="/dashboard/usuarios"
           on:click={closeMenu}
           class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/usuarios') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Usuarios
         </a>
-        
+
         <a
           href="/dashboard/instituciones"
           on:click={closeMenu}
@@ -68,24 +68,24 @@
           Afiliados
         </a>
       {/if}
-      
+
       {#if user?.role === 'INTITUTION'}
-        <a 
-          href="/dashboard/instituciones" 
+        <a
+          href="/dashboard/afiliados"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/instituciones') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/afiliados') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
-          Mi Institución
+          Afiliados
+        </a>
+
+        <a
+          href="/dashboard/upload"
+          on:click={closeMenu}
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/upload') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+        >
+          Subir Archivos
         </a>
       {/if}
-      
-      <a 
-        href="/dashboard/upload" 
-        on:click={closeMenu}
-        class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/upload') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
-      >
-        Subir Archivos
-      </a>
       
       <!-- Información del usuario en móvil -->
       <div class="pt-4 pb-3 border-t border-gray-200">

@@ -1,15 +1,12 @@
 <script lang="ts">
   import { Modal } from '$lib/components/shared';
   import type { UserListItem, UserRole } from '$lib/db/models';
-  import { InstitutionService } from '$lib/db/services/institutionService';
-  
+
   export let showModal: boolean;
   export let modalType: 'create' | 'edit' | 'delete';
   export let user: UserListItem | null = null;
+  export let institutions: Array<{ id: string; name: string | null }> = [];
   export let onClose: () => void;
-
-  let institutions: Array<{ id: string; name: string }> = [];
-  let loadingInstitutions = false;
 
   let formData = {
     name: user?.name || '',
@@ -20,11 +17,6 @@
     role: user?.role || 'INTITUTION' as UserRole,
     isActive: user?.isActive ?? true
   };
-
-  // Cargar instituciones al abrir el modal
-  $: if (showModal && institutions.length === 0) {
-    loadInstitutions();
-  }
 
   // Reset form data when user changes or modal opens
   $: if (user && modalType === 'edit' && showModal) {
@@ -51,21 +43,6 @@
         role: 'INTITUTION',
         isActive: true
       };
-    }
-  }
-
-  async function loadInstitutions() {
-    try {
-      loadingInstitutions = true;
-      const result = await InstitutionService.findMany({}, { page: 1, limit: 100 });
-      institutions = result.data.map(inst => ({
-        id: inst.id,
-        name: inst.name
-      }));
-    } catch (error) {
-      console.error('Error al cargar instituciones:', error);
-    } finally {
-      loadingInstitutions = false;
     }
   }
 
@@ -125,7 +102,7 @@
         { value: '', label: 'Sin institución' },
         ...institutions.map(inst => ({
           value: inst.id,
-          label: inst.name
+          label: inst.name || 'Sin nombre'
         }))
       ]
     },
