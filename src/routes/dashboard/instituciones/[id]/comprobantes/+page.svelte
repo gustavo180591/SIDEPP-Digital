@@ -123,9 +123,9 @@
             </div>
             <div class="ml-5 w-0 flex-1">
               <dl>
-                <dt class="text-sm font-semibold text-gray-600 truncate">Monto Total</dt>
+                <dt class="text-sm font-semibold text-gray-600 truncate">Monto Total Remunerativo</dt>
                 <dd class="text-2xl font-bold text-gray-900">
-                  ${Number(data.stats.totalAmount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  ${Number(data.stats.totalRemunerativo).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </dd>
               </dl>
             </div>
@@ -133,20 +133,22 @@
         </div>
       </div>
 
-      <div class="bg-white overflow-hidden shadow-lg hover:shadow-xl rounded-xl transition-all duration-300 hover:scale-105 border border-orange-100">
+      <div class="bg-white overflow-hidden shadow-lg hover:shadow-xl rounded-xl transition-all duration-300 hover:scale-105 border border-purple-100">
         <div class="p-6">
           <div class="flex items-center">
             <div class="flex-shrink-0">
-              <div class="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+              <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
               </div>
             </div>
             <div class="ml-5 w-0 flex-1">
               <dl>
-                <dt class="text-sm font-semibold text-gray-600 truncate">Últimos 30 días</dt>
-                <dd class="text-2xl font-bold text-gray-900">{data.stats.recentUploads}</dd>
+                <dt class="text-sm font-semibold text-gray-600 truncate">Monto Total del Concepto</dt>
+                <dd class="text-2xl font-bold text-gray-900">
+                  ${Number(data.stats.totalConcepto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </dd>
               </dl>
             </div>
           </div>

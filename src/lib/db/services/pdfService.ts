@@ -150,42 +150,34 @@ export class PdfService {
    */
   static async getStats(institutionId: string) {
     try {
-      const [totalPdfs, recentUploads] = await Promise.all([
-        prisma.pdfFile.count({
-          where: {
-            period: {
-              institutionId: institutionId
-            }
-          }
-        }),
-        prisma.pdfFile.count({
-          where: {
-            period: {
-              institutionId: institutionId
-            },
-            createdAt: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Últimos 30 días
-            }
-          }
-        })
-      ]);
-
-      // Obtener el monto total desde los PDFs asociados a períodos de la institución
-      const totalAmountResult = await prisma.pdfFile.aggregate({
+      // Contar total de PDFs
+      const totalPdfs = await prisma.pdfFile.count({
         where: {
           period: {
             institutionId: institutionId
           }
+        }
+      });
+
+      // Sumar totalRem y conceptAmount desde las líneas de contribución
+      const contributionTotals = await prisma.contributionLine.aggregate({
+        where: {
+          pdfFile: {
+            period: {
+              institutionId: institutionId
+            }
+          }
         },
         _sum: {
-          totalAmount: true
+          totalRem: true,
+          conceptAmount: true
         }
       });
 
       return {
         totalPdfs,
-        totalAmount: totalAmountResult._sum.totalAmount != null ? Number(totalAmountResult._sum.totalAmount) : 0,
-        recentUploads
+        totalRemunerativo: contributionTotals._sum.totalRem != null ? Number(contributionTotals._sum.totalRem) : 0,
+        totalConcepto: contributionTotals._sum.conceptAmount != null ? Number(contributionTotals._sum.conceptAmount) : 0
       };
     } catch (error) {
       console.error('Error al obtener estadísticas:', error);

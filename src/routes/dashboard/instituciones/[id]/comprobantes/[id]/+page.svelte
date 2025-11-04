@@ -67,17 +67,17 @@
 
     <!-- Información del Comprobante -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <!-- Información del PDF -->
+      <!-- Información del Comprobante -->
       <div class="card bg-white shadow-sm">
         <div class="card-body">
-          <h2 class="card-title text-xl mb-4">Información del Archivo</h2>
+          <h2 class="card-title text-xl mb-4">Información del Comprobante</h2>
           <div class="space-y-3">
             <div>
-              <label class="text-sm font-medium text-gray-500">Nombre del Archivo</label>
+              <label class="text-sm font-medium text-gray-500">Archivo</label>
               <p class="text-gray-900 font-mono">{data.pdfFile?.fileName || 'Sin nombre'}</p>
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-500">Fecha de Subida</label>
+              <label class="text-sm font-medium text-gray-500">Fecha de Carga</label>
               <p class="text-gray-900">{data.pdfFile?.createdAt ? formatDate(data.pdfFile.createdAt) : 'No especificada'}</p>
             </div>
             <div>
@@ -87,43 +87,33 @@
               </p>
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-500">Concepto</label>
+              <label class="text-sm font-medium text-gray-500">Tipo de Aporte / Concepto</label>
               <p class="text-gray-900">{data.pdfFile?.concept || data.payroll?.concept || 'Sin concepto'}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Información del Período de Nómina -->
+      <!-- Resumen del Período -->
       <div class="card bg-white shadow-sm">
         <div class="card-body">
-          <h2 class="card-title text-xl mb-4">Período de Nómina</h2>
+          <h2 class="card-title text-xl mb-4">Resumen del Período</h2>
           <div class="space-y-3">
             <div>
-              <label class="text-sm font-medium text-gray-500">Cantidad de Personas</label>
+              <label class="text-sm font-medium text-gray-500">Cantidad de Afiliados</label>
               <p class="text-gray-900 text-2xl font-bold">{data.pdfFile?.peopleCount || data.payroll?.peopleCount || 0}</p>
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-500">Monto Total</label>
-              <p class="text-gray-900 text-2xl font-bold text-green-600">
-                {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || data.pdfFile?.totalAmount || 0)}
+              <label class="text-sm font-medium text-gray-500">Total Remunerativo</label>
+              <p class="text-gray-900 text-xl font-bold text-blue-600">
+                {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.totalRem) || 0), 0) || 0)}
               </p>
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-500">Estado de Transferencia</label>
-              <div class="mt-1">
-                {#key data.payroll?.transfer}
-                  {#if data.payroll?.transfer}
-                    <span class="badge {getTransferStatus(data.payroll.transfer).class}">
-                      {getTransferStatus(data.payroll.transfer).text}
-                    </span>
-                  {:else}
-                    <span class="badge {getTransferStatus(null).class}">
-                      {getTransferStatus(null).text}
-                    </span>
-                  {/if}
-                {/key}
-              </div>
+              <label class="text-sm font-medium text-gray-500">Total del Concepto</label>
+              <p class="text-gray-900 text-xl font-bold text-green-600">
+                {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || data.pdfFile?.totalAmount || 0)}
+              </p>
             </div>
           </div>
         </div>
@@ -169,22 +159,22 @@
       </div>
     {/if}
 
-    <!-- Líneas de Contribución -->
+    <!-- Detalle por Afiliado -->
     <div class="card bg-white shadow-sm">
       <div class="card-body">
-        <h2 class="card-title text-xl mb-4">Líneas de Contribución</h2>
-        
+        <h2 class="card-title text-xl mb-4">Detalle por Afiliado</h2>
+
         {#if data.contributionLines && data.contributionLines.length > 0}
           <div class="overflow-x-auto">
             <table class="table table-zebra w-full">
               <thead>
                 <tr>
-                  <th>Miembro</th>
+                  <th>Afiliado</th>
                   <th>Concepto</th>
-                  <th>Cantidad</th>
-                  <th>Monto por Concepto</th>
-                  <th>Total REM</th>
-                  <th>Estado</th>
+                  <th class="text-center">Cantidad</th>
+                  <th class="text-right">Remuneración Total</th>
+                  <th class="text-right">Aporte del Concepto</th>
+                  <th class="text-center">Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,26 +187,26 @@
                           <div class="text-sm text-gray-500">DNI: {line.member.documentoIdentidad || '-'}</div>
                         </div>
                       {:else}
-                        <span class="text-gray-500">Sin miembro asignado</span>
+                        <span class="text-gray-500">Sin afiliado asignado</span>
                       {/if}
                     </td>
                     <td>
                       <div class="font-medium">{line.name || 'Sin nombre'}</div>
                     </td>
-                    <td>
+                    <td class="text-center">
                       <span class="badge badge-outline">{line.quantity || 0}</span>
                     </td>
-                    <td>
-                      <div class="text-right">
-                        {formatCurrency(line.conceptAmount || 0)}
-                      </div>
-                    </td>
-                    <td>
-                      <div class="text-right font-medium">
+                    <td class="text-right">
+                      <div class="font-medium text-blue-600">
                         {formatCurrency(line.totalRem || 0)}
                       </div>
                     </td>
-                    <td>
+                    <td class="text-right">
+                      <div class="font-medium text-green-600">
+                        {formatCurrency(line.conceptAmount || 0)}
+                      </div>
+                    </td>
+                    <td class="text-center">
                       <span class="badge {line.status === 'PENDING' ? 'badge-warning' : line.status === 'MATCHED' ? 'badge-success' : 'badge-error'}">
                         {line.status === 'PENDING' ? 'Pendiente' : line.status === 'MATCHED' ? 'Coincide' : 'Faltante'}
                       </span>
@@ -231,7 +221,7 @@
             <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">No hay líneas de contribución</h3>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No hay detalles por afiliado</h3>
             <p class="text-gray-500">Este comprobante no tiene líneas de contribución asociadas.</p>
           </div>
         {/if}
