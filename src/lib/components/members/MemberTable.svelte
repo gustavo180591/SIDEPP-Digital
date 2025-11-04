@@ -51,13 +51,6 @@
       `
     },
     {
-      key: 'numeroMatricula',
-      label: 'N° Matrícula',
-      render: (member: Member) => `
-        <span class="badge badge-outline text-xs">${member.numeroMatricula}</span>
-      `
-    },
-    {
       key: 'membershipStartDate',
       label: 'Fecha de Ingreso',
       render: (member: Member) => `

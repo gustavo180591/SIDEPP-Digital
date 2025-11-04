@@ -15,6 +15,16 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
     throw error(400, 'ID de institución requerido');
   }
 
+  // Validar que usuarios INTITUTION solo puedan acceder a su propia institución
+  if (locals.user.role === 'INTITUTION') {
+    if (!locals.user.institutionId) {
+      throw error(403, 'Usuario sin institución asignada');
+    }
+    if (institutionId !== locals.user.institutionId) {
+      throw error(403, 'No tiene permiso para ver esta institución');
+    }
+  }
+
   try {
     // Obtener los datos de la institución
     const institution = await InstitutionService.getById(institutionId);
@@ -54,11 +64,21 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 
 export const actions: Actions = {
   // Crear miembro
-  createMember: async ({ request, params }) => {
+  createMember: async ({ request, params, locals }) => {
     const institutionId = params.id;
-    
+
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
+    }
+
+    // Validar que usuarios INTITUTION solo puedan crear miembros en su institución
+    if (locals.user?.role === 'INTITUTION') {
+      if (!locals.user.institutionId) {
+        throw error(403, 'Usuario sin institución asignada');
+      }
+      if (institutionId !== locals.user.institutionId) {
+        throw error(403, 'No tiene permiso para modificar esta institución');
+      }
     }
 
     try {
@@ -103,11 +123,21 @@ export const actions: Actions = {
   },
 
   // Actualizar miembro
-  updateMember: async ({ request, params }) => {
+  updateMember: async ({ request, params, locals }) => {
     const institutionId = params.id;
-    
+
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
+    }
+
+    // Validar que usuarios INTITUTION solo puedan actualizar miembros de su institución
+    if (locals.user?.role === 'INTITUTION') {
+      if (!locals.user.institutionId) {
+        throw error(403, 'Usuario sin institución asignada');
+      }
+      if (institutionId !== locals.user.institutionId) {
+        throw error(403, 'No tiene permiso para modificar esta institución');
+      }
     }
 
     try {
@@ -156,14 +186,24 @@ export const actions: Actions = {
   },
 
   // Eliminar miembro
-  deleteMember: async ({ request, params }) => {
+  deleteMember: async ({ request, params, locals }) => {
     const institutionId = params.id;
-    
+
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
     }
 
-    try {
+    // Validar que usuarios INTITUTION solo puedan eliminar miembros de su institución
+    if (locals.user?.role === 'INTITUTION') {
+      if (!locals.user.institutionId) {
+        throw error(403, 'Usuario sin institución asignada');
+      }
+      if (institutionId !== locals.user.institutionId) {
+        throw error(403, 'No tiene permiso para modificar esta institución');
+      }
+    }
+
+    try{
       const formData = await request.formData();
       const memberId = formData.get('id') as string;
       
@@ -181,11 +221,21 @@ export const actions: Actions = {
   },
 
   // Actualizar institución
-  update: async ({ request, params }) => {
+  update: async ({ request, params, locals }) => {
     const institutionId = params.id;
-    
+
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
+    }
+
+    // Validar que usuarios INTITUTION solo puedan actualizar su propia institución
+    if (locals.user?.role === 'INTITUTION') {
+      if (!locals.user.institutionId) {
+        throw error(403, 'Usuario sin institución asignada');
+      }
+      if (institutionId !== locals.user.institutionId) {
+        throw error(403, 'No tiene permiso para modificar esta institución');
+      }
     }
 
     try {

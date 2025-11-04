@@ -822,6 +822,33 @@ export const POST: RequestHandler = async (event) => {
 				if (existing) {
 					console.log('[APORTES][23] ✓ Institución encontrada:', { id: existing.id, cuit: existing.cuit, name: existing.name });
 					institution = { id: existing.id, name: existing.name ?? null, cuit: existing.cuit ?? null, address: existing.address ?? null };
+
+					// Validar que usuarios INTITUTION solo puedan subir PDFs de su institución
+					if (auth.user.role === 'INTITUTION') {
+						if (!auth.user.institutionId) {
+							console.error('[APORTES][23] ❌ Usuario INTITUTION sin institución asignada');
+							return json({
+								status: 'error',
+								message: 'Usuario sin institución asignada',
+								details: {}
+							}, { status: 403 });
+						}
+						if (auth.user.institutionId !== institution.id) {
+							console.error('[APORTES][23] ❌ Usuario intenta subir PDF de otra institución:', {
+								userInstitutionId: auth.user.institutionId,
+								pdfInstitutionId: institution.id
+							});
+							return json({
+								status: 'error',
+								message: 'No tiene permiso para subir archivos para esta institución',
+								details: {
+									institutionName: institution.name,
+									institutionCuit: institution.cuit
+								}
+							}, { status: 403 });
+						}
+						console.log('[APORTES][23] ✓ Validación de institución OK para usuario INTITUTION');
+					}
 				} else {
 					console.error('[APORTES][23] ❌ No existe institución con ese CUIT');
 					return json({

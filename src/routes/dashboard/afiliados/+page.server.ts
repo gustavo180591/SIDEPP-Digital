@@ -13,7 +13,15 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     const search = url.searchParams.get('search') || '';
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');
-    const institutionId = url.searchParams.get('institutionId') || undefined;
+    let institutionId = url.searchParams.get('institutionId') || undefined;
+
+    // Si el usuario es INTITUTION, forzar filtro por su institución
+    if (locals.user.role === 'INTITUTION') {
+      if (!locals.user.institutionId) {
+        throw error(403, 'Usuario sin institución asignada');
+      }
+      institutionId = locals.user.institutionId;
+    }
 
     // Obtener todos los miembros con filtros
     const members = await MemberService.getAll({

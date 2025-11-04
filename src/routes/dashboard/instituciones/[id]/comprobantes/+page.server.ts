@@ -4,11 +4,21 @@ import { PayrollService } from '$lib/db/services/payrollService';
 import { PdfService } from '$lib/db/services/pdfService';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, locals }) => {
   const institutionId = params.id;
-  
+
   if (!institutionId) {
     throw error(400, 'ID de institución requerido');
+  }
+
+  // Validar que usuarios INTITUTION solo puedan acceder a su propia institución
+  if (locals.user?.role === 'INTITUTION') {
+    if (!locals.user.institutionId) {
+      throw error(403, 'Usuario sin institución asignada');
+    }
+    if (institutionId !== locals.user.institutionId) {
+      throw error(403, 'No tiene permiso para ver esta institución');
+    }
   }
 
   try {

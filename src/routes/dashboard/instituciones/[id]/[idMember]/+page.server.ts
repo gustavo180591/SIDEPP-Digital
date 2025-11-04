@@ -3,11 +3,21 @@ import { MemberService } from '$lib/db/services/memberService';
 import { InstitutionService } from '$lib/db/services/institutionService';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
   const { id: institutionId, idMember } = params;
 
   if (!institutionId || !idMember) {
     throw error(400, 'ID de institución y miembro requeridos');
+  }
+
+  // Validar que usuarios INTITUTION solo puedan acceder a miembros de su institución
+  if (locals.user?.role === 'INTITUTION') {
+    if (!locals.user.institutionId) {
+      throw error(403, 'Usuario sin institución asignada');
+    }
+    if (institutionId !== locals.user.institutionId) {
+      throw error(403, 'No tiene permiso para ver esta institución');
+    }
   }
 
   // Obtener los datos de la institución

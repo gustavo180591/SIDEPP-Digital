@@ -3,7 +3,7 @@ import { InstitutionService } from '$lib/db/services/institutionService';
 import { PayrollService } from '$lib/db/services/payrollService';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, locals }) => {
   // Resolver IDs con fallbacks de URL
   let urlInstitutionId: string | undefined = params.id as string | undefined;
   let payrollId: string | undefined = (params as any).id_1 ?? (params as any).pdfId ?? (params as any).pid;
@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
       payrollId = payrollId || segments[idx + 3];
     }
   }
-  
+
   if (!payrollId) {
     throw error(400, 'ID de nómina (payroll) requerido');
   }
@@ -33,6 +33,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
   // Validar que tenga institutionId
   if (!payroll.institutionId) {
     throw error(400, 'El período de nómina no tiene institución asociada');
+  }
+
+  // Validar que usuarios INTITUTION solo puedan acceder a comprobantes de su institución
+  if (locals.user?.role === 'INTITUTION') {
+    if (!locals.user.institutionId) {
+      throw error(403, 'Usuario sin institución asignada');
+    }
+    if (payroll.institutionId !== locals.user.institutionId) {
+      throw error(403, 'No tiene permiso para ver este comprobante');
+    }
   }
 
   // Validar que tenga al menos un PDF

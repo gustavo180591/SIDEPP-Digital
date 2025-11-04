@@ -65,16 +65,28 @@ const auth: Handle = async ({ event, resolve }) => {
 
     console.log('🔐 Verificando autorización - Ruta:', path, 'Rol:', userRole);
 
-    // Definir rutas que requieren roles específicos
-    const adminRoutes = ['/dashboard/usuarios', '/dashboard/instituciones'];
+    // Rutas exclusivas para ADMIN
+    const adminOnlyRoutes = ['/dashboard/usuarios'];
 
-    const needsAdmin = adminRoutes.some((r) => path.startsWith(r));
+    // Rutas de instituciones - permitir ADMIN e INTITUTION
+    const institutionRoutes = ['/dashboard/instituciones'];
 
-    console.log('🔐 Necesita admin:', needsAdmin);
+    // Verificar rutas solo-admin
+    const needsAdminOnly = adminOnlyRoutes.some((r) => path.startsWith(r));
+    const isInstitutionRoute = institutionRoutes.some((r) => path.startsWith(r));
 
-    // Verificar permisos
-    if (needsAdmin && userRole !== 'ADMIN') {
+    console.log('🔐 Ruta solo-admin:', needsAdminOnly, '| Ruta institución:', isInstitutionRoute);
+
+    // Bloquear rutas solo-admin para no-admins
+    if (needsAdminOnly && userRole !== 'ADMIN') {
       console.log('❌ Sin permisos de admin, redirigiendo a unauthorized');
+      throw redirect(303, '/unauthorized');
+    }
+
+    // Para rutas de instituciones, permitir ADMIN e INTITUTION
+    // Las validaciones a nivel de página verificarán que INTITUTION solo vea su institución
+    if (isInstitutionRoute && userRole !== 'ADMIN' && userRole !== 'INTITUTION') {
+      console.log('❌ Sin permisos para ver instituciones, redirigiendo a unauthorized');
       throw redirect(303, '/unauthorized');
     }
 
