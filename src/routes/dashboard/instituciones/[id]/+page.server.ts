@@ -143,13 +143,19 @@ export const actions: Actions = {
     try {
       const formData = await request.formData();
       const memberId = formData.get('id') as string;
-      
+
       if (!memberId) {
         return { success: false, message: 'ID de miembro requerido' };
       }
 
+      // Obtener el miembro actual para preservar el fullName original
+      const currentMember = await MemberService.findById(memberId);
+      if (!currentMember) {
+        return { success: false, message: 'Miembro no encontrado' };
+      }
+
       const memberData = {
-        fullName: formData.get('fullName') as string,
+        fullName: currentMember.fullName, // Preservar el nombre original (no editable)
         email: formData.get('email') as string,
         numeroOrden: formData.get('numeroOrden') as string,
         numeroMatricula: formData.get('numeroMatricula') as string,

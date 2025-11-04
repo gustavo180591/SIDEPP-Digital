@@ -67,7 +67,8 @@
       type: 'text',
       placeholder: 'Nombre completo del miembro',
       required: true,
-      value: formData.fullName
+      value: formData.fullName,
+      readonly: modalType === 'edit' // Solo lectura al editar
     },
     {
       name: 'email',

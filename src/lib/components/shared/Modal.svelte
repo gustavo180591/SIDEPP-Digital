@@ -18,6 +18,7 @@
     value?: any;
     span?: number; // Para grid cols
     options?: Array<{ value: string; label: string }>; // Para campos select
+    readonly?: boolean; // Para campos de solo lectura
   }> = [];
   export let deleteMessage: string = '';
   export let deleteItemName: string = '';
@@ -112,11 +113,12 @@
                   <span class="label-text">{field.label} {field.required ? '*' : ''}</span>
                 </label>
                 {#if field.type === 'select'}
-                  <select 
+                  <select
                     id={field.name}
                     name={field.name}
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors {field.readonly ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500'}"
                     required={field.required}
+                    disabled={field.readonly}
                   >
                     <option value="">{field.placeholder || 'Seleccionar...'}</option>
                     {#each field.options || [] as option}
@@ -126,14 +128,15 @@
                     {/each}
                   </select>
                 {:else}
-                  <input 
+                  <input
                     id={field.name}
-                    type={field.type} 
+                    type={field.type}
                     name={field.name}
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors {field.readonly ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500'}"
                     placeholder={field.placeholder || field.label}
                     value={field.value || ''}
                     required={field.required}
+                    readonly={field.readonly}
                   />
                 {/if}
               </div>
