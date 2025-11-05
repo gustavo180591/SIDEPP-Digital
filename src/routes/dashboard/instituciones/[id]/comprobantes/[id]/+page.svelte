@@ -105,32 +105,7 @@
       </div>
 
       <!-- Resumen - Condicional por tipo -->
-      {#if ['SUELDO', 'FOPID', 'AGUINALDO'].includes(data.pdfFile?.type)}
-        <!-- Resumen con detalles de afiliados -->
-        <div class="card bg-white shadow-sm">
-          <div class="card-body">
-            <h2 class="card-title text-xl mb-4">Resumen del Período</h2>
-            <div class="space-y-3">
-              <div>
-                <label class="text-sm font-medium text-gray-500">Cantidad de Afiliados</label>
-                <p class="text-gray-900 text-2xl font-bold">{data.pdfFile?.peopleCount || data.payroll?.peopleCount || 0}</p>
-              </div>
-              <div>
-                <label class="text-sm font-medium text-gray-500">Total Remunerativo</label>
-                <p class="text-gray-900 text-xl font-bold text-blue-600">
-                  {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.totalRem) || 0), 0) || 0)}
-                </p>
-              </div>
-              <div>
-                <label class="text-sm font-medium text-gray-500">Total del Concepto</label>
-                <p class="text-gray-900 text-xl font-bold text-green-600">
-                  {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || data.pdfFile?.totalAmount || 0)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      {:else if data.pdfFile?.type === 'COMPROBANTE'}
+      {#if data.pdfFile?.type === 'COMPROBANTE'}
         <!-- Información del Comprobante -->
         <div class="card bg-white shadow-sm">
           <div class="card-body">
@@ -149,11 +124,36 @@
               {#if data.pdfFile?.metadata}
                 <div>
                   <label class="text-sm font-medium text-gray-500">Metadata del Documento</label>
-                  <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                  <div class="text-sm text-gray-600 bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
                     <pre class="whitespace-pre-wrap">{JSON.stringify(data.pdfFile.metadata, null, 2)}</pre>
                   </div>
                 </div>
               {/if}
+            </div>
+          </div>
+        </div>
+      {:else if ['SUELDO', 'FOPID', 'AGUINALDO'].includes(data.pdfFile?.type)}
+        <!-- Resumen con detalles de afiliados -->
+        <div class="card bg-white shadow-sm">
+          <div class="card-body">
+            <h2 class="card-title text-xl mb-4">Resumen del Archivo</h2>
+            <div class="space-y-3">
+              <div>
+                <label class="text-sm font-medium text-gray-500">Cantidad de Afiliados</label>
+                <p class="text-gray-900 text-2xl font-bold">{data.pdfFile?.peopleCount || 0}</p>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-500">Total Remunerativo</label>
+                <p class="text-gray-900 text-xl font-bold text-blue-600">
+                  {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.totalRem) || 0), 0) || 0)}
+                </p>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-500">Total del Concepto</label>
+                <p class="text-gray-900 text-xl font-bold text-green-600">
+                  {formatCurrency(data.contributionLines?.reduce((acc, line) => acc + (Number(line.conceptAmount) || 0), 0) || data.pdfFile?.totalAmount || 0)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -200,10 +200,39 @@
     {/if}
 
     <!-- Detalle por Afiliado - Solo para SUELDO, FOPID, AGUINALDO -->
-    {#if ['SUELDO', 'FOPID', 'AGUINALDO'].includes(data.pdfFile?.type)}
+    {#if data.pdfFile?.type === 'COMPROBANTE'}
+      <!-- Información adicional para Comprobantes -->
       <div class="card bg-white shadow-sm">
         <div class="card-body">
-          <h2 class="card-title text-xl mb-4">Detalle por Afiliado</h2>
+          <div class="flex items-center gap-4 mb-4">
+            <div class="flex-shrink-0">
+              <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 class="card-title text-xl">Comprobante de Pago</h2>
+              <p class="text-gray-600">Este es un comprobante general sin detalles individuales por afiliado.</p>
+            </div>
+          </div>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div class="text-sm text-blue-800">
+                <p class="font-medium mb-1">Sobre este tipo de documento</p>
+                <p>Los comprobantes de tipo COMPROBANTE son documentos de respaldo que certifican el pago realizado. No contienen información detallada de aportes individuales. Para consultar los detalles por afiliado, revise los documentos de tipo SUELDO, FOPID o AGUINALDO del mismo período.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {:else if ['SUELDO', 'FOPID', 'AGUINALDO'].includes(data.pdfFile?.type)}
+      <div class="card bg-white shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title text-xl mb-4">Contribuciones por Afiliado</h2>
 
           {#if data.contributionLines && data.contributionLines.length > 0}
             <div class="overflow-x-auto">
@@ -262,39 +291,10 @@
               <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
-              <h3 class="text-lg font-medium text-gray-900 mb-2">No hay detalles por afiliado</h3>
-              <p class="text-gray-500">Este documento no tiene líneas de contribución asociadas.</p>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">No hay contribuciones registradas</h3>
+              <p class="text-gray-500">Este archivo no tiene líneas de contribución asociadas.</p>
             </div>
           {/if}
-        </div>
-      </div>
-    {:else if data.pdfFile?.type === 'COMPROBANTE'}
-      <!-- Información adicional para Comprobantes -->
-      <div class="card bg-white shadow-sm">
-        <div class="card-body">
-          <div class="flex items-center gap-4 mb-4">
-            <div class="flex-shrink-0">
-              <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </div>
-            <div>
-              <h2 class="card-title text-xl">Comprobante de Pago</h2>
-              <p class="text-gray-600">Este documento es un comprobante general que no contiene detalles individuales por afiliado.</p>
-            </div>
-          </div>
-
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div class="flex items-start gap-3">
-              <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <div class="text-sm text-blue-800">
-                <p class="font-medium mb-1">Información</p>
-                <p>Los comprobantes de tipo COMPROBANTE representan documentos de respaldo o certificaciones que no incluyen información detallada de aportes por afiliado. Para ver detalles individuales, consulte los documentos de tipo SUELDO, FOPID o AGUINALDO.</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     {/if}

@@ -63,8 +63,8 @@
 
   // Función para ver detalles de un PDF
   function viewPdfDetails(pdf: any) {
-    const payrollId = pdf?.period?.id || pdf?.id;
-    goto(`/dashboard/instituciones/${data.institution.id}/comprobantes/${payrollId}`);
+    const pdfFileId = pdf?.id;
+    goto(`/dashboard/instituciones/${data.institution.id}/comprobantes/${pdfFileId}`);
   }
 </script>
 
