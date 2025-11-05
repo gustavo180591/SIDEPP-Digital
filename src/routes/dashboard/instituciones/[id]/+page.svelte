@@ -117,6 +117,7 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Header con navegación -->
+    {#if data.user?.role === 'ADMIN'}
     <div class="flex items-center gap-4 mb-6">
       <a href="/dashboard/instituciones" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:shadow-md transition-all">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,6 +126,7 @@
         Volver a Instituciones
       </a>
     </div>
+    {/if}
 
     <!-- Header de la institución -->
     <PageHeader 

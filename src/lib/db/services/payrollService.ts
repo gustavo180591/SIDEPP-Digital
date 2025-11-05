@@ -111,6 +111,11 @@ export class PayrollService {
       createdAt: firstPdf.createdAt,
       updatedAt: firstPdf.updatedAt,
       bufferHash: firstPdf.bufferHash,
+      type: firstPdf.type,
+      concept: firstPdf.concept,
+      peopleCount: firstPdf.peopleCount,
+      totalAmount: firstPdf.totalAmount != null ? Number(firstPdf.totalAmount) : null,
+      metadata: firstPdf.metadata,
       period: transformedPeriod,
       contributionLine: firstPdf.contributionLine.map((c) => ({
         id: c.id,

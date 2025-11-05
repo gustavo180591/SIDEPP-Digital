@@ -68,7 +68,7 @@
           {/if}
 
           {#if data.user && data.user.role === 'INTITUTION'}
-            <a href="/dashboard/instituciones" class="relative group bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <a href="/dashboard/instituciones/{data.user.institutionId}" class="relative group bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
               <div>
                 <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-md">
                   <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
