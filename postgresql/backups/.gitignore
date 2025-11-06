@@ -1,6 +1,6 @@
 # Ignorar todos los archivos de backup
-*.dump
-*.sql
+# *.dump
+# *.sql
 *.tar
 *.gz
 
