@@ -1,0 +1,8 @@
+# Ignorar todos los archivos de backup
+*.dump
+*.sql
+*.tar
+*.gz
+
+# Excepto este .gitignore
+!.gitignore
