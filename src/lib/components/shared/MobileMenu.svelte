@@ -68,6 +68,14 @@
         >
           Afiliados
         </a>
+
+        <a
+          href="/dashboard/reportes"
+          on:click={closeMenu}
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/reportes') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+        >
+          Reportes
+        </a>
       {/if}
 
       {#if user?.role === 'INTITUTION'}
