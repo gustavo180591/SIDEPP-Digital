@@ -78,6 +78,9 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/static ./static
 COPY --from=builder /app/prisma ./prisma
 
+# Crear directorio para uploads si no existe
+RUN mkdir -p /app/uploads
+
 # Variables de entorno
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -85,6 +88,10 @@ ENV HOST=0.0.0.0
 
 # Exponer el puerto
 EXPOSE 3000
+
+# Healthcheck para verificar que la app está funcionando
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Comando para iniciar la aplicación
 CMD ["node", "build"]
