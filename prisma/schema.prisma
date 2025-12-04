@@ -8,21 +8,21 @@ datasource db {
 }
 
 model Institution {
-  id               String          @id @default(cuid())
+  id               String            @id @default(cuid())
   name             String?
-  cuit             String?         @unique
+  cuit             String?           @unique
   address          String?
   city             String?
   state            String?
-  country          String?         @default("Argentina")
+  country          String?           @default("Argentina")
   responsibleName  String?
   responsibleEmail String?
   responsablePhone String?
-  createdAt        DateTime?       @default(now())
-  updatedAt        DateTime?       @updatedAt
+  createdAt        DateTime?         @default(now())
+  updatedAt        DateTime?         @updatedAt
   members          Member[]
   payrollPeriods   PayrollPeriod[]
-  users            User[]
+  userInstitutions UserInstitution[]
 
   @@map("institutions")
 }
@@ -135,24 +135,35 @@ model PdfFile {
 }
 
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
-  name          String?
-  password      String
-  institutionId String?
-  role          UserRole     @default(INTITUTION)
-  isActive      Boolean      @default(true)
-  lastLogin     DateTime?
-  loginAttempts Int          @default(0)
-  lockedUntil   DateTime?
-  resetToken    String?      @unique
-  resetExpires  DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  deletedAt     DateTime?
-  institution   Institution? @relation(fields: [institutionId], references: [id])
+  id               String            @id @default(cuid())
+  email            String            @unique
+  name             String?
+  password         String
+  role             UserRole          @default(LIQUIDADOR)
+  isActive         Boolean           @default(true)
+  lastLogin        DateTime?
+  loginAttempts    Int               @default(0)
+  lockedUntil      DateTime?
+  resetToken       String?           @unique
+  resetExpires     DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  userInstitutions UserInstitution[]
 
   @@map("users")
+}
+
+model UserInstitution {
+  id            String      @id @default(cuid())
+  userId        String
+  institutionId String
+  createdAt     DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, institutionId])
+  @@map("user_institutions")
 }
 
 enum PdfFileType {
@@ -170,6 +181,6 @@ enum ContributionStatus {
 
 enum UserRole {
   ADMIN
-  OPERATOR
-  INTITUTION
+  FINANZAS
+  LIQUIDADOR
 }

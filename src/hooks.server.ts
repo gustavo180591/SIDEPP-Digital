@@ -27,12 +27,14 @@ const auth: Handle = async ({ event, resolve }) => {
     const user = await validateUser(decoded.userId);
 
     if (user) {
-      console.log('✅ Usuario autenticado:', user.email, 'Rol:', user.role);
+      console.log('✅ Usuario autenticado:', user.email, 'Rol:', user.role, 'Instituciones:', user.institutions.length);
       event.locals.user = {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
+        institutions: user.institutions,
+        // Compatibilidad temporal
         institutionId: user.institutionId,
         institutionName: user.institutionName
       };
@@ -69,14 +71,21 @@ const auth: Handle = async ({ event, resolve }) => {
     // Rutas exclusivas para ADMIN
     const adminOnlyRoutes = ['/dashboard/usuarios'];
 
-    // Rutas de instituciones - permitir ADMIN e INTITUTION
-    const institutionRoutes = ['/dashboard/instituciones'];
+    // Rutas para subir - ADMIN y LIQUIDADOR
+    const uploadRoutes = ['/dashboard/upload'];
 
     // Verificar rutas solo-admin
     const needsAdminOnly = adminOnlyRoutes.some((r) => path.startsWith(r));
-    const isInstitutionRoute = institutionRoutes.some((r) => path.startsWith(r));
+    const isUploadRoute = uploadRoutes.some((r) => path.startsWith(r));
 
-    console.log('🔐 Ruta solo-admin:', needsAdminOnly, '| Ruta institución:', isInstitutionRoute);
+    // Verificar si es ruta de listado de instituciones (exacta) o afiliados
+    const isInstitutionsListRoute = path === '/dashboard/instituciones';
+    const isAfiliadosRoute = path.startsWith('/dashboard/afiliados');
+
+    // Verificar si es ruta de detalle de institución (/dashboard/instituciones/{id})
+    const isInstitutionDetailRoute = path.startsWith('/dashboard/instituciones/') && path !== '/dashboard/instituciones/';
+
+    console.log('🔐 Ruta solo-admin:', needsAdminOnly, '| Ruta upload:', isUploadRoute, '| Lista instituciones:', isInstitutionsListRoute, '| Detalle institución:', isInstitutionDetailRoute);
 
     // Bloquear rutas solo-admin para no-admins
     if (needsAdminOnly && userRole !== 'ADMIN') {
@@ -84,10 +93,27 @@ const auth: Handle = async ({ event, resolve }) => {
       throw redirect(303, '/unauthorized');
     }
 
-    // Para rutas de instituciones, permitir ADMIN e INTITUTION
-    // Las validaciones a nivel de página verificarán que INTITUTION solo vea su institución
-    if (isInstitutionRoute && userRole !== 'ADMIN' && userRole !== 'INTITUTION') {
-      console.log('❌ Sin permisos para ver instituciones, redirigiendo a unauthorized');
+    // Lista de instituciones: ADMIN, FINANZAS y LIQUIDADOR
+    if (isInstitutionsListRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS' && userRole !== 'LIQUIDADOR') {
+      console.log('❌ Sin permisos para ver lista de instituciones');
+      throw redirect(303, '/unauthorized');
+    }
+
+    // Afiliados: solo ADMIN y FINANZAS
+    if (isAfiliadosRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS') {
+      console.log('❌ Sin permisos para ver afiliados');
+      throw redirect(303, '/unauthorized');
+    }
+
+    // Detalle de institución: solo ADMIN y FINANZAS pueden acceder
+    if (isInstitutionDetailRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS') {
+      console.log('❌ Sin permisos para ver detalle de institución');
+      throw redirect(303, '/unauthorized');
+    }
+
+    // Rutas de upload: solo ADMIN y LIQUIDADOR
+    if (isUploadRoute && userRole !== 'ADMIN' && userRole !== 'LIQUIDADOR') {
+      console.log('❌ Sin permisos para subir, redirigiendo a unauthorized');
       throw redirect(303, '/unauthorized');
     }
 

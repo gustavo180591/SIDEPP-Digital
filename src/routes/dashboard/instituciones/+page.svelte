@@ -7,11 +7,14 @@
 
   export let data: any;
 
+  // Verificar si es LIQUIDADOR (solo lectura)
+  $: isLiquidador = data.user?.role === 'LIQUIDADOR';
+
   let showCreateModal = false;
   let showEditModal = false;
   let showDeleteModal = false;
   let selectedInstitution: InstitutionListItem | null = null;
-  let searchTerm = data.filters.search || '';
+  let searchTerm = data.filters?.search || '';
   let searchTimeout: NodeJS.Timeout;
 
   // Función para construir URL con filtros
@@ -61,55 +64,101 @@
 </script>
 
 <svelte:head>
-  <title>Gestión de Instituciones - SIDEPP Digital</title>
+  <title>{isLiquidador ? 'Mis Instituciones' : 'Gestión de Instituciones'} - SIDEPP Digital</title>
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-  <!-- Header -->
-  <PageHeader 
-    title="Instituciones"
-    description="Gestiona las instituciones del sistema"
-    actionLabel="Nueva Institución"
-    onAction={() => showCreateModal = true}
-  />
+  {#if isLiquidador}
+    <!-- Vista solo lectura para LIQUIDADOR -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">Mis Instituciones</h1>
+      <p class="mt-2 text-gray-600">Instituciones asignadas a tu cuenta</p>
+    </div>
 
-  <!-- Buscador -->
-  <SearchBox 
-    bind:searchTerm 
-    onSearch={handleSearch}
-    placeholder="Buscar por nombre o CUIT..."
-    label="Buscar institución"
-  />
+    <!-- Lista simple de instituciones para LIQUIDADOR -->
+    {#if data.institutions && data.institutions.length > 0}
+      <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Institución</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CUIT</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ciudad</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            {#each data.institutions as institution}
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="font-medium text-gray-900">{institution.name}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="text-sm text-gray-600 font-mono">{institution.cuit || '-'}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="text-sm text-gray-600">{institution.city || '-'}</span>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else}
+      <div class="text-center py-12 bg-white rounded-lg shadow">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No tienes instituciones asignadas</h3>
+        <p class="mt-1 text-sm text-gray-500">Contacta al administrador para que te asigne una institución.</p>
+      </div>
+    {/if}
+  {:else}
+    <!-- Vista completa para ADMIN y FINANZAS -->
+    <PageHeader
+      title="Instituciones"
+      description="Gestiona las instituciones del sistema"
+      actionLabel="Nueva Institución"
+      onAction={() => showCreateModal = true}
+    />
 
-  <!-- Tabla de instituciones -->
-  <InstitutionTable 
-    institutions={data.institutions} 
-    pagination={data.pagination}
-    {buildUrl}
-    {goto}
-    onEdit={openEditModal} 
-    onDelete={openDeleteModal} 
-  />
+    <!-- Buscador -->
+    <SearchBox
+      bind:searchTerm
+      onSearch={handleSearch}
+      placeholder="Buscar por nombre o CUIT..."
+      label="Buscar institución"
+    />
 
-  <!-- Modales -->
-  <InstitutionModal 
-    showModal={showCreateModal}
-    modalType="create"
-    institution={null}
-    onClose={closeModals}
-  />
-  
-  <InstitutionModal 
-    showModal={showEditModal}
-    modalType="edit"
-    institution={selectedInstitution}
-    onClose={closeModals}
-  />
-  
-  <InstitutionModal 
-    showModal={showDeleteModal}
-    modalType="delete"
-    institution={selectedInstitution}
-    onClose={closeModals}
-  />
+    <!-- Tabla de instituciones -->
+    <InstitutionTable
+      institutions={data.institutions}
+      pagination={data.pagination}
+      {buildUrl}
+      {goto}
+      onEdit={openEditModal}
+      onDelete={openDeleteModal}
+    />
+
+    <!-- Modales -->
+    <InstitutionModal
+      showModal={showCreateModal}
+      modalType="create"
+      institution={null}
+      onClose={closeModals}
+    />
+
+    <InstitutionModal
+      showModal={showEditModal}
+      modalType="edit"
+      institution={selectedInstitution}
+      onClose={closeModals}
+    />
+
+    <InstitutionModal
+      showModal={showDeleteModal}
+      modalType="delete"
+      institution={selectedInstitution}
+      onClose={closeModals}
+    />
+  {/if}
 </div>

@@ -1,11 +1,12 @@
-import type { User, UserRole, Institution } from '@prisma/client';
+import type { User, UserRole, Institution, UserInstitution } from '@prisma/client';
 
 // Tipos para crear usuario
 export type CreateUserData = {
   email: string;
   name?: string;
   password: string;
-  institutionId?: string;
+  institutionId?: string;       // Para compatibilidad (single)
+  institutionIds?: string[];    // Para N:N (multiple)
   role?: UserRole;
   isActive?: boolean;
 };
@@ -15,9 +16,11 @@ export type UpdateUserData = Partial<Omit<CreateUserData, 'password'>> & {
   password?: string;
 };
 
-// Tipo para usuario con relaciones
+// Tipo para usuario con relaciones (N:N)
 export type UserWithRelations = User & {
-  institution: Institution | null;
+  userInstitutions: (UserInstitution & {
+    institution: Institution;
+  })[];
 };
 
 // Tipo para lista de usuarios (sin datos sensibles)
@@ -25,16 +28,17 @@ export type UserListItem = {
   id: string;
   email: string;
   name: string | null;
-  institutionId: string | null;
   role: UserRole;
   isActive: boolean;
   lastLogin: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  institution: {
-    id: string;
-    name: string;
-  } | null;
+  userInstitutions: {
+    institution: {
+      id: string;
+      name: string | null;
+    };
+  }[];
 };
 
 // Filtros para búsqueda de usuarios

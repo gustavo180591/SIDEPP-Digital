@@ -64,9 +64,6 @@
         <div class="font-medium text-gray-900">
           ${member.fullName || '-'}
         </div>
-        <div class="text-xs text-gray-500">
-          DNI: ${member.documentoIdentidad || '-'}
-        </div>
       `
     },
     {
@@ -79,43 +76,38 @@
                class="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200">
               ${member.institucion.name || '-'}
             </a>
-            <div class="text-xs text-gray-500">
-              CUIT: ${member.institucion.cuit || '-'}
-            </div>
           `;
         }
         return '<span class="text-sm text-gray-400">Sin institución</span>';
       }
     },
     {
-      key: 'email',
-      label: 'Email',
+      key: 'documentoIdentidad',
+      label: 'DNI',
+      render: (member: MemberWithInstitution) => `
+        <span class="text-sm text-gray-700 font-medium">${member.documentoIdentidad || '-'}</span>
+      `
+    },
+    {
+      key: 'numeroMatricula',
+      label: 'Nro. Afiliado',
+      render: (member: MemberWithInstitution) => `
+        <span class="badge badge-info text-xs">${member.numeroMatricula || '-'}</span>
+      `
+    },
+    {
+      key: 'phone',
+      label: 'Teléfono',
       render: (member: MemberWithInstitution) => {
-        if (member.email) {
+        if (member.phone) {
           return `
-            <a href="mailto:${member.email}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
-              ${member.email}
+            <a href="tel:${member.phone}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
+              ${member.phone}
             </a>
           `;
         }
         return '<span class="text-sm text-gray-400">-</span>';
       }
-    },
-    {
-      key: 'numeroOrden',
-      label: 'N° Orden',
-      render: (member: MemberWithInstitution) => `
-        <span class="badge badge-outline text-xs">${member.numeroOrden || '-'}</span>
-      `
-    },
-    {
-      key: 'membershipStartDate',
-      label: 'Fecha de Ingreso',
-      render: (member: MemberWithInstitution) => `
-        <div class="text-sm text-gray-600">
-          ${member.membershipStartDate ? new Date(member.membershipStartDate).toLocaleDateString('es-AR') : '-'}
-        </div>
-      `
     },
     {
       key: 'status',
@@ -229,7 +221,7 @@
         <SearchBox
           bind:searchTerm
           onSearch={handleSearch}
-          placeholder="Buscar por nombre, DNI, email, N° orden o matrícula..."
+          placeholder="Buscar por nombre, DNI, N° afiliado o teléfono..."
           label="Buscar afiliado"
         />
 

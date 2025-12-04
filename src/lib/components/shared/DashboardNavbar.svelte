@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import MobileMenu from './MobileMenu.svelte';
 
   // Definir props usando Svelte 5 $props()
@@ -9,17 +8,13 @@
       id: string;
       email: string;
       name?: string | null;
-      role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+      role: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
       institutionId?: string | null;
       institutionName?: string | null;
     } | null
   } = $props();
 
   let mobileMenuOpen = $state(false);
-
-  function handleLogout() {
-    goto('/logout');
-  }
 
   function toggleMobileMenu() {
     mobileMenuOpen = !mobileMenuOpen;
@@ -74,17 +69,20 @@
 
         <!-- Navegación desktop -->
         <div class="hidden md:ml-8 md:flex md:space-x-1">
-          <a
-            href="/dashboard"
-            class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            Dashboard
-          </a>
+          <!-- Dashboard: Solo ADMIN y FINANZAS -->
+          {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS'}
+            <a
+              href="/dashboard"
+              class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Dashboard
+            </a>
+          {/if}
 
-          <!-- Solo mostrar para ADMIN -->
+          <!-- Usuarios: Solo ADMIN -->
           {#if user?.role === 'ADMIN'}
             <a
               href="/dashboard/usuarios"
@@ -95,7 +93,10 @@
               </svg>
               Usuarios
             </a>
+          {/if}
 
+          <!-- Instituciones: ADMIN, FINANZAS y LIQUIDADOR -->
+          {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS' || user?.role === 'LIQUIDADOR'}
             <a
               href="/dashboard/instituciones"
               class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard/instituciones') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
@@ -103,9 +104,12 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              Instituciones
+              {user?.role === 'LIQUIDADOR' ? 'Mis Instituciones' : 'Instituciones'}
             </a>
+          {/if}
 
+          <!-- Afiliados: ADMIN y FINANZAS -->
+          {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS'}
             <a
               href="/dashboard/afiliados"
               class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard/afiliados') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
@@ -117,18 +121,8 @@
             </a>
           {/if}
 
-          <!-- Solo mostrar para INTITUTION -->
-          {#if user?.role === 'INTITUTION'}
-            <a
-              href="/dashboard/afiliados"
-              class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard/afiliados') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Afiliados
-            </a>
-
+          <!-- Subir Aportes: ADMIN y LIQUIDADOR -->
+          {#if user?.role === 'ADMIN' || user?.role === 'LIQUIDADOR'}
             <a
               href="/dashboard/upload"
               class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {isActive('/dashboard/upload') ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'}"
@@ -154,24 +148,23 @@
             <div class="flex flex-col">
               <span class="text-sm font-semibold text-gray-900">{user?.name || user?.email}</span>
               <span class="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase()}</span>
-              {#if user?.institutionName}
-                <span class="text-xs text-blue-600 font-medium">{user.institutionName}</span>
-              {/if}
             </div>
           </div>
         </div>
 
         <!-- Botón de logout mejorado -->
-        <button
-          on:click={handleLogout}
-          class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow"
-          title="Cerrar sesión"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-          </svg>
-          <span class="hidden lg:inline">Salir</span>
-        </button>
+        <form method="POST" action="/logout" class="inline">
+          <button
+            type="submit"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow"
+            title="Cerrar sesión"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            <span class="hidden lg:inline">Salir</span>
+          </button>
+        </form>
 
         <!-- Menú móvil (hamburguesa) -->
         <div class="md:hidden">

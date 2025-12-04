@@ -127,6 +127,24 @@
                       </option>
                     {/each}
                   </select>
+                {:else if field.type === 'multiselect'}
+                  <div class="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-2 bg-white">
+                    {#each field.options || [] as option}
+                      <label class="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name={field.name}
+                          value={option.value}
+                          checked={Array.isArray(field.value) && field.value.includes(option.value)}
+                          class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span class="text-sm text-gray-700">{option.label}</span>
+                      </label>
+                    {/each}
+                    {#if !field.options || field.options.length === 0}
+                      <p class="text-sm text-gray-400 p-1">No hay opciones disponibles</p>
+                    {/if}
+                  </div>
                 {:else}
                   <input
                     id={field.name}

@@ -14,13 +14,23 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');
     let institutionId = url.searchParams.get('institutionId') || undefined;
+    let institutionIds: string[] | undefined;
 
-    // Si el usuario es INTITUTION, forzar filtro por su institución
-    if (locals.user.role === 'INTITUTION') {
-      if (!locals.user.institutionId) {
+    // Si el usuario es LIQUIDADOR, forzar filtro por sus instituciones
+    if (locals.user.role === 'LIQUIDADOR') {
+      if (!locals.user.institutions || locals.user.institutions.length === 0) {
         throw error(403, 'Usuario sin institución asignada');
       }
-      institutionId = locals.user.institutionId;
+      // Si hay una institución seleccionada en URL, validar que el usuario tenga acceso
+      if (institutionId) {
+        const hasAccess = locals.user.institutions.some(inst => inst.id === institutionId);
+        if (!hasAccess) {
+          throw error(403, 'No tiene acceso a esta institución');
+        }
+      } else {
+        // Si no hay filtro, mostrar de todas sus instituciones
+        institutionIds = locals.user.institutions.map(inst => inst.id);
+      }
     }
 
     // Obtener todos los miembros con filtros
@@ -28,7 +38,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
       search,
       page,
       limit,
-      institutionId
+      institutionId,
+      institutionIds
     });
 
     return {

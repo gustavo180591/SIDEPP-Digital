@@ -1,5 +1,10 @@
-<script>
+<script lang="ts">
   import FileUploadForm from '$lib/components/FileUploadForm.svelte';
+
+  export let data: {
+    institutions: Array<{ id: string; name: string | null }>;
+    userRole: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
+  };
 </script>
 
 <svelte:head>
@@ -26,6 +31,6 @@
     </div>
 
     <!-- Upload Form -->
-    <FileUploadForm />
+    <FileUploadForm institutions={data.institutions} />
   </div>
 </div>

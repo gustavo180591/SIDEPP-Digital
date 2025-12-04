@@ -6,7 +6,7 @@ export interface AuthResult {
     id: string;
     email: string;
     name: string | null;
-    role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+    role: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
     institutionId: string | null;
   };
   error?: string;
@@ -56,7 +56,7 @@ export async function requireAuth(event: RequestEvent): Promise<AuthResult> {
  */
 export async function requireRole(
   event: RequestEvent,
-  allowedRoles: Array<'ADMIN' | 'OPERATOR' | 'INTITUTION'>
+  allowedRoles: Array<'ADMIN' | 'FINANZAS' | 'LIQUIDADOR'>
 ): Promise<AuthResult> {
   const authResult = await requireAuth(event);
 

@@ -164,17 +164,23 @@ export class MemberService {
     page?: number;
     limit?: number;
     institutionId?: string;
+    institutionIds?: string[];
   }) {
     try {
-      const { search = '', page = 1, limit = 10, institutionId } = options;
+      const { search = '', page = 1, limit = 10, institutionId, institutionIds } = options;
       const skip = (page - 1) * limit;
 
       const where: any = {
         deletedAt: null
       };
 
+      // Filtrar por una institución específica
       if (institutionId) {
         where.institucionId = institutionId;
+      }
+      // O filtrar por múltiples instituciones (para LIQUIDADOR con varias)
+      else if (institutionIds && institutionIds.length > 0) {
+        where.institucionId = { in: institutionIds };
       }
 
       if (search) {

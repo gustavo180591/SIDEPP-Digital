@@ -22,17 +22,28 @@ export class UserService {
       // Hash de la contraseña
       const hashedPassword = await bcrypt.hash(data.password, 12);
 
+      // Soportar institutionId (single) o institutionIds (multiple)
+      const institutionIds = data.institutionIds || (data.institutionId ? [data.institutionId] : []);
+
       const user = await prisma.user.create({
         data: {
           email: data.email,
           name: data.name,
           password: hashedPassword,
-          institutionId: data.institutionId,
-          role: data.role || 'INTITUTION',
-          isActive: data.isActive ?? true
+          role: data.role || 'LIQUIDADOR',
+          isActive: data.isActive ?? true,
+          userInstitutions: {
+            create: institutionIds.map(instId => ({
+              institutionId: instId
+            }))
+          }
         },
         include: {
-          institution: true
+          userInstitutions: {
+            include: {
+              institution: true
+            }
+          }
         }
       });
 
@@ -51,7 +62,11 @@ export class UserService {
       const user = await prisma.user.findUnique({
         where: { id },
         include: {
-          institution: true
+          userInstitutions: {
+            include: {
+              institution: true
+            }
+          }
         }
       });
 
@@ -70,7 +85,11 @@ export class UserService {
       const user = await prisma.user.findUnique({
         where: { email },
         include: {
-          institution: true
+          userInstitutions: {
+            include: {
+              institution: true
+            }
+          }
         }
       });
 
@@ -111,7 +130,11 @@ export class UserService {
       }
 
       if (institutionId) {
-        where.institutionId = institutionId;
+        where.userInstitutions = {
+          some: {
+            institutionId: institutionId
+          }
+        };
       }
 
       // Usar el paginador
@@ -121,16 +144,19 @@ export class UserService {
           id: true,
           email: true,
           name: true,
-          institutionId: true,
           role: true,
           isActive: true,
           lastLogin: true,
           createdAt: true,
           updatedAt: true,
-          institution: {
+          userInstitutions: {
             select: {
-              id: true,
-              name: true
+              institution: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
             }
           }
         },
@@ -159,11 +185,38 @@ export class UserService {
         updateData.password = await bcrypt.hash(data.password, 12);
       }
 
+      // Remover institutionIds del updateData ya que se maneja aparte
+      delete updateData.institutionIds;
+      delete updateData.institutionId;
+
+      // Si hay nuevas instituciones, actualizar la relación
+      const institutionIds = data.institutionIds || (data.institutionId ? [data.institutionId] : null);
+
+      if (institutionIds !== null) {
+        // Eliminar relaciones existentes y crear nuevas
+        await prisma.userInstitution.deleteMany({
+          where: { userId: id }
+        });
+
+        if (institutionIds.length > 0) {
+          await prisma.userInstitution.createMany({
+            data: institutionIds.map(instId => ({
+              userId: id,
+              institutionId: instId
+            }))
+          });
+        }
+      }
+
       const user = await prisma.user.update({
         where: { id },
         data: updateData,
         include: {
-          institution: true
+          userInstitutions: {
+            include: {
+              institution: true
+            }
+          }
         }
       });
 
@@ -224,7 +277,20 @@ export class UserService {
         throw new Error('Usuario no encontrado');
       }
 
-      return await this.update(id, { isActive: !user.isActive });
+      // Actualizar directamente sin pasar institutionIds para no resetear las instituciones
+      const updated = await prisma.user.update({
+        where: { id },
+        data: { isActive: !user.isActive },
+        include: {
+          userInstitutions: {
+            include: {
+              institution: true
+            }
+          }
+        }
+      });
+
+      return updated;
     } catch (error) {
       console.error('Error al cambiar estado del usuario:', error);
       throw new Error('No se pudo cambiar el estado del usuario');
@@ -240,7 +306,7 @@ export class UserService {
         prisma.user.count({ where: { deletedAt: null } }),
         prisma.user.count({ where: { isActive: true, deletedAt: null } }),
         prisma.user.count({ where: { role: 'ADMIN', deletedAt: null } }),
-        prisma.user.count({ where: { role: 'INTITUTION', deletedAt: null } })
+        prisma.user.count({ where: { role: 'LIQUIDADOR', deletedAt: null } })
       ]);
 
       return {

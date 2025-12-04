@@ -7,7 +7,7 @@
       id: string;
       email: string;
       name?: string | null;
-      role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+      role: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
       institutionId?: string | null;
       institutionName?: string | null;
     } | null;
@@ -36,14 +36,18 @@
 {#if isOpen}
   <div class="md:hidden">
     <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-b border-gray-200">
-      <a 
-        href="/dashboard" 
-        on:click={closeMenu}
-        class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
-      >
-        Dashboard
-      </a>
-      
+      <!-- Dashboard: Solo ADMIN y FINANZAS -->
+      {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS'}
+        <a
+          href="/dashboard"
+          on:click={closeMenu}
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+        >
+          Dashboard
+        </a>
+      {/if}
+
+      <!-- Usuarios: Solo ADMIN -->
       {#if user?.role === 'ADMIN'}
         <a
           href="/dashboard/usuarios"
@@ -52,15 +56,21 @@
         >
           Usuarios
         </a>
+      {/if}
 
+      <!-- Instituciones: ADMIN, FINANZAS y LIQUIDADOR -->
+      {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS' || user?.role === 'LIQUIDADOR'}
         <a
           href="/dashboard/instituciones"
           on:click={closeMenu}
           class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/instituciones') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
-          Instituciones
+          {user?.role === 'LIQUIDADOR' ? 'Mis Instituciones' : 'Instituciones'}
         </a>
+      {/if}
 
+      <!-- Afiliados: ADMIN y FINANZAS -->
+      {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS'}
         <a
           href="/dashboard/afiliados"
           on:click={closeMenu}
@@ -70,21 +80,14 @@
         </a>
       {/if}
 
-      {#if user?.role === 'INTITUTION'}
-        <a
-          href="/dashboard/afiliados"
-          on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/afiliados') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
-        >
-          Afiliados
-        </a>
-
+      <!-- Subir Aportes: ADMIN y LIQUIDADOR -->
+      {#if user?.role === 'ADMIN' || user?.role === 'LIQUIDADOR'}
         <a
           href="/dashboard/upload"
           on:click={closeMenu}
           class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/upload') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
-          Subir Archivos
+          Subir Aportes
         </a>
       {/if}
       

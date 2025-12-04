@@ -30,12 +30,17 @@
     },
     {
       key: 'institution',
-      label: 'Institución',
+      label: 'Instituciones',
       render: (user: UserListItem) => {
-        if (user.institution) {
+        if (user.userInstitutions && user.userInstitutions.length > 0) {
+          const names = user.userInstitutions.map(ui => ui.institution.name || 'Sin nombre');
+          if (names.length === 1) {
+            return `<div class="text-sm text-gray-900">${names[0]}</div>`;
+          }
           return `
             <div class="text-sm text-gray-900">
-              ${user.institution.name}
+              ${names[0]}
+              <span class="text-xs text-blue-600 ml-1">+${names.length - 1} más</span>
             </div>
           `;
         }
@@ -46,15 +51,15 @@
       key: 'role',
       label: 'Rol',
       render: (user: UserListItem) => {
-        const roleLabels = {
+        const roleLabels: Record<string, string> = {
           'ADMIN': 'Administrador',
-          'OPERATOR': 'Operador',
-          'INTITUTION': 'Institución'
+          'FINANZAS': 'Finanzas',
+          'LIQUIDADOR': 'Liquidador'
         };
-        const roleColors = {
+        const roleColors: Record<string, string> = {
           'ADMIN': 'badge-error',
-          'OPERATOR': 'badge-warning',
-          'INTITUTION': 'badge-info'
+          'FINANZAS': 'badge-warning',
+          'LIQUIDADOR': 'badge-info'
         };
         return `
           <span class="badge ${roleColors[user.role]} text-xs">

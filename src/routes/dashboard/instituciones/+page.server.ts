@@ -9,13 +9,30 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
     throw redirect(303, '/login');
   }
 
-  // Validar que sea ADMIN (solo admins pueden ver instituciones)
-  if (locals.user.role !== 'ADMIN') {
+  // Validar rol: ADMIN, FINANZAS o LIQUIDADOR
+  if (locals.user.role !== 'ADMIN' && locals.user.role !== 'FINANZAS' && locals.user.role !== 'LIQUIDADOR') {
     throw redirect(303, '/unauthorized');
   }
 
   try {
-    // Obtener parámetros de la URL
+    // Si es LIQUIDADOR, devolver solo sus instituciones asignadas
+    if (locals.user.role === 'LIQUIDADOR') {
+      const userInstitutions = locals.user.institutions || [];
+      return {
+        institutions: userInstitutions,
+        pagination: {
+          page: 1,
+          limit: userInstitutions.length,
+          total: userInstitutions.length,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false
+        },
+        filters: {}
+      };
+    }
+
+    // Para ADMIN y FINANZAS: obtener todas las instituciones con filtros
     const searchParams = url.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');

@@ -1,6 +1,9 @@
 <script lang="ts">
   import AnalysisTable from './AnalysisTable.svelte';
 
+  // Props
+  export let institutions: Array<{ id: string; name: string | null }> = [];
+
   let fileInputSueldos: HTMLInputElement | null = null;
   let fileInputFopid: HTMLInputElement | null = null;
   let fileInputAguinaldo: HTMLInputElement | null = null;
@@ -9,7 +12,13 @@
   let uploadingStage: string = '';
   let selectedMonth: string = '';
   let selectedYear: number | string = '';
+  let selectedInstitutionId: string = '';
   let allowOCR: boolean = true;
+
+  // Auto-seleccionar institución si solo hay una
+  $: if (institutions.length === 1 && !selectedInstitutionId) {
+    selectedInstitutionId = institutions[0].id;
+  }
 
   // Computed value para selectedPeriod en formato YYYY-MM
   $: selectedPeriod = selectedMonth && selectedYear ? `${selectedYear}-${selectedMonth}` : '';
@@ -150,6 +159,12 @@
       return;
     }
 
+    // Validar institución seleccionada
+    if (!selectedInstitutionId) {
+      errorMessage = 'Debes seleccionar una institución.';
+      return;
+    }
+
     // Validar archivos requeridos
     if (!fileSueldos || !fileFopid) {
       errorMessage = 'Debes subir los archivos: Aportes Sueldos y Aportes FOPID.';
@@ -176,6 +191,7 @@
         f.append('file', file);
         if (selectedPeriod) f.append('selectedPeriod', selectedPeriod);
         f.append('allowOCR', String(allowOCR));
+        f.append('institutionId', selectedInstitutionId);
         return f;
       };
 
@@ -333,7 +349,30 @@
           </select>
         </div>
       </div>
-      <div></div>
+      <div>
+        <label for="institution" class="mb-1 block text-sm font-medium text-gray-700">Institución <span class="text-red-500">*</span></label>
+        <select
+          id="institution"
+          bind:value={selectedInstitutionId}
+          required
+          disabled={institutions.length === 1}
+          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        >
+          {#if institutions.length === 0}
+            <option value="">No hay instituciones asignadas</option>
+          {:else if institutions.length === 1}
+            <option value={institutions[0].id}>{institutions[0].name || 'Sin nombre'}</option>
+          {:else}
+            <option value="">Seleccionar institución</option>
+            {#each institutions as inst}
+              <option value={inst.id}>{inst.name || 'Sin nombre'}</option>
+            {/each}
+          {/if}
+        </select>
+        {#if institutions.length === 1}
+          <p class="mt-1 text-xs text-gray-500">Institución asignada automáticamente</p>
+        {/if}
+      </div>
     </div>
 
     <div class="flex flex-col gap-4">

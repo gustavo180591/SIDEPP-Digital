@@ -7,6 +7,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
         email: locals.user.email,
         name: locals.user.name,
         role: locals.user.role,
+        institutions: locals.user.institutions || [],
         institutionId: locals.user.institutionId,
         institutionName: locals.user.institutionName
     } : null;

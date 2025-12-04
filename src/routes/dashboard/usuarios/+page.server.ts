@@ -81,12 +81,13 @@ export const actions: Actions = {
   create: async ({ request }: { request: Request }) => {
     try {
       const formData = await request.formData();
-      
+
       const name = formData.get('name') as string;
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
       const confirmPassword = formData.get('confirmPassword') as string;
-      const institutionId = formData.get('institutionId') as string;
+      // Obtener múltiples instituciones del form (multiselect envía múltiples values)
+      const institutionIds = formData.getAll('institutionIds') as string[];
       const role = formData.get('role') as any;
       const isActive = formData.get('isActive') === 'true';
 
@@ -109,13 +110,13 @@ export const actions: Actions = {
         return fail(400, { error: 'Ya existe un usuario con este email' });
       }
 
-      // Crear el usuario
+      // Crear el usuario con múltiples instituciones
       const user = await UserService.create({
         name: name?.trim() || undefined,
         email: email.trim(),
         password: password,
-        institutionId: institutionId?.trim() || undefined,
-        role: role || 'INTITUTION',
+        institutionIds: institutionIds.filter(id => id.trim()),
+        role: role || 'LIQUIDADOR',
         isActive
       });
 
@@ -129,12 +130,13 @@ export const actions: Actions = {
   update: async ({ request }: { request: Request }) => {
     try {
       const formData = await request.formData();
-      
+
       const id = formData.get('id') as string;
       const name = formData.get('name') as string;
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
-      const institutionId = formData.get('institutionId') as string;
+      // Obtener múltiples instituciones del form (multiselect envía múltiples values)
+      const institutionIds = formData.getAll('institutionIds') as string[];
       const role = formData.get('role') as any;
       const isActive = formData.get('isActive') === 'true';
 
@@ -152,12 +154,12 @@ export const actions: Actions = {
         return fail(400, { error: 'Ya existe otro usuario con este email' });
       }
 
-      // Preparar datos de actualización
+      // Preparar datos de actualización con múltiples instituciones
       const updateData: any = {
         name: name?.trim() || null,
         email: email.trim(),
-        institutionId: institutionId?.trim() || null,
-        role: role || 'INTITUTION',
+        institutionIds: institutionIds.filter(id => id.trim()),
+        role: role || 'LIQUIDADOR',
         isActive
       };
 

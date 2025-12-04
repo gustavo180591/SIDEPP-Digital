@@ -823,10 +823,10 @@ export const POST: RequestHandler = async (event) => {
 					console.log('[APORTES][23] ✓ Institución encontrada:', { id: existing.id, cuit: existing.cuit, name: existing.name });
 					institution = { id: existing.id, name: existing.name ?? null, cuit: existing.cuit ?? null, address: existing.address ?? null };
 
-					// Validar que usuarios INTITUTION solo puedan subir PDFs de su institución
-					if (auth.user.role === 'INTITUTION') {
+					// Validar que usuarios LIQUIDADOR solo puedan subir PDFs de su institución
+					if (auth.user.role === 'LIQUIDADOR') {
 						if (!auth.user.institutionId) {
-							console.error('[APORTES][23] ❌ Usuario INTITUTION sin institución asignada');
+							console.error('[APORTES][23] ❌ Usuario LIQUIDADOR sin institución asignada');
 							return json({
 								status: 'error',
 								message: 'Usuario sin institución asignada',
@@ -847,7 +847,7 @@ export const POST: RequestHandler = async (event) => {
 								}
 							}, { status: 403 });
 						}
-						console.log('[APORTES][23] ✓ Validación de institución OK para usuario INTITUTION');
+						console.log('[APORTES][23] ✓ Validación de institución OK para usuario LIQUIDADOR');
 					}
 				} else {
 					console.error('[APORTES][23] ❌ No existe institución con ese CUIT');
