@@ -11,10 +11,10 @@ import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
-// Importar analyzer de transferencias mejorado
-import { parseTransferenciaPDFCompleto } from '$lib/utils/analyzer-pdf/analyzer-pdf-transferencia.js';
+// Importar analyzer de transferencias con IA (Claude)
+import { analyzeTransferenciaIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 // Importar utilidades de CUIT
-import { normalizeCuit, formatCuit } from '$lib/utils/cuit-utils.js';
+import { normalizeCuit, formatCuit as formatCuitUtil } from '$lib/utils/cuit-utils.js';
 
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
@@ -692,21 +692,29 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		// ============================================================================
-		// NUEVO: Usar analyzer mejorado de pdf2json para transferencias
+		// NUEVO: Usar analyzer con IA (Claude API)
 		// ============================================================================
-		console.log('[BANK][10] 🚀 Usando analyzer mejorado con pdf2json...');
+		console.log('[BANK][10] 🤖 Usando analyzer con IA (Claude API)...');
 		let analyzerResult: any = null;
 		try {
-			analyzerResult = await parseTransferenciaPDFCompleto(savedPath);
-			console.log('[BANK][10] ✓ Analyzer ejecutado exitosamente');
+			analyzerResult = await analyzeTransferenciaIA(buffer, file.name);
+			console.log('[BANK][10] ✓ Analyzer IA ejecutado exitosamente');
 			console.log('[BANK][10] Tipo detectado:', analyzerResult.tipo);
 			console.log('[BANK][10] CBU Destino:', analyzerResult.operacion?.cbuDestino);
 			console.log('[BANK][10] Importe:', analyzerResult.operacion?.importe);
 			console.log('[BANK][10] Cuenta Origen:', analyzerResult.operacion?.cuentaOrigen);
-			console.log('[BANK][10] Beneficiario:', analyzerResult.beneficiario?.nombre);
-			console.log('[BANK][10] CUIT Beneficiario:', analyzerResult.beneficiario?.cuit);
+			console.log('[BANK][10] Titular:', analyzerResult.operacion?.titular);
+			console.log('[BANK][10] CUIT Ordenante:', analyzerResult.ordenante?.cuit);
+			console.log('[BANK][10] Nro Referencia:', analyzerResult.nroReferencia);
+			console.log('[BANK][10] Nro Operación:', analyzerResult.nroOperacion);
 		} catch (analyzerErr) {
-			console.warn('[BANK][10] ⚠️ Error en analyzer mejorado, continuando con método legacy:', analyzerErr);
+			console.error('[BANK][10] ❌ Error en analyzer IA:', analyzerErr);
+			// El analyzer IA es crítico, si falla retornamos error
+			return json({
+				status: 'error',
+				message: 'Error al analizar el PDF con IA. Verifique que el archivo sea un comprobante de transferencia válido.',
+				details: analyzerErr instanceof Error ? analyzerErr.message : 'Error desconocido'
+			}, { status: 400 });
 		}
 		// ============================================================================
 
@@ -1133,13 +1141,14 @@ export const POST: RequestHandler = async (event) => {
 							}
 
 							// Logging de diagnóstico antes de guardar
+							// Nota: El analyzer IA usa operacion.titular y operacion.cuit para el beneficiario
 							console.log('[BANK][DEBUG] Datos a guardar en BankTransfer:', {
 								importe: importeDecimal,
 								importeATransferir: importeATransferirDecimal,
 								importeTotal: importeTotalDecimal,
 								cbuDestino: analyzerResult.operacion?.cbuDestino,
-								cuitBenef: analyzerResult.beneficiario?.cuit,
-								titular: analyzerResult.beneficiario?.nombre
+								cuitBenef: analyzerResult.operacion?.cuit,
+								titular: analyzerResult.operacion?.titular
 							});
 
 							// Crear el BankTransfer con manejo de race conditions
@@ -1154,10 +1163,11 @@ export const POST: RequestHandler = async (event) => {
 										cuentaOrigen: analyzerResult.operacion?.cuentaOrigen || null,
 										importe: importeDecimal,
 										cuitOrdenante: analyzerResult.ordenante?.cuit || null,
-										cuitBenef: analyzerResult.beneficiario?.cuit || null,
-										titular: analyzerResult.beneficiario?.nombre || null,
+										// El analyzer IA usa operacion.cuit y operacion.titular para el beneficiario
+										cuitBenef: analyzerResult.operacion?.cuit || null,
+										titular: analyzerResult.operacion?.titular || null,
 										bufferHash: bufferHash,
-										// Nuevos campos del analyzer
+										// Campos del analyzer
 										banco: analyzerResult.operacion?.banco || null,
 										tipoOperacion: analyzerResult.operacion?.tipoOperacion || null,
 										importeATransferir: importeATransferirDecimal,

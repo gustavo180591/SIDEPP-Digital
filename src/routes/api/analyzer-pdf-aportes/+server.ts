@@ -11,8 +11,8 @@ import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
-// Importar analyzer de PDFs mejorado
-import { parseListadoPDFCompleto } from '$lib/utils/analyzer-pdf/analyzer-pdf-aportes.js';
+// Importar analyzer de PDFs con IA (Claude)
+import { analyzeAportesIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 // Importar utilidades de CUIT (formatCuit ya existe localmente en este archivo)
 import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
 
@@ -633,22 +633,29 @@ export const POST: RequestHandler = async (event) => {
 		let pdfFileId: string | null = null;
 
 		// ============================================================================
-		// NUEVO: Usar analyzer mejorado de pdf2json
+		// NUEVO: Usar analyzer con IA (Claude API)
 		// ============================================================================
-		console.log('[APORTES][10] 🚀 Usando analyzer mejorado con pdf2json...');
+		console.log('[APORTES][10] 🤖 Usando analyzer con IA (Claude API)...');
 		let analyzerResult: any = null;
 		try {
-			analyzerResult = await parseListadoPDFCompleto(savedPath);
-			console.log('[APORTES][10] ✓ Analyzer ejecutado exitosamente');
+			analyzerResult = await analyzeAportesIA(buffer, file.name);
+			console.log('[APORTES][10] ✓ Analyzer IA ejecutado exitosamente');
 			console.log('[APORTES][10] Tipo detectado:', analyzerResult.tipo);
-			console.log('[APORTES][10] Empresa:', analyzerResult.empresa);
+			console.log('[APORTES][10] Escuela:', analyzerResult.escuela?.nombre);
+			console.log('[APORTES][10] CUIT:', analyzerResult.escuela?.cuit);
 			console.log('[APORTES][10] Concepto:', analyzerResult.concepto);
 			console.log('[APORTES][10] Periodo:', analyzerResult.periodo);
-			console.log('[APORTES][10] Total páginas:', analyzerResult.metadata?.totalPaginas);
-			console.log('[APORTES][10] Total personas:', analyzerResult.totalesGenerales?.totalRegistros);
-			console.log('[APORTES][10] Monto total:', analyzerResult.totalesGenerales?.montoTotal);
+			console.log('[APORTES][10] Total personas:', analyzerResult.totales?.cantidadPersonas);
+			console.log('[APORTES][10] Monto total:', analyzerResult.totales?.montoTotal);
+			console.log('[APORTES][10] Personas detectadas:', analyzerResult.personas?.length);
 		} catch (analyzerErr) {
-			console.warn('[APORTES][10] ⚠️ Error en analyzer mejorado, continuando con método legacy:', analyzerErr);
+			console.error('[APORTES][10] ❌ Error en analyzer IA:', analyzerErr);
+			// El analyzer IA es crítico, si falla retornamos error
+			return json({
+				status: 'error',
+				message: 'Error al analizar el PDF con IA. Verifique que el archivo sea un listado de aportes válido.',
+				details: analyzerErr instanceof Error ? analyzerErr.message : 'Error desconocido'
+			}, { status: 400 });
 		}
 		// ============================================================================
 
@@ -787,11 +794,11 @@ export const POST: RequestHandler = async (event) => {
 		console.log('[APORTES][21] Detectando institución por CUIT...');
 		let institution: { id: string; name: string | null; cuit: string | null; address?: string | null } | undefined = undefined;
 		try {
-			// Priorizar datos del analyzer mejorado si están disponibles
+			// Priorizar datos del analyzer IA si están disponibles
 			let instCuitDigits: string | null = null;
-			if (analyzerResult && analyzerResult.empresa && analyzerResult.empresa.cuit) {
-				console.log('[APORTES][21] ✓ Usando CUIT del analyzer mejorado:', analyzerResult.empresa.cuit);
-				instCuitDigits = analyzerResult.empresa.cuit.replace(/\D/g, '');
+			if (analyzerResult && analyzerResult.escuela && analyzerResult.escuela.cuit) {
+				console.log('[APORTES][21] ✓ Usando CUIT del analyzer IA:', analyzerResult.escuela.cuit);
+				instCuitDigits = analyzerResult.escuela.cuit.replace(/\D/g, '');
 			} else {
 				instCuitDigits = extractInstitutionCuit(fullText);
 				console.log('[APORTES][21] CUIT extraído (crudo - método legacy):', instCuitDigits);
@@ -872,18 +879,18 @@ export const POST: RequestHandler = async (event) => {
 
 		// Extraer datos específicos de tabla (solo si el analyzer falló)
 		let tableData: any = {};
-		if (!analyzerResult || !analyzerResult.totalesGenerales) {
+		if (!analyzerResult || !analyzerResult.totales) {
 			console.log('[APORTES][25] 📊 Extrayendo datos de tabla con extractTableData (método legacy)...');
 			tableData = extractTableData(fullText);
 			console.log('[APORTES][25] Datos de tabla extraídos:', tableData);
 		} else {
-			console.log('[APORTES][25] ⏩ Saltando extractTableData - usando datos del analyzer');
+			console.log('[APORTES][25] ⏩ Saltando extractTableData - usando datos del analyzer IA');
 		}
 
 		// Extraer filas individuales de personas
 		console.log('[APORTES][26] 👥 Extrayendo personas...');
 
-		// Priorizar datos del analyzer mejorado si están disponibles
+		// Priorizar datos del analyzer IA si están disponibles
 		let personas: Array<{
 			nombre: string;
 			totRemunerativo: number;
@@ -891,48 +898,52 @@ export const POST: RequestHandler = async (event) => {
 			montoConcepto: number;
 		}> = [];
 
-		if (analyzerResult && analyzerResult.paginas && analyzerResult.paginas.length > 0) {
-			console.log('[APORTES][26] ✓ Usando personas del analyzer mejorado');
-			// Combinar personas de todas las páginas
-			personas = analyzerResult.paginas.flatMap((pagina: any) =>
-				pagina.personas.map((p: any) => ({
-					nombre: p.nombre,
-					totRemunerativo: p.totalRemunerativo,
-					cantidadLegajos: p.cantidadLegajos,
-					montoConcepto: p.montoConcepto
-				}))
-			);
-			console.log('[APORTES][26] Total de personas del analyzer:', personas.length);
+		if (analyzerResult && analyzerResult.personas && analyzerResult.personas.length > 0) {
+			console.log('[APORTES][26] ✓ Usando personas del analyzer IA');
+			// El analyzer IA ya devuelve personas en formato plano
+			personas = analyzerResult.personas.map((p: any) => ({
+				nombre: p.nombre,
+				totRemunerativo: p.totalRemunerativo,
+				cantidadLegajos: p.cantidadLegajos,
+				montoConcepto: p.montoConcepto
+			}));
+			console.log('[APORTES][26] Total de personas del analyzer IA:', personas.length);
 		} else {
 			console.log('[APORTES][26] Usando extractPersonas (método legacy)...');
 			personas = extractPersonas(fullText);
 			console.log('[APORTES][26] Total de personas extraídas (legacy):', personas.length);
 		}
 		
-		// Detectar tipo de PDF (FOPID o SUELDO)
+		// Detectar tipo de PDF (FOPID o SUELDO) - priorizar analyzer IA
 		console.log('[APORTES][26.5] 🔍 Detectando tipo de PDF...');
 		let pdfType: 'FOPID' | 'SUELDO' = 'SUELDO'; // default
-		
-		// Buscar "FOPID" o "fopid" en las primeras líneas del texto
-		const firstLines = fullText.split(/\r?\n/).slice(0, 20).join('\n');
-		if (/\bfopid\b/i.test(firstLines)) {
+
+		// El analyzer IA devuelve periodo = "FOPID" si es FOPID
+		if (analyzerResult && analyzerResult.periodo === 'FOPID') {
 			pdfType = 'FOPID';
-			console.log('[APORTES][26.5] ✓ PDF detectado como FOPID');
+			console.log('[APORTES][26.5] ✓ PDF detectado como FOPID (analyzer IA)');
 		} else {
-			console.log('[APORTES][26.5] ✓ PDF detectado como SUELDO (default)');
+			// Fallback: buscar en texto
+			const firstLines = fullText.split(/\r?\n/).slice(0, 20).join('\n');
+			if (/\bfopid\b/i.test(firstLines)) {
+				pdfType = 'FOPID';
+				console.log('[APORTES][26.5] ✓ PDF detectado como FOPID (texto)');
+			} else {
+				console.log('[APORTES][26.5] ✓ PDF detectado como SUELDO (default)');
+			}
 		}
-		
+
 		// Calcular datos de tabla para el PDF
 		console.log('[APORTES][26.8] 📊 Calculando datos para PdfFile...');
 
 		let peopleCountForPdf: number | null = null;
 		let totalAmountForPdf: number | null = null;
 
-		// Prioridad 1: Usar datos del analyzer si están disponibles
-		if (analyzerResult && analyzerResult.totalesGenerales) {
-			peopleCountForPdf = analyzerResult.totalesGenerales.totalRegistros ?? analyzerResult.totalesGenerales.cantidadPersonas;
-			totalAmountForPdf = analyzerResult.totalesGenerales.montoTotal;
-			console.log('[APORTES][26.8] ✓ Usando totales del analyzer:', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
+		// Prioridad 1: Usar datos del analyzer IA si están disponibles
+		if (analyzerResult && analyzerResult.totales) {
+			peopleCountForPdf = analyzerResult.totales.cantidadPersonas;
+			totalAmountForPdf = analyzerResult.totales.montoTotal;
+			console.log('[APORTES][26.8] ✓ Usando totales del analyzer IA:', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
 		} else {
 			// Fallback: Método legacy
 			console.log('[APORTES][26.8] Calculando con métodos legacy...');
@@ -943,11 +954,11 @@ export const POST: RequestHandler = async (event) => {
 			console.log('[APORTES][26.8] Totales calculados (legacy):', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
 		}
 
-		// Extraer concepto del texto - priorizar analyzer mejorado
+		// Extraer concepto del texto - priorizar analyzer IA
 		let conceptForPdf = 'Aporte Sindical SIDEPP (1%)'; // default
 		if (analyzerResult && analyzerResult.concepto) {
 			conceptForPdf = analyzerResult.concepto;
-			console.log('[APORTES][26.8] ✓ Concepto del analyzer mejorado:', conceptForPdf);
+			console.log('[APORTES][26.8] ✓ Concepto del analyzer IA:', conceptForPdf);
 		} else {
 			const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
 			conceptForPdf = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
@@ -959,16 +970,8 @@ export const POST: RequestHandler = async (event) => {
 		// Crear PdfFile en DB con el tipo detectado y los datos calculados
 		console.log('[APORTES][27] 💾 Creando registro PdfFile en DB con tipo:', pdfType);
 		try {
-			// Preparar metadata si el analyzer tiene datos
-			let pdfMetadata: any = null;
-			if (analyzerResult && analyzerResult.metadata) {
-				pdfMetadata = {
-					creator: analyzerResult.metadata.creator,
-					creationDate: analyzerResult.metadata.creationDate,
-					totalPaginas: analyzerResult.metadata.totalPaginas
-				};
-				console.log('[APORTES][27] ℹ️  Guardando metadata del PDF:', pdfMetadata);
-			}
+			// El analyzer IA no devuelve metadata de pdf2json, así que no la guardamos
+			const pdfMetadata: any = null;
 
 			const createdPdf = await prisma.pdfFile.create({
 				data: {
@@ -1090,14 +1093,14 @@ export const POST: RequestHandler = async (event) => {
 				console.log(`[APORTES][28] ✓ Resumen: ${membersFound} miembros encontrados, ${membersCreated} miembros creados, ${personas.length} contribution lines creadas`);
 
 				// Validar totales: comparar suma de ContributionLines vs totales del analyzer
-				if (analyzerResult && analyzerResult.totalesGenerales && personas.length > 0) {
+				if (analyzerResult && analyzerResult.totales && personas.length > 0) {
 					console.log('[APORTES][28.5] 🔍 Validando totales...');
 
 					const totalCalculado = personas.reduce((sum, p) => {
 						return sum + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0);
 					}, 0);
 
-					const totalAnalyzer = analyzerResult.totalesGenerales.montoTotal;
+					const totalAnalyzer = analyzerResult.totales.montoTotal;
 					const diferencia = Math.abs(totalCalculado - totalAnalyzer);
 					const porcentajeDiferencia = (diferencia / totalAnalyzer) * 100;
 

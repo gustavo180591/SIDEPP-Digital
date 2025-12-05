@@ -55,6 +55,7 @@
 		"vitest-browser-svelte": "^0.1.0"
 	},
 	"dependencies": {
+		"@anthropic-ai/sdk": "^0.71.1",
 		"@prisma/client": "^6.16.2",
 		"@types/bcrypt": "^6.0.0",
 		"@types/jsonwebtoken": "^9.0.10",

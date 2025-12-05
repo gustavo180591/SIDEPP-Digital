@@ -35,14 +35,13 @@ export class InstitutionService {
         data,
         include: {
           members: true,
-          users: true,
+          userInstitutions: true,
           payrollPeriods: true
         }
       });
-      
+
       return {
-        ...institution,
-        payrollPeriods: institution.payrollPeriods
+        ...institution
       } as SerializableInstitution;
     } catch (error) {
       console.error('Error al crear institución:', error);
@@ -59,7 +58,7 @@ export class InstitutionService {
         where: { id },
         include: {
           members: true,
-          users: true,
+          userInstitutions: true,
           payrollPeriods: true
         }
       });
@@ -69,8 +68,7 @@ export class InstitutionService {
       }
 
       return {
-        ...institution,
-        payrollPeriods: institution.payrollPeriods
+        ...institution
       } as SerializableInstitution;
     } catch (error) {
       console.error('Error al obtener institución:', error);
@@ -217,14 +215,13 @@ export class InstitutionService {
         data,
         include: {
           members: true,
-          users: true,
+          userInstitutions: true,
           payrollPeriods: true
         }
       });
-      
+
       return {
-        ...institution,
-        payrollPeriods: institution.payrollPeriods
+        ...institution
       } as SerializableInstitution;
     } catch (error) {
       console.error('Error al actualizar institución:', error);
@@ -271,7 +268,7 @@ export class InstitutionService {
     try {
       const [membersCount, usersCount, payrollPeriodsCount] = await Promise.all([
         prisma.member.count({ where: { institucionId: id } }),
-        prisma.user.count({ where: { institutionId: id } }),
+        prisma.userInstitution.count({ where: { institutionId: id } }),
         prisma.payrollPeriod.count({ where: { institutionId: id } })
       ]);
 
@@ -283,6 +280,37 @@ export class InstitutionService {
     } catch (error) {
       console.error('Error al obtener estadísticas:', error);
       throw new Error('No se pudieron obtener las estadísticas');
+    }
+  }
+
+  /**
+   * Obtener lista simplificada de instituciones para selectores
+   * Opcionalmente filtra por IDs específicos (para LIQUIDADOR)
+   */
+  static async getListForSelect(institutionIds?: string[]): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const where: any = {};
+
+      if (institutionIds && institutionIds.length > 0) {
+        where.id = { in: institutionIds };
+      }
+
+      const institutions = await prisma.institution.findMany({
+        where,
+        select: {
+          id: true,
+          name: true
+        },
+        orderBy: { name: 'asc' }
+      });
+
+      return institutions.map(inst => ({
+        id: inst.id,
+        name: inst.name || 'Sin nombre'
+      }));
+    } catch (error) {
+      console.error('Error al obtener lista de instituciones:', error);
+      throw new Error('No se pudieron obtener las instituciones');
     }
   }
 }

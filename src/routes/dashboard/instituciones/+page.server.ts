@@ -92,7 +92,12 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
 };
 
 export const actions: Actions = {
-  create: async ({ request }: { request: Request }) => {
+  create: async ({ request, locals }: { request: Request; locals: any }) => {
+    // Solo ADMIN puede crear instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para crear instituciones' });
+    }
+
     try {
       const formData = await request.formData();
       
@@ -139,10 +144,15 @@ export const actions: Actions = {
     }
   },
 
-  update: async ({ request }: { request: Request }) => {
+  update: async ({ request, locals }: { request: Request; locals: any }) => {
+    // Solo ADMIN puede actualizar instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para actualizar instituciones' });
+    }
+
     try {
       const formData = await request.formData();
-      
+
       const id = formData.get('id') as string;
       const name = formData.get('name') as string;
       const cuit = formData.get('cuit') as string;
@@ -190,7 +200,12 @@ export const actions: Actions = {
     }
   },
 
-  delete: async ({ request }: { request: Request }) => {
+  delete: async ({ request, locals }: { request: Request; locals: any }) => {
+    // Solo ADMIN puede eliminar instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para eliminar instituciones' });
+    }
+
     try {
       const formData = await request.formData();
       const id = formData.get('id') as string;

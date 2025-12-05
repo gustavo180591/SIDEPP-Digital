@@ -79,6 +79,11 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
+    // FINANZAS no puede crear miembros (solo lectura)
+    if (locals.user?.role === 'FINANZAS') {
+      return { success: false, message: 'No tiene permisos para crear miembros' };
+    }
+
     // Validar que usuarios LIQUIDADOR solo puedan crear miembros en sus instituciones
     if (locals.user?.role === 'LIQUIDADOR') {
       if (!hasAccessToInstitution(locals.user, institutionId)) {
@@ -133,6 +138,11 @@ export const actions: Actions = {
 
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
+    }
+
+    // FINANZAS no puede actualizar miembros (solo lectura)
+    if (locals.user?.role === 'FINANZAS') {
+      return { success: false, message: 'No tiene permisos para actualizar miembros' };
     }
 
     // Validar que usuarios LIQUIDADOR solo puedan actualizar miembros de sus instituciones
@@ -201,6 +211,11 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
+    // FINANZAS no puede eliminar miembros (solo lectura)
+    if (locals.user?.role === 'FINANZAS') {
+      return { success: false, message: 'No tiene permisos para eliminar miembros' };
+    }
+
     // Validar que usuarios LIQUIDADOR solo puedan eliminar miembros de sus instituciones
     if (locals.user?.role === 'LIQUIDADOR') {
       if (!hasAccessToInstitution(locals.user, institutionId)) {
@@ -233,11 +248,9 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
-    // Validar que usuarios LIQUIDADOR solo puedan actualizar sus instituciones
-    if (locals.user?.role === 'LIQUIDADOR') {
-      if (!hasAccessToInstitution(locals.user, institutionId)) {
-        throw error(403, 'No tiene permiso para modificar esta institución');
-      }
+    // Solo ADMIN puede actualizar instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return { success: false, message: 'No tiene permisos para actualizar instituciones' };
     }
 
     try {
@@ -261,11 +274,16 @@ export const actions: Actions = {
   },
 
   // Eliminar institución
-  delete: async ({ params }) => {
+  delete: async ({ params, locals }) => {
     const institutionId = params.id;
-    
+
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
+    }
+
+    // Solo ADMIN puede eliminar instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return { success: false, message: 'No tiene permisos para eliminar instituciones' };
     }
 
     try {

@@ -7,8 +7,10 @@
 
   export let data: any;
 
-  // Verificar si es LIQUIDADOR (solo lectura)
+  // Verificar roles para control de acceso
   $: isLiquidador = data.user?.role === 'LIQUIDADOR';
+  $: isFinanzas = data.user?.role === 'FINANZAS';
+  $: isAdmin = data.user?.role === 'ADMIN';
 
   let showCreateModal = false;
   let showEditModal = false;
@@ -112,8 +114,33 @@
         <p class="mt-1 text-sm text-gray-500">Contacta al administrador para que te asigne una institución.</p>
       </div>
     {/if}
+  {:else if isFinanzas}
+    <!-- Vista solo lectura para FINANZAS -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">Instituciones</h1>
+      <p class="mt-2 text-gray-600">Vista de auditoría - Solo lectura</p>
+    </div>
+
+    <!-- Buscador -->
+    <SearchBox
+      bind:searchTerm
+      onSearch={handleSearch}
+      placeholder="Buscar por nombre o CUIT..."
+      label="Buscar institución"
+    />
+
+    <!-- Tabla de instituciones sin acciones de edición -->
+    <InstitutionTable
+      institutions={data.institutions}
+      pagination={data.pagination}
+      {buildUrl}
+      {goto}
+      onEdit={() => {}}
+      onDelete={() => {}}
+      readOnly={true}
+    />
   {:else}
-    <!-- Vista completa para ADMIN y FINANZAS -->
+    <!-- Vista completa para ADMIN -->
     <PageHeader
       title="Instituciones"
       description="Gestiona las instituciones del sistema"
