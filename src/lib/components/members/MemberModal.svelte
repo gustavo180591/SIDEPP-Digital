@@ -14,6 +14,7 @@
   let formData = {
     fullName: member?.fullName || '',
     email: member?.email || '',
+    phone: member?.phone || '',
     numeroOrden: member?.numeroOrden || '',
     numeroMatricula: member?.numeroMatricula || '',
     documentoIdentidad: member?.documentoIdentidad || '',
@@ -27,6 +28,7 @@
     formData = {
       fullName: member.fullName || '',
       email: member.email || '',
+      phone: member.phone || '',
       numeroOrden: member.numeroOrden || '',
       numeroMatricula: member.numeroMatricula || '',
       documentoIdentidad: member.documentoIdentidad || '',
@@ -42,6 +44,7 @@
       formData = {
         fullName: '',
         email: '',
+        phone: '',
         numeroOrden: '',
         numeroMatricula: '',
         documentoIdentidad: '',
@@ -56,6 +59,7 @@
     formData = {
       fullName: '',
       email: '',
+      phone: '',
       numeroOrden: '',
       numeroMatricula: '',
       documentoIdentidad: '',
@@ -89,8 +93,7 @@
       type: 'text',
       placeholder: 'Nombre completo del miembro',
       required: true,
-      value: formData.fullName,
-      readonly: modalType === 'edit' // Solo lectura al editar
+      value: formData.fullName
     },
     {
       name: 'email',
@@ -98,6 +101,13 @@
       type: 'email',
       placeholder: 'email@ejemplo.com',
       value: formData.email
+    },
+    {
+      name: 'phone',
+      label: 'Teléfono',
+      type: 'text',
+      placeholder: 'Número de teléfono',
+      value: formData.phone
     },
     {
       name: 'documentoIdentidad',
