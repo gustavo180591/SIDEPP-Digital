@@ -185,10 +185,13 @@ export class InstitutionService {
           id: true,
           name: true,
           cuit: true,
+          address: true,
           city: true,
           state: true,
+          country: true,
           responsibleName: true,
           responsibleEmail: true,
+          responsablePhone: true,
           createdAt: true,
           updatedAt: true
         },

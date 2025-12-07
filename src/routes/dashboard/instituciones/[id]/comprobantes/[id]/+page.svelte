@@ -365,7 +365,7 @@
                   <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Cantidad</th>
                   <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Remuneración Total</th>
                   <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Aporte del Concepto</th>
-                  <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Estado</th>
+                  
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
@@ -404,11 +404,7 @@
                         {formatCurrency(line.conceptAmount || 0)}
                       </div>
                     </td>
-                    <td class="px-6 py-4 text-center">
-                      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {line.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : line.status === 'MATCHED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                        {line.status === 'PENDING' ? '⏳ Pendiente' : line.status === 'MATCHED' ? '✓ Coincide' : '✗ Faltante'}
-                      </span>
-                    </td>
+                    
                   </tr>
                 {/each}
               </tbody>

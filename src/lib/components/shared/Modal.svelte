@@ -219,7 +219,7 @@
                     name={field.name}
                     class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors {field.readonly ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500'}"
                     placeholder={field.placeholder || field.label}
-                    value={field.value || ''}
+                    bind:value={field.value}
                     required={field.required}
                     readonly={field.readonly}
                   />
@@ -261,8 +261,9 @@
               {/if}
             </button>
           </div>
-          
-          {#each Object.entries(formData) as [key, value]}
+
+          <!-- Solo enviar hidden inputs para campos que NO tienen un field visible (ej: id) -->
+          {#each Object.entries(formData).filter(([key]) => !fields.some(f => f.name === key)) as [key, value]}
             <input type="hidden" name={key} value={value} />
           {/each}
         </form>
