@@ -518,6 +518,107 @@ async function findMemberByName(
 	}
 }
 
+/**
+ * Función de limpieza/rollback que elimina:
+ * - Archivos físicos de la carpeta analyzer
+ * - Entradas del hash-index.json
+ * - Registros de la DB (ContributionLine, PdfFile, PayrollPeriod huérfanos)
+ */
+async function performCleanup(): Promise<{
+	hashIndexCleared: boolean;
+	filesDeleted: number;
+	pdfFilesDeleted: number;
+	contributionLinesDeleted: number;
+	payrollPeriodsDeleted: number;
+	errors: string[];
+}> {
+	const results = {
+		hashIndexCleared: false,
+		filesDeleted: 0,
+		pdfFilesDeleted: 0,
+		contributionLinesDeleted: 0,
+		payrollPeriodsDeleted: 0,
+		errors: [] as string[]
+	};
+
+	// 1. Limpiar hash-index.json
+	console.log('[CLEANUP][1] Limpiando hash-index.json...');
+	try {
+		await writeFile(HASH_INDEX, Buffer.from('{}', 'utf8'));
+		results.hashIndexCleared = true;
+		console.log('[CLEANUP][1] ✓ hash-index.json limpiado');
+	} catch (e) {
+		const msg = `Error limpiando hash-index: ${e instanceof Error ? e.message : e}`;
+		results.errors.push(msg);
+		console.error('[CLEANUP][1] ❌', msg);
+	}
+
+	// 2. Eliminar archivos físicos de la carpeta analyzer
+	console.log('[CLEANUP][2] Eliminando archivos de', ANALYZER_DIR);
+	try {
+		const { readdir, unlink } = await import('node:fs/promises');
+		const files = await readdir(ANALYZER_DIR);
+		for (const file of files) {
+			if (file === 'hash-index.json') continue;
+			try {
+				await unlink(join(ANALYZER_DIR, file));
+				results.filesDeleted++;
+			} catch (unlinkErr) {
+				results.errors.push(`Error borrando ${file}: ${unlinkErr}`);
+			}
+		}
+		console.log('[CLEANUP][2] ✓', results.filesDeleted, 'archivos eliminados');
+	} catch (e) {
+		const msg = `Error leyendo directorio: ${e instanceof Error ? e.message : e}`;
+		results.errors.push(msg);
+		console.error('[CLEANUP][2] ❌', msg);
+	}
+
+	// 3. Eliminar ContributionLines de la DB
+	console.log('[CLEANUP][3] Eliminando ContributionLines de DB...');
+	try {
+		const deleteResult = await prisma.contributionLine.deleteMany({});
+		results.contributionLinesDeleted = deleteResult.count;
+		console.log('[CLEANUP][3] ✓', results.contributionLinesDeleted, 'contribution lines eliminadas');
+	} catch (e) {
+		const msg = `Error eliminando ContributionLines: ${e instanceof Error ? e.message : e}`;
+		results.errors.push(msg);
+		console.error('[CLEANUP][3] ❌', msg);
+	}
+
+	// 4. Eliminar PdfFiles de la DB
+	console.log('[CLEANUP][4] Eliminando PdfFiles de DB...');
+	try {
+		const deleteResult = await prisma.pdfFile.deleteMany({});
+		results.pdfFilesDeleted = deleteResult.count;
+		console.log('[CLEANUP][4] ✓', results.pdfFilesDeleted, 'pdf files eliminados');
+	} catch (e) {
+		const msg = `Error eliminando PdfFiles: ${e instanceof Error ? e.message : e}`;
+		results.errors.push(msg);
+		console.error('[CLEANUP][4] ❌', msg);
+	}
+
+	// 5. Eliminar PayrollPeriods huérfanos de la DB
+	console.log('[CLEANUP][5] Eliminando PayrollPeriods huérfanos de DB...');
+	try {
+		const deleteResult = await prisma.payrollPeriod.deleteMany({
+			where: {
+				pdfFiles: {
+					none: {}
+				}
+			}
+		});
+		results.payrollPeriodsDeleted = deleteResult.count;
+		console.log('[CLEANUP][5] ✓', results.payrollPeriodsDeleted, 'payroll periods eliminados');
+	} catch (e) {
+		const msg = `Error eliminando PayrollPeriods: ${e instanceof Error ? e.message : e}`;
+		results.errors.push(msg);
+		console.error('[CLEANUP][5] ❌', msg);
+	}
+
+	return results;
+}
+
 export const POST: RequestHandler = async (event) => {
 	// Requerir autenticación
 	const auth = await requireAuth(event);
@@ -1461,9 +1562,66 @@ export const POST: RequestHandler = async (event) => {
 		console.error('========================================');
 		console.error('[APORTES] Error:', message);
 		console.error('[APORTES] Stack:', err instanceof Error ? err.stack : 'N/A');
+		console.error('========================================');
+
+		// ROLLBACK AUTOMÁTICO: Limpiar todo cuando hay error
+		console.log('\n🧹 [APORTES] Ejecutando rollback automático...');
+		try {
+			const cleanupResults = await performCleanup();
+			console.log('🧹 [APORTES] Rollback completado:', cleanupResults);
+		} catch (cleanupErr) {
+			console.error('🧹 [APORTES] Error durante rollback:', cleanupErr);
+		}
 		console.error('========================================\n\n');
-		return json({ error: 'Error al procesar el archivo', details: message }, { status: 500 });
+
+		return json({
+			error: 'Error al procesar el archivo',
+			details: message,
+			rollback: true,
+			message: 'Se ejecutó limpieza automática. Puede reintentar la carga.'
+		}, { status: 500 });
 	}
 };
 
+/**
+ * DELETE /api/analyzer-pdf-aportes
+ * Limpia todos los datos de análisis: archivos físicos, hash-index y registros de DB
+ * Útil para reintentar después de un error - cualquier usuario autenticado puede usarlo
+ */
+export const DELETE: RequestHandler = async (event) => {
+	// Requerir autenticación
+	const auth = await requireAuth(event);
+	if (auth.error) {
+		return json({ error: auth.error }, { status: auth.status || 401 });
+	}
 
+	console.log('\n========================================');
+	console.log('🧹 [CLEANUP] INICIO DE LIMPIEZA MANUAL');
+	console.log(`🧹 [CLEANUP] Usuario: ${auth.user?.email} (${auth.user?.role})`);
+	console.log('========================================\n');
+
+	try {
+		const results = await performCleanup();
+
+		console.log('\n========================================');
+		console.log('✅ [CLEANUP] LIMPIEZA COMPLETADA');
+		console.log('========================================');
+		console.log('Resumen:', results);
+		console.log('========================================\n');
+
+		return json({
+			status: 'success',
+			message: 'Limpieza completada',
+			results
+		});
+
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Error desconocido';
+		console.error('[CLEANUP] ❌ Error general:', message);
+		return json({
+			status: 'error',
+			message: 'Error durante la limpieza',
+			details: message
+		}, { status: 500 });
+	}
+};

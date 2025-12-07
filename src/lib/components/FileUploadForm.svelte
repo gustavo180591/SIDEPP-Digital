@@ -80,14 +80,28 @@
   const sumFromResult = (r: AnalyzerResult | null): number => {
     if (!r) return 0;
 
-    // PRIORIDAD 1: Usar tableData.montoConcepto si existe (total de la tabla de TOTALES)
+    // PRIORIDAD 1: Usar checks.sumTotal (viene calculado del backend con los totales del analyzer IA)
+    const checksTotal = r.checks?.sumTotal;
+    if (typeof checksTotal === 'number' && Number.isFinite(checksTotal) && checksTotal > 0) {
+      console.log('Usando checks.sumTotal:', checksTotal);
+      return checksTotal;
+    }
+
+    // PRIORIDAD 2: Usar checks.declaredTotal como alternativa
+    const declaredTotal = r.checks?.declaredTotal;
+    if (typeof declaredTotal === 'number' && Number.isFinite(declaredTotal) && declaredTotal > 0) {
+      console.log('Usando checks.declaredTotal:', declaredTotal);
+      return declaredTotal;
+    }
+
+    // PRIORIDAD 3: Usar tableData.montoConcepto si existe
     const tableAmount = r.preview?.listado?.tableData?.montoConcepto;
     if (typeof tableAmount === 'number' && Number.isFinite(tableAmount) && tableAmount > 0) {
       console.log('Usando tableData.montoConcepto:', tableAmount);
       return tableAmount;
     }
 
-    // PRIORIDAD 2: Sumar desde el array de personas si existe
+    // PRIORIDAD 4: Sumar desde el array de personas si existe
     const personas = r.preview?.listado?.personas || [];
     if (Array.isArray(personas) && personas.length > 0) {
       const total = personas.reduce((acc, p) => acc + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
@@ -95,13 +109,6 @@
         console.log('Sumando desde personas:', total, '(', personas.length, 'personas)');
         return total;
       }
-    }
-
-    // PRIORIDAD 3: Usar checks.sumTotal como fallback
-    const checksTotal = r.checks?.sumTotal;
-    if (typeof checksTotal === 'number' && Number.isFinite(checksTotal) && checksTotal > 0) {
-      console.log('Usando checks.sumTotal:', checksTotal);
-      return checksTotal;
     }
 
     console.warn('No se pudo extraer monto del concepto del resultado');
@@ -250,7 +257,12 @@
       if (showAguinaldo) console.log('Total Aportes Aguinaldo:', totalAguinaldo);
       console.log('SUMA TOTAL APORTES:', aportesTotal);
 
-      transferImporte = typeof resultTransfer?.transferAmount === 'number' ? resultTransfer.transferAmount : null;
+      // Buscar importe de transferencia con múltiples fallbacks
+      transferImporte =
+        (typeof resultTransfer?.transferAmount === 'number' ? resultTransfer.transferAmount : null)
+        ?? resultTransfer?.checks?.sumTotal
+        ?? resultTransfer?.checks?.declaredTotal
+        ?? null;
       console.log('Importe Transferencia Bancaria:', transferImporte);
 
       if (aportesTotal != null && transferImporte != null) {
@@ -536,7 +548,7 @@
               <div class="flex-1">
                 <p class="text-xs font-medium text-gray-600">Personas Procesadas</p>
                 <p class="text-sm font-semibold text-gray-900">
-                  {resultSueldos?.preview?.listado?.tableData?.personas || resultSueldos?.preview?.listado?.count || 0}
+                  {resultSueldos?.preview?.listado?.tableData?.personas || resultSueldos?.preview?.listado?.personas?.length || resultSueldos?.preview?.listado?.count || 0}
                 </p>
               </div>
             </div>
@@ -569,9 +581,17 @@
             </div>
 
             <div class="flex items-start gap-2">
-              {#if totalsMatch}
+              {#if aportesTotal === 0 && (transferImporte === 0 || transferImporte === null)}
+                <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+              {:else if totalsMatch}
                 <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              {:else if totalsMatch === null}
+                <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
               {:else}
                 <svg class="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -580,7 +600,12 @@
               {/if}
               <div class="flex-1">
                 <p class="text-xs font-medium text-gray-600">Estado de Validación</p>
-                {#if totalsMatch}
+                {#if aportesTotal === 0 && (transferImporte === 0 || transferImporte === null)}
+                  <p class="text-sm font-semibold text-yellow-700">⚠️ No se detectaron montos</p>
+                  <p class="text-xs text-yellow-600">Verifique que los archivos contengan datos válidos</p>
+                {:else if totalsMatch === null}
+                  <p class="text-sm font-semibold text-gray-500">— Sin comparar</p>
+                {:else if totalsMatch}
                   <p class="text-sm font-semibold text-green-700">✅ Totales Coinciden</p>
                 {:else}
                   <p class="text-sm font-semibold text-red-700">❌ Discrepancia Detectada</p>
@@ -619,28 +644,28 @@
           <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
             <div class="text-sm font-semibold text-gray-600 mb-2">Aportes Sueldos</div>
             <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultSueldos.fileName}>{resultSueldos.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{(resultSueldos.size / 1024).toFixed(1)} KB</div>
+            <div class="mt-1 text-sm text-gray-500">{fileInputSueldos?.files?.[0]?.size ? (fileInputSueldos.files[0].size / 1024).toFixed(1) : '—'} KB</div>
           </div>
         {/if}
         {#if resultFopid}
           <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
             <div class="text-sm font-semibold text-gray-600 mb-2">Aportes FOPID</div>
             <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultFopid.fileName}>{resultFopid.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{(resultFopid.size / 1024).toFixed(1)} KB</div>
+            <div class="mt-1 text-sm text-gray-500">{fileInputFopid?.files?.[0]?.size ? (fileInputFopid.files[0].size / 1024).toFixed(1) : '—'} KB</div>
           </div>
         {/if}
         {#if resultAguinaldo}
           <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
             <div class="text-sm font-semibold text-gray-600 mb-2">Aportes Aguinaldo</div>
             <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultAguinaldo.fileName}>{resultAguinaldo.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{(resultAguinaldo.size / 1024).toFixed(1)} KB</div>
+            <div class="mt-1 text-sm text-gray-500">{fileInputAguinaldo?.files?.[0]?.size ? (fileInputAguinaldo.files[0].size / 1024).toFixed(1) : '—'} KB</div>
           </div>
         {/if}
         {#if resultTransfer}
           <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
             <div class="text-sm font-semibold text-gray-600 mb-2">Transferencia Bancaria</div>
             <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultTransfer.fileName}>{resultTransfer.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{(resultTransfer.size / 1024).toFixed(1)} KB</div>
+            <div class="mt-1 text-sm text-gray-500">{fileInputTransfer?.files?.[0]?.size ? (fileInputTransfer.files[0].size / 1024).toFixed(1) : '—'} KB</div>
           </div>
         {/if}
       </div>
