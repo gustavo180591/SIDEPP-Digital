@@ -57,6 +57,16 @@ export interface Operacion {
   importeTotal: number | null;
 }
 
+export interface TransferenciaItem {
+  titulo: string;
+  nroReferencia: string | null;
+  nroOperacion: string | null;
+  fecha: string | null;
+  hora: string | null;
+  ordenante: OrdenanteNuevo;
+  operacion: Operacion;
+}
+
 export interface TransferenciaPDFResult {
   tipo: 'TRANSFERENCIA';
   archivo: string;
@@ -69,8 +79,22 @@ export interface TransferenciaPDFResult {
   operacion: Operacion;
 }
 
+/**
+ * Resultado de análisis de PDF con múltiples transferencias
+ * Soporta PDFs que contienen más de un comprobante de transferencia
+ */
+export interface MultiTransferenciaPDFResult {
+  tipo: 'TRANSFERENCIAS_MULTIPLES';
+  archivo: string;
+  transferencias: TransferenciaItem[];
+  resumen: {
+    cantidadTransferencias: number;
+    importeTotal: number;
+  };
+}
+
 // ========================================
 // Tipo union para resultados
 // ========================================
 
-export type PDFResult = ListadoPDFResult | TransferenciaPDFResult;
+export type PDFResult = ListadoPDFResult | TransferenciaPDFResult | MultiTransferenciaPDFResult;

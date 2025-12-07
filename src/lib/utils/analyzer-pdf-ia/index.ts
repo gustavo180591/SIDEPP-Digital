@@ -1,10 +1,10 @@
 import { extractPDFContent, extractTextWithPdfJs, detectDocumentType } from './pdf-extractor.js';
 import { analyzeAportesWithAI } from './analyzer-aportes-ia.js';
-import { analyzeTransferenciaWithAI, analyzeTransferenciaWithVision } from './analyzer-transferencia-ia.js';
-import type { ListadoPDFResult, TransferenciaPDFResult, PDFResult } from './types/index.js';
+import { analyzeTransferenciaWithAI, analyzeTransferenciaWithVision, analyzeMultipleTransferenciasWithVision } from './analyzer-transferencia-ia.js';
+import type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult, PDFResult } from './types/index.js';
 
 // Re-exportar tipos
-export type { ListadoPDFResult, TransferenciaPDFResult, PDFResult };
+export type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult, PDFResult };
 
 /**
  * Analiza un PDF de listado de aportes usando IA
@@ -45,24 +45,25 @@ export async function analyzeAportesIA(
 /**
  * Analiza un PDF de transferencia bancaria usando IA
  * Soporta tanto PDFs con texto como PDFs escaneados (imágenes)
+ * Soporta múltiples transferencias en el mismo PDF
  *
  * @param buffer - Buffer del archivo PDF
  * @param filename - Nombre del archivo original
- * @returns Datos estructurados de la transferencia
+ * @returns Datos estructurados de la(s) transferencia(s)
  */
 export async function analyzeTransferenciaIA(
   buffer: Buffer,
   filename: string
-): Promise<TransferenciaPDFResult> {
+): Promise<TransferenciaPDFResult | MultiTransferenciaPDFResult> {
   console.log(`[analyzeTransferenciaIA] Procesando: ${filename}`);
 
   // Extraer contenido del PDF
   const content = await extractPDFContent(buffer);
 
   if (!content.hasText) {
-    // PDF sin texto - usar Vision API
-    console.log(`[analyzeTransferenciaIA] PDF sin texto, usando Vision API...`);
-    return analyzeTransferenciaWithVision(content.imageBase64, filename);
+    // PDF sin texto - usar Vision API para todas las páginas
+    console.log(`[analyzeTransferenciaIA] PDF sin texto, usando Vision API para ${content.imagesBase64.length} página(s)...`);
+    return analyzeMultipleTransferenciasWithVision(content.imagesBase64, filename);
   }
 
   console.log(`[analyzeTransferenciaIA] Texto extraído: ${content.text.length} caracteres`);
@@ -100,9 +101,9 @@ export async function analyzePDF(
       }
     }
 
-    // Sin texto, asumir transferencia y usar Vision
-    console.log(`[analyzePDF] PDF sin texto, usando Vision API para transferencia...`);
-    return analyzeTransferenciaWithVision(content.imageBase64, filename);
+    // Sin texto, asumir transferencia y usar Vision para todas las páginas
+    console.log(`[analyzePDF] PDF sin texto, usando Vision API para ${content.imagesBase64.length} página(s)...`);
+    return analyzeMultipleTransferenciasWithVision(content.imagesBase64, filename);
   }
 
   // Detectar tipo de documento
@@ -125,4 +126,4 @@ export async function analyzePDF(
 // Exportar funciones auxiliares por si se necesitan
 export { extractPDFContent, extractTextWithPdfJs, detectDocumentType, cleanTextForAI } from './pdf-extractor.js';
 export { analyzeAportesWithAI } from './analyzer-aportes-ia.js';
-export { analyzeTransferenciaWithAI, analyzeTransferenciaWithVision } from './analyzer-transferencia-ia.js';
+export { analyzeTransferenciaWithAI, analyzeTransferenciaWithVision, analyzeMultipleTransferenciasWithVision } from './analyzer-transferencia-ia.js';

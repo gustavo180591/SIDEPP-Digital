@@ -1,13 +1,104 @@
+import { spawn } from 'child_process';
+import { writeFile, readFile, unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
 export interface PDFExtractionResult {
   hasText: boolean;
   text: string;
-  imageBase64: string; // Imagen en base64 para Vision API
+  imagesBase64: string[]; // Imágenes en base64 para Vision API (una por página)
+}
+
+/**
+ * Convierte TODAS las páginas de un PDF a imágenes PNG usando pdftoppm
+ * Requiere poppler-utils instalado (apt-get install poppler-utils)
+ * Retorna un array de imágenes en base64 (una por página)
+ */
+async function convertPdfToImages(buffer: Buffer): Promise<string[]> {
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 8);
+  const tmpPdf = join(tmpdir(), `analyzer-${timestamp}-${randomId}.pdf`);
+  const outPrefix = join(tmpdir(), `analyzer-${timestamp}-${randomId}`);
+  const generatedFiles: string[] = [];
+
+  try {
+    // Guardar PDF temporal
+    await writeFile(tmpPdf, buffer);
+
+    // Convertir TODAS las páginas a PNG usando pdftoppm (poppler-utils)
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('pdftoppm', [
+        '-png',           // Formato PNG
+        '-r', '150',      // Resolución 150 DPI
+        // Sin -f y -l para convertir TODAS las páginas
+        tmpPdf,
+        outPrefix
+      ]);
+
+      let stderr = '';
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`pdftoppm exited with code ${code}: ${stderr}`));
+        }
+      });
+
+      proc.on('error', (err) => {
+        reject(new Error(`Failed to start pdftoppm: ${err.message}`));
+      });
+    });
+
+    // Buscar todas las imágenes generadas (pdftoppm genera -1.png, -2.png, etc.)
+    const imagesBase64: string[] = [];
+    let pageNum = 1;
+
+    while (true) {
+      const imgPath = `${outPrefix}-${pageNum}.png`;
+      try {
+        const imgBuffer = await readFile(imgPath);
+        imagesBase64.push(imgBuffer.toString('base64'));
+        generatedFiles.push(imgPath);
+        console.log(`[convertPdfToImages] ✓ Página ${pageNum} convertida (${imgBuffer.length} bytes)`);
+        pageNum++;
+      } catch {
+        // No hay más páginas
+        break;
+      }
+    }
+
+    // Limpiar archivos temporales
+    await unlink(tmpPdf).catch(() => {});
+    for (const file of generatedFiles) {
+      await unlink(file).catch(() => {});
+    }
+
+    if (imagesBase64.length === 0) {
+      throw new Error('No se pudo convertir ninguna página del PDF');
+    }
+
+    console.log(`[convertPdfToImages] ✓ Total: ${imagesBase64.length} páginas convertidas`);
+    return imagesBase64;
+
+  } catch (error) {
+    // Limpiar en caso de error
+    await unlink(tmpPdf).catch(() => {});
+    for (const file of generatedFiles) {
+      await unlink(file).catch(() => {});
+    }
+    console.error('[convertPdfToImages] Error:', error);
+    throw new Error(`No se pudo convertir el PDF a imágenes: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
 }
 
 /**
  * Extrae texto de un PDF usando pdfjs-dist (100% Node.js)
  * Adaptado para trabajar con Buffer en lugar de path de archivo
- * Nota: No usamos pdf-parse porque Vite lo redirige a un shim
+ * Si el PDF no tiene texto, lo convierte a imagen para Vision API
  */
 export async function extractPDFContent(buffer: Buffer): Promise<PDFExtractionResult> {
   try {
@@ -19,20 +110,18 @@ export async function extractPDFContent(buffer: Buffer): Promise<PDFExtractionRe
       return {
         hasText: true,
         text,
-        imageBase64: '',
+        imagesBase64: [],
       };
     }
 
-    // PDF sin texto suficiente - necesita Vision API
-    console.log(`      -> PDF con imágenes detectado, requiere Vision API`);
-
-    // Convertir buffer a base64 para enviar a Vision API
-    const imageBase64 = buffer.toString('base64');
+    // PDF sin texto suficiente - convertir TODAS las páginas a imágenes para Vision API
+    console.log(`      -> PDF con imágenes detectado, convirtiendo todas las páginas a PNG para Vision API...`);
+    const imagesBase64 = await convertPdfToImages(buffer);
 
     return {
       hasText: false,
       text: '',
-      imageBase64,
+      imagesBase64,
     };
   } catch (error) {
     console.error('Error extrayendo contenido del PDF:', error);

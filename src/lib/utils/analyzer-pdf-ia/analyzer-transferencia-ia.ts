@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { openai, MODEL_CONFIG } from './openai-config.js';
 import { cleanTextForAI } from './pdf-extractor.js';
-import type { TransferenciaPDFResult } from './types/index.js';
+import type { TransferenciaPDFResult, MultiTransferenciaPDFResult, TransferenciaItem } from './types/index.js';
 
 // Schema de validacion con Zod
 const OrdenanteSchema = z.object({
@@ -198,4 +198,114 @@ export async function analyzeTransferenciaWithVision(
     }
     throw err;
   }
+}
+
+/**
+ * Analiza MÚLTIPLES páginas de un PDF usando Vision API
+ * Cada página se analiza por separado y luego se combinan los resultados
+ * Retorna MultiTransferenciaPDFResult si hay más de 1 transferencia, o TransferenciaPDFResult si hay solo 1
+ */
+export async function analyzeMultipleTransferenciasWithVision(
+  imagesBase64: string[],
+  filename: string
+): Promise<TransferenciaPDFResult | MultiTransferenciaPDFResult> {
+  console.log(`[analyzeMultipleTransferenciasWithVision] Analizando ${imagesBase64.length} página(s)...`);
+
+  const transferencias: TransferenciaItem[] = [];
+
+  // Analizar cada página por separado
+  for (let i = 0; i < imagesBase64.length; i++) {
+    const imageBase64 = imagesBase64[i];
+    console.log(`[analyzeMultipleTransferenciasWithVision] Procesando página ${i + 1}/${imagesBase64.length}...`);
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 2000,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Analiza la siguiente imagen de un comprobante de transferencia bancaria y extrae la informacion estructurada en formato JSON:',
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/png;base64,${imageBase64}`,
+                  detail: 'high',
+                },
+              },
+            ],
+          },
+        ],
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Sin contenido de OpenAI`);
+        continue;
+      }
+
+      const parsed = JSON.parse(content);
+      const validated = TransferenciaSchema.parse(parsed);
+
+      // Agregar como TransferenciaItem (sin tipo ni archivo)
+      transferencias.push({
+        titulo: validated.titulo,
+        nroReferencia: validated.nroReferencia,
+        nroOperacion: validated.nroOperacion,
+        fecha: validated.fecha,
+        hora: validated.hora,
+        ordenante: validated.ordenante,
+        operacion: validated.operacion,
+      });
+
+      console.log(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: ✓ Transferencia de $${validated.operacion.importe}`);
+    } catch (err) {
+      console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Error - ${err instanceof Error ? err.message : 'Error desconocido'}`);
+      // Continuar con las demás páginas
+    }
+  }
+
+  if (transferencias.length === 0) {
+    throw new Error('No se pudo extraer ninguna transferencia del PDF');
+  }
+
+  // Si solo hay 1 transferencia, retornar formato simple
+  if (transferencias.length === 1) {
+    const t = transferencias[0];
+    return {
+      tipo: 'TRANSFERENCIA',
+      archivo: filename,
+      titulo: t.titulo,
+      nroReferencia: t.nroReferencia,
+      nroOperacion: t.nroOperacion,
+      fecha: t.fecha,
+      hora: t.hora,
+      ordenante: t.ordenante,
+      operacion: t.operacion,
+    };
+  }
+
+  // Múltiples transferencias - calcular total
+  const importeTotal = transferencias.reduce((sum, t) => {
+    return sum + (t.operacion.importe ?? 0);
+  }, 0);
+
+  console.log(`[analyzeMultipleTransferenciasWithVision] ✓ Total: ${transferencias.length} transferencias, $${importeTotal.toFixed(2)}`);
+
+  return {
+    tipo: 'TRANSFERENCIAS_MULTIPLES',
+    archivo: filename,
+    transferencias,
+    resumen: {
+      cantidadTransferencias: transferencias.length,
+      importeTotal: Math.round(importeTotal * 100) / 100,
+    },
+  };
 }

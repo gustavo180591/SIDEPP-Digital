@@ -694,17 +694,50 @@ export const POST: RequestHandler = async (event) => {
 		// ============================================================================
 		console.log('[BANK][10] 🤖 Usando analyzer con IA (Claude API)...');
 		let analyzerResult: any = null;
+		let isMultipleTransfers = false;
+		let totalImporteMultiple = 0;
 		try {
 			analyzerResult = await analyzeTransferenciaIA(buffer, file.name);
 			console.log('[BANK][10] ✓ Analyzer IA ejecutado exitosamente');
 			console.log('[BANK][10] Tipo detectado:', analyzerResult.tipo);
-			console.log('[BANK][10] CBU Destino:', analyzerResult.operacion?.cbuDestino);
-			console.log('[BANK][10] Importe:', analyzerResult.operacion?.importe);
-			console.log('[BANK][10] Cuenta Origen:', analyzerResult.operacion?.cuentaOrigen);
-			console.log('[BANK][10] Titular:', analyzerResult.operacion?.titular);
-			console.log('[BANK][10] CUIT Ordenante:', analyzerResult.ordenante?.cuit);
-			console.log('[BANK][10] Nro Referencia:', analyzerResult.nroReferencia);
-			console.log('[BANK][10] Nro Operación:', analyzerResult.nroOperacion);
+
+			// Manejar múltiples transferencias
+			if (analyzerResult.tipo === 'TRANSFERENCIAS_MULTIPLES') {
+				isMultipleTransfers = true;
+				totalImporteMultiple = analyzerResult.resumen?.importeTotal ?? 0;
+				console.log('[BANK][10] 📋 MÚLTIPLES TRANSFERENCIAS DETECTADAS:');
+				console.log('[BANK][10]   Cantidad:', analyzerResult.resumen?.cantidadTransferencias);
+				console.log('[BANK][10]   Importe Total:', totalImporteMultiple);
+				for (let i = 0; i < analyzerResult.transferencias.length; i++) {
+					const t = analyzerResult.transferencias[i];
+					console.log(`[BANK][10]   Transferencia ${i + 1}: $${t.operacion?.importe} - Nro. ${t.nroOperacion}`);
+				}
+				// Para compatibilidad con el resto del código, usar la primera transferencia como base
+				// pero guardaremos el importe total
+				if (analyzerResult.transferencias.length > 0) {
+					const primera = analyzerResult.transferencias[0];
+					analyzerResult.ordenante = primera.ordenante;
+					analyzerResult.nroReferencia = primera.nroReferencia;
+					analyzerResult.nroOperacion = primera.nroOperacion;
+					analyzerResult.fecha = primera.fecha;
+					analyzerResult.hora = primera.hora;
+					// Crear una operación combinada con el total
+					analyzerResult.operacion = {
+						...primera.operacion,
+						importe: totalImporteMultiple, // Usar el total
+						importeATransferir: totalImporteMultiple,
+						importeTotal: totalImporteMultiple
+					};
+				}
+			} else {
+				console.log('[BANK][10] CBU Destino:', analyzerResult.operacion?.cbuDestino);
+				console.log('[BANK][10] Importe:', analyzerResult.operacion?.importe);
+				console.log('[BANK][10] Cuenta Origen:', analyzerResult.operacion?.cuentaOrigen);
+				console.log('[BANK][10] Titular:', analyzerResult.operacion?.titular);
+				console.log('[BANK][10] CUIT Ordenante:', analyzerResult.ordenante?.cuit);
+				console.log('[BANK][10] Nro Referencia:', analyzerResult.nroReferencia);
+				console.log('[BANK][10] Nro Operación:', analyzerResult.nroOperacion);
+			}
 		} catch (analyzerErr) {
 			console.error('[BANK][10] ❌ Error en analyzer IA:', analyzerErr);
 			// El analyzer IA es crítico, si falla retornamos error
@@ -1192,7 +1225,18 @@ export const POST: RequestHandler = async (event) => {
 			bufferHash,
 			pdfFileId,
 			members: membersResult,
-			transferAmount
+			transferAmount,
+			// Información de múltiples transferencias (si aplica)
+			multipleTransfers: isMultipleTransfers ? {
+				count: analyzerResult?.resumen?.cantidadTransferencias ?? 0,
+				totalAmount: totalImporteMultiple,
+				transfers: analyzerResult?.transferencias?.map((t: any, i: number) => ({
+					index: i + 1,
+					nroOperacion: t.nroOperacion,
+					importe: t.operacion?.importe ?? 0,
+					fecha: t.fecha
+				})) ?? []
+			} : null
 		}, { status: 201 });
 	} catch (err) {
 		console.error('\n========================================');
