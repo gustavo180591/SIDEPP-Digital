@@ -10,40 +10,25 @@ async function main() {
   const defaultPassword = '123456';
   const hashed = await hash(defaultPassword, 10);
 
-  // Crear instituciones de ejemplo
-  console.log('🏢 Creando instituciones...');
+  // Crear institución EFA San Bonifacio
+  console.log('🏢 Creando institución...');
 
-  const institution1 = await prisma.institution.upsert({
-    where: { id: 'inst-municipalidad-clorinda' },
-    update: { name: 'Municipalidad de Clorinda', cuit: '30-99999999-1' },
+  const institution = await prisma.institution.upsert({
+    where: { id: 'inst-efa-san-bonifacio' },
+    update: {
+      name: 'EFA San Bonifacio',
+      cuit: '30-64012797-6',
+      address: 'Ruta Nac. 14 Km 1200'
+    },
     create: {
-      id: 'inst-municipalidad-clorinda',
-      name: 'Municipalidad de Clorinda',
-      cuit: '30-99999999-1'
+      id: 'inst-efa-san-bonifacio',
+      name: 'EFA San Bonifacio',
+      cuit: '30-64012797-6',
+      address: 'Ruta Nac. 14 Km 1200'
     }
   });
 
-  const institution2 = await prisma.institution.upsert({
-    where: { id: 'inst-hospital-central' },
-    update: { name: 'Hospital Central Formosa', cuit: '30-88888888-2' },
-    create: {
-      id: 'inst-hospital-central',
-      name: 'Hospital Central Formosa',
-      cuit: '30-88888888-2'
-    }
-  });
-
-  const institution3 = await prisma.institution.upsert({
-    where: { id: 'inst-escuela-tecnica' },
-    update: { name: 'Escuela Técnica N°1', cuit: '30-77777777-3' },
-    create: {
-      id: 'inst-escuela-tecnica',
-      name: 'Escuela Técnica N°1',
-      cuit: '30-77777777-3'
-    }
-  });
-
-  console.log('✅ Instituciones creadas:', institution1.name, institution2.name, institution3.name);
+  console.log('✅ Institución creada:', institution.name);
 
   // Crear usuario ADMIN
   console.log('👤 Creando usuarios...');
@@ -143,66 +128,51 @@ async function main() {
   // Crear relaciones Usuario-Institución para Liquidadores
   console.log('🔗 Asignando instituciones a liquidadores...');
 
-  // Liquidador 1: solo Municipalidad de Clorinda
+  // Todos los liquidadores asignados a EFA San Bonifacio
   await prisma.userInstitution.upsert({
     where: {
       userId_institutionId: {
         userId: liquidador1.id,
-        institutionId: institution1.id
+        institutionId: institution.id
       }
     },
     update: {},
     create: {
       userId: liquidador1.id,
-      institutionId: institution1.id
+      institutionId: institution.id
     }
   });
-  console.log('  ✓ Liquidador 1 → Municipalidad de Clorinda');
+  console.log('  ✓ Liquidador 1 → EFA San Bonifacio');
 
-  // Liquidador 2: solo Hospital Central
   await prisma.userInstitution.upsert({
     where: {
       userId_institutionId: {
         userId: liquidador2.id,
-        institutionId: institution2.id
+        institutionId: institution.id
       }
     },
     update: {},
     create: {
       userId: liquidador2.id,
-      institutionId: institution2.id
+      institutionId: institution.id
     }
   });
-  console.log('  ✓ Liquidador 2 → Hospital Central');
+  console.log('  ✓ Liquidador 2 → EFA San Bonifacio');
 
-  // Liquidador 3: múltiples instituciones (Municipalidad + Escuela Técnica)
   await prisma.userInstitution.upsert({
     where: {
       userId_institutionId: {
         userId: liquidador3.id,
-        institutionId: institution1.id
+        institutionId: institution.id
       }
     },
     update: {},
     create: {
       userId: liquidador3.id,
-      institutionId: institution1.id
+      institutionId: institution.id
     }
   });
-  await prisma.userInstitution.upsert({
-    where: {
-      userId_institutionId: {
-        userId: liquidador3.id,
-        institutionId: institution3.id
-      }
-    },
-    update: {},
-    create: {
-      userId: liquidador3.id,
-      institutionId: institution3.id
-    }
-  });
-  console.log('  ✓ Liquidador 3 → Municipalidad de Clorinda + Escuela Técnica N°1');
+  console.log('  ✓ Liquidador 3 → EFA San Bonifacio');
 
   console.log('\n✅ Seed completado exitosamente!\n');
   console.log('═══════════════════════════════════════════════════════════════');
@@ -215,9 +185,9 @@ async function main() {
   console.log('  • finanzas@sidepp.com     → Ve instituciones y afiliados');
   console.log('');
   console.log('LIQUIDADOR:');
-  console.log('  • liquidador1@sidepp.com  → Solo sube (1 institución)');
-  console.log('  • liquidador2@sidepp.com  → Solo sube (1 institución)');
-  console.log('  • liquidador3@sidepp.com  → Solo sube (2 instituciones)');
+  console.log('  • liquidador1@sidepp.com  → EFA San Bonifacio');
+  console.log('  • liquidador2@sidepp.com  → EFA San Bonifacio');
+  console.log('  • liquidador3@sidepp.com  → EFA San Bonifacio');
   console.log('═══════════════════════════════════════════════════════════════');
 }
 

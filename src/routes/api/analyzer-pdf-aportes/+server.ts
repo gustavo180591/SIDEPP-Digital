@@ -589,14 +589,53 @@ export const POST: RequestHandler = async (event) => {
 		// Deduplicación en DB por hash
 		console.log('[APORTES][6] Verificando duplicados en base de datos...');
 		try {
-			const existingPdf = await prisma.pdfFile.findUnique({ where: { bufferHash } });
+			const existingPdf = await prisma.pdfFile.findUnique({
+				where: { bufferHash },
+				include: {
+					contributionLine: true,
+					period: {
+						include: {
+							institution: true
+						}
+					}
+				}
+			});
 			if (existingPdf) {
 				console.warn('[APORTES][6] ⚠️ Duplicado en DB:', { id: existingPdf.id, fileName: existingPdf.fileName });
-				return json({ status: 'duplicate', message: 'El archivo ya fue cargado (DB)', bufferHash, pdfFileId: existingPdf.id }, { status: 409 });
+
+				// Devolver datos del PDF existente para que el frontend pueda mostrarlos
+				const peopleCount = existingPdf.peopleCount ?? existingPdf.contributionLine.length;
+				const totalAmount = existingPdf.totalAmount ? parseFloat(existingPdf.totalAmount.toString()) : 0;
+
+				return json({
+					status: 'duplicate',
+					message: 'El archivo ya fue cargado anteriormente',
+					bufferHash,
+					pdfFileId: existingPdf.id,
+					fileName: existingPdf.fileName,
+					// Datos del PDF existente
+					existingData: {
+						type: existingPdf.type,
+						concept: existingPdf.concept,
+						peopleCount,
+						totalAmount,
+						period: existingPdf.period ? {
+							month: existingPdf.period.month,
+							year: existingPdf.period.year
+						} : null,
+						institution: existingPdf.period?.institution ? {
+							id: existingPdf.period.institution.id,
+							name: existingPdf.period.institution.name,
+							cuit: existingPdf.period.institution.cuit
+						} : null
+					}
+				}, { status: 409 });
 			}
 			console.log('[APORTES][6] ✓ No es duplicado en DB');
 		} catch (dbDupErr) {
-			console.warn('[APORTES][6] ⚠️ Error verificando duplicado en DB:', dbDupErr);
+			console.error('[APORTES][6] ❌ Error verificando duplicado en DB:', dbDupErr);
+			// Si hay error verificando, es mejor fallar que continuar y crear duplicado
+			throw dbDupErr;
 		}
 
 		console.log('[APORTES][7] Validando tipo de archivo...');
@@ -1140,7 +1179,22 @@ export const POST: RequestHandler = async (event) => {
 			
 			
 
-			const detectedPeriod = detectPeriod(fullText);
+			// Priorizar período del analyzer IA sobre el método legacy
+			let detectedPeriod: { month?: number | null; year?: number | null; raw?: string | null } = detectPeriod(fullText);
+
+			// Si el analyzer IA tiene período, usarlo
+			if (analyzerResult && analyzerResult.periodo && analyzerResult.periodo !== 'FOPID') {
+				const mmYyyyMatch = analyzerResult.periodo.match(/^(\d{1,2})\/(\d{4})$/);
+				if (mmYyyyMatch) {
+					detectedPeriod = {
+						month: parseInt(mmYyyyMatch[1]),
+						year: parseInt(mmYyyyMatch[2]),
+						raw: analyzerResult.periodo
+					};
+					console.log('[APORTES] Período detectado del analyzer IA:', detectedPeriod);
+				}
+			}
+
 			const selectedPeriod = parseSelectedPeriod(selectedPeriodRaw);
 			const periodMatches = selectedPeriod && detectedPeriod.year && detectedPeriod.month
 				? (selectedPeriod.year === detectedPeriod.year && selectedPeriod.month === detectedPeriod.month)
@@ -1164,20 +1218,46 @@ export const POST: RequestHandler = async (event) => {
 				
 			}
 		} else {
-			
-			
-			
-			
+			// No hay rows de extractLineData, pero aún podemos tener datos del analyzer IA
+
+			// Priorizar período del analyzer IA sobre el método legacy
+			let detectedPeriod: { month?: number | null; year?: number | null; raw?: string | null } = detectPeriod(fullText);
+
+			// Si el analyzer IA tiene período, usarlo
+			if (analyzerResult && analyzerResult.periodo && analyzerResult.periodo !== 'FOPID') {
+				const mmYyyyMatch = analyzerResult.periodo.match(/^(\d{1,2})\/(\d{4})$/);
+				if (mmYyyyMatch) {
+					detectedPeriod = {
+						month: parseInt(mmYyyyMatch[1]),
+						year: parseInt(mmYyyyMatch[2]),
+						raw: analyzerResult.periodo
+					};
+					console.log('[APORTES] Período detectado del analyzer IA (else):', detectedPeriod);
+				}
+			}
+
+			const selectedPeriod = parseSelectedPeriod(selectedPeriodRaw);
+			const periodMatches = selectedPeriod && detectedPeriod.year && detectedPeriod.month
+				? (selectedPeriod.year === detectedPeriod.year && selectedPeriod.month === detectedPeriod.month)
+				: null;
+
+			// Usar totales del analyzer IA si están disponibles
+			const sumTotal = analyzerResult?.totales?.montoTotal ?? 0;
+			const declaredTotal = analyzerResult?.totales?.montoTotal ?? null;
+			const totalMatches = declaredTotal != null;
+
+			checks = { sumTotal, declaredTotal, totalMatches, detectedPeriod, selectedPeriod, periodMatches };
+
 			// Aún así, incluir datos de tabla si se encontraron
 			if (Object.keys(tableData).length > 0 || personas.length > 0) {
-				preview = { 
-					listado: { 
-						count: 0, 
-						total: 0, 
+				preview = {
+					listado: {
+						count: personas.length,
+						total: sumTotal,
 						rows: [],
 						tableData,
 						personas
-					} 
+					}
 				};
 			}
 		}
