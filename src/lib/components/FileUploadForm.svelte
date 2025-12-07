@@ -13,7 +13,6 @@
   let selectedMonth: string = '';
   let selectedYear: number | string = '';
   let selectedInstitutionId: string = '';
-  let allowOCR: boolean = true;
 
   // Auto-seleccionar institución si solo hay una
   $: if (institutions.length === 1 && !selectedInstitutionId) {
@@ -42,7 +41,6 @@
     mimeType: string;
     status: string;
     classification?: 'comprobante' | 'listado' | 'desconocido';
-    needsOCR?: boolean;
     preview?: {
       listado?: {
         count: number;
@@ -197,7 +195,6 @@
         const f = new FormData();
         f.append('file', file);
         if (selectedPeriod) f.append('selectedPeriod', selectedPeriod);
-        f.append('allowOCR', String(allowOCR));
         f.append('institutionId', selectedInstitutionId);
         return f;
       };
@@ -441,11 +438,6 @@
           required
         />
       </div>
-    </div>
-
-    <div class="flex items-center gap-2">
-      <input id="allowocr" type="checkbox" bind:checked={allowOCR} class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-      <label for="allowocr" class="text-sm text-gray-700">Permitir OCR si es necesario</label>
     </div>
 
     <div class="flex justify-end pt-4 border-t border-gray-200">

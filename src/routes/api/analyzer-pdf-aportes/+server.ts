@@ -5,8 +5,6 @@ import { join } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { CONFIG } from '$lib/server/config';
 import { requireAuth } from '$lib/server/auth/middleware';
-// pdfParse se importa dinámicamente para evitar problemas de cliente
-import { ocrPdfFirstPage } from '$lib/server/pdf/ocr';
 import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
@@ -641,13 +639,10 @@ export const POST: RequestHandler = async (event) => {
 		const formData = await event.request.formData();
 		const file = formData.get('file') as File | null;
 		const selectedPeriodRaw = (formData.get('selectedPeriod') as string | null) ?? null;
-		const allowOCR = String(formData.get('allowOCR') ?? 'true') === 'true';
-
 		console.log('[APORTES][2] Archivo recibido:', file?.name);
 		console.log('[APORTES][2] Tamaño:', file?.size, 'bytes');
 		console.log('[APORTES][2] Tipo:', file?.type);
 		console.log('[APORTES][2] Período seleccionado:', selectedPeriodRaw);
-		console.log('[APORTES][2] Permitir OCR:', allowOCR);
 
 		if (!file) {
 			return json({ error: 'No se proporcionó ningún archivo' }, { status: 400 });
@@ -855,53 +850,7 @@ export const POST: RequestHandler = async (event) => {
 			
 		}
 
-		let needsOCR = extractedText.trim().length === 0;
-		let ocrText: string | null = null;
-		
-		
-		
-		
-		if (needsOCR && allowOCR) {
-			
-			try {
-				const ocr = await ocrPdfFirstPage(buffer);
-				if (ocr && ocr.text.trim()) {
-					const t = ocr.text.toLowerCase();
-					ocrText = t;
-					
-					
-					
-					
-					const isComprobante = /(comprobante|transferencia|operaci[oó]n|cbu|importe|referencia)/i.test(t);
-					const isListado = /(listado|detalle de aportes|aportes|cuil|cuit|legajo|n[oº]\.\?\s*orden)/i.test(t);
-					
-					
-					
-					
-					if (isComprobante && !isListado) {
-						kind = 'comprobante';
-						
-					} else if (isListado && !isComprobante) {
-						kind = 'listado';
-						
-					} else {
-						kind = 'desconocido';
-						
-					}
-					needsOCR = false;
-				} else {
-					
-				}
-			} catch (e) {
-				
-			}
-		} else if (needsOCR && !allowOCR) {
-			
-		} else {
-			
-		}
-
-		const fullText = (extractedText && extractedText.trim().length > 0) ? extractedText : (ocrText || '');
+		const fullText = extractedText;
 		console.log('[APORTES][17] Texto final para procesamiento:', fullText.length, 'caracteres');
 
 		let preview: unknown = undefined;
@@ -1530,7 +1479,6 @@ export const POST: RequestHandler = async (event) => {
 			mimeType: detectedFileType.mime,
 			status: 'saved',
 			classification: kind,
-			needsOCR,
 			preview,
 			checks,
 			institution,
