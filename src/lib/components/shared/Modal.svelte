@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  
+  import SearchableSelect from './SearchableSelect.svelte';
+
   export let showModal: boolean;
   export let title: string;
   export let type: 'create' | 'edit' | 'delete' = 'create';
@@ -113,20 +114,14 @@
                   <span class="label-text">{field.label} {field.required ? '*' : ''}</span>
                 </label>
                 {#if field.type === 'select'}
-                  <select
-                    id={field.name}
-                    name={field.name}
-                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors {field.readonly ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500'}"
+                  <SearchableSelect
+                    options={field.options || []}
+                    value={field.value || ''}
+                    placeholder={field.placeholder || 'Buscar...'}
                     required={field.required}
                     disabled={field.readonly}
-                  >
-                    <option value="">{field.placeholder || 'Seleccionar...'}</option>
-                    {#each field.options || [] as option}
-                      <option value={option.value} selected={field.value === option.value}>
-                        {option.label}
-                      </option>
-                    {/each}
-                  </select>
+                    name={field.name}
+                  />
                 {:else if field.type === 'multiselect'}
                   <div class="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-2 bg-white">
                     {#each field.options || [] as option}

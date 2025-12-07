@@ -1,8 +1,36 @@
 <script lang="ts">
   import AnalysisTable from './AnalysisTable.svelte';
+  import SearchableSelect from './shared/SearchableSelect.svelte';
 
   // Props
   export let institutions: Array<{ id: string; name: string | null }> = [];
+
+  // Opciones para los selects de mes y año
+  const monthOptions = [
+    { value: '01', label: 'Enero' },
+    { value: '02', label: 'Febrero' },
+    { value: '03', label: 'Marzo' },
+    { value: '04', label: 'Abril' },
+    { value: '05', label: 'Mayo' },
+    { value: '06', label: 'Junio' },
+    { value: '07', label: 'Julio' },
+    { value: '08', label: 'Agosto' },
+    { value: '09', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' }
+  ];
+
+  const yearOptions = Array.from({ length: 31 }, (_, i) => ({
+    value: String(2010 + i),
+    label: String(2010 + i)
+  }));
+
+  // Opciones de instituciones reactivas
+  $: institutionOptions = institutions.map((inst) => ({
+    value: inst.id,
+    label: inst.name || 'Sin nombre'
+  }));
 
   let fileInputSueldos: HTMLInputElement | null = null;
   let fileInputFopid: HTMLInputElement | null = null;
@@ -11,7 +39,7 @@
   let uploading = false;
   let uploadingStage: string = '';
   let selectedMonth: string = '';
-  let selectedYear: number | string = '';
+  let selectedYear: string = '';
   let selectedInstitutionId: string = '';
 
   // Auto-seleccionar institución si solo hay una
@@ -325,59 +353,32 @@
       <div>
         <label for="period" class="mb-1 block text-sm font-medium text-gray-700">Mes/Año <span class="text-red-500">*</span></label>
         <div class="grid grid-cols-2 gap-2">
-          <select
-            id="month"
+          <SearchableSelect
+            options={monthOptions}
             bind:value={selectedMonth}
+            placeholder="Buscar mes..."
             required
-            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          >
-            <option value="">Seleccionar mes</option>
-            <option value="01">Enero</option>
-            <option value="02">Febrero</option>
-            <option value="03">Marzo</option>
-            <option value="04">Abril</option>
-            <option value="05">Mayo</option>
-            <option value="06">Junio</option>
-            <option value="07">Julio</option>
-            <option value="08">Agosto</option>
-            <option value="09">Septiembre</option>
-            <option value="10">Octubre</option>
-            <option value="11">Noviembre</option>
-            <option value="12">Diciembre</option>
-          </select>
-          <select
-            id="year"
+            name="month"
+          />
+          <SearchableSelect
+            options={yearOptions}
             bind:value={selectedYear}
+            placeholder="Buscar año..."
             required
-            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          >
-            <option value="">Seleccionar año</option>
-            {#each Array.from({ length: 31 }, (_, i) => 2010 + i) as year}
-              <option value={year}>{year}</option>
-            {/each}
-          </select>
+            name="year"
+          />
         </div>
       </div>
       <div>
         <label for="institution" class="mb-1 block text-sm font-medium text-gray-700">Institución <span class="text-red-500">*</span></label>
-        <select
-          id="institution"
+        <SearchableSelect
+          options={institutionOptions}
           bind:value={selectedInstitutionId}
+          placeholder={institutions.length === 0 ? 'No hay instituciones asignadas' : 'Buscar institución...'}
           required
-          disabled={institutions.length === 1}
-          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        >
-          {#if institutions.length === 0}
-            <option value="">No hay instituciones asignadas</option>
-          {:else if institutions.length === 1}
-            <option value={institutions[0].id}>{institutions[0].name || 'Sin nombre'}</option>
-          {:else}
-            <option value="">Seleccionar institución</option>
-            {#each institutions as inst}
-              <option value={inst.id}>{inst.name || 'Sin nombre'}</option>
-            {/each}
-          {/if}
-        </select>
+          disabled={institutions.length <= 1}
+          name="institution"
+        />
         {#if institutions.length === 1}
           <p class="mt-1 text-xs text-gray-500">Institución asignada automáticamente</p>
         {/if}

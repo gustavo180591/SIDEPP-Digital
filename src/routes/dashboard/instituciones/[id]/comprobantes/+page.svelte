@@ -1,16 +1,49 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { PageHeader, SearchBox } from '$lib/components/shared';
+  import { PageHeader, SearchBox, SearchableSelect } from '$lib/components/shared';
   import { PdfTable } from '$lib/components/pdfs';
   import type { PdfFileWithPeriod } from '$lib/db/services/pdfService';
-  
+
   export let data: any;
-  
+
   let searchTerm = data.search || '';
   let yearFilter = data.year || '';
   let monthFilter = data.month || '';
   let searchTimeout: NodeJS.Timeout;
+
+  // Opciones para los filtros
+  const yearOptions = [
+    { value: '', label: 'Todos los años' },
+    ...Array.from({ length: 10 }, (_, i) => {
+      const year = new Date().getFullYear() - i;
+      return { value: String(year), label: String(year) };
+    })
+  ];
+
+  const monthOptions = [
+    { value: '', label: 'Todos los meses' },
+    { value: '1', label: 'Enero' },
+    { value: '2', label: 'Febrero' },
+    { value: '3', label: 'Marzo' },
+    { value: '4', label: 'Abril' },
+    { value: '5', label: 'Mayo' },
+    { value: '6', label: 'Junio' },
+    { value: '7', label: 'Julio' },
+    { value: '8', label: 'Agosto' },
+    { value: '9', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' }
+  ];
+
+  // Reaccionar a cambios en los filtros
+  $: if (yearFilter !== data.year) {
+    handleYearFilter();
+  }
+  $: if (monthFilter !== data.month) {
+    handleMonthFilter();
+  }
 
   // Función para construir URL con filtros
   function buildUrl(filters: Record<string, string>) {
@@ -185,16 +218,12 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             Año
           </label>
-          <select
+          <SearchableSelect
+            options={yearOptions}
             bind:value={yearFilter}
-            on:change={handleYearFilter}
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
-          >
-            <option value="">Todos los años</option>
-            {#each Array.from({length: 10}, (_, i) => new Date().getFullYear() - i) as year}
-              <option value={year}>{year}</option>
-            {/each}
-          </select>
+            placeholder="Buscar año..."
+            name="year"
+          />
         </div>
 
         <!-- Filtro por mes -->
@@ -202,25 +231,12 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             Mes
           </label>
-          <select
+          <SearchableSelect
+            options={monthOptions}
             bind:value={monthFilter}
-            on:change={handleMonthFilter}
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
-          >
-            <option value="">Todos los meses</option>
-            <option value="1">Enero</option>
-            <option value="2">Febrero</option>
-            <option value="3">Marzo</option>
-            <option value="4">Abril</option>
-            <option value="5">Mayo</option>
-            <option value="6">Junio</option>
-            <option value="7">Julio</option>
-            <option value="8">Agosto</option>
-            <option value="9">Septiembre</option>
-            <option value="10">Octubre</option>
-            <option value="11">Noviembre</option>
-            <option value="12">Diciembre</option>
-          </select>
+            placeholder="Buscar mes..."
+            name="month"
+          />
         </div>
       </div>
         
