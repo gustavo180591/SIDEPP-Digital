@@ -16,6 +16,19 @@ import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
 // Librería para manejo preciso de montos monetarios
 import currency from 'currency.js';
 
+// ============================================================================
+// ROLLBACK DE SESIÓN: Interface y tipos para tracking de datos creados
+// ============================================================================
+interface SessionCleanupData {
+  periodId: string | null;           // PayrollPeriod creado/usado
+  periodWasCreated: boolean;         // true si fue CREADO en esta sesión
+  pdfFileIds: string[];              // PdfFiles creados
+  contributionLineIds: string[];     // ContributionLines creadas
+  memberIdsCreated: string[];        // Members NUEVOS (no los encontrados)
+  hashEntries: string[];             // Hashes agregados al índice
+  savedFilePaths: string[];          // Rutas de archivos físicos guardados
+}
+
 // Configuración de currency.js para pesos argentinos (ARS)
 // Formato: 1.234,56 (punto como separador de miles, coma como decimal)
 const ARS = (value: number | string) => currency(value, {
@@ -545,103 +558,157 @@ async function findMemberByName(
 }
 
 /**
- * Función de limpieza/rollback que elimina:
- * - Archivos físicos de la carpeta analyzer
- * - Entradas del hash-index.json
- * - Registros de la DB (ContributionLine, PdfFile, PayrollPeriod huérfanos)
+ * Función de limpieza/rollback de SESIÓN que elimina SOLO los datos creados en esta sesión:
+ * - Archivos físicos específicos de esta sesión
+ * - Entradas del hash-index.json de esta sesión
+ * - Registros de la DB creados en esta sesión (ContributionLine, Member, PdfFile, PayrollPeriod)
+ *
+ * Esta función implementa "borrón y cuenta nueva" - si falla cualquier archivo,
+ * se limpia TODO lo creado en la sesión actual.
  */
-async function performCleanup(): Promise<{
-	hashIndexCleared: boolean;
-	filesDeleted: number;
-	pdfFilesDeleted: number;
+async function performSessionCleanup(data: SessionCleanupData): Promise<{
 	contributionLinesDeleted: number;
-	payrollPeriodsDeleted: number;
+	membersDeleted: number;
+	pdfFilesDeleted: number;
+	periodDeleted: boolean;
+	hashesRemoved: number;
+	filesDeleted: number;
 	errors: string[];
 }> {
 	const results = {
-		hashIndexCleared: false,
-		filesDeleted: 0,
-		pdfFilesDeleted: 0,
 		contributionLinesDeleted: 0,
-		payrollPeriodsDeleted: 0,
+		membersDeleted: 0,
+		pdfFilesDeleted: 0,
+		periodDeleted: false,
+		hashesRemoved: 0,
+		filesDeleted: 0,
 		errors: [] as string[]
 	};
 
-	// 1. Limpiar hash-index.json
-	console.log('[CLEANUP][1] Limpiando hash-index.json...');
-	try {
-		await writeFile(HASH_INDEX, Buffer.from('{}', 'utf8'));
-		results.hashIndexCleared = true;
-		console.log('[CLEANUP][1] ✓ hash-index.json limpiado');
-	} catch (e) {
-		const msg = `Error limpiando hash-index: ${e instanceof Error ? e.message : e}`;
-		results.errors.push(msg);
-		console.error('[CLEANUP][1] ❌', msg);
-	}
+	console.log('[SESSION_CLEANUP] Iniciando limpieza de sesión...');
+	console.log('[SESSION_CLEANUP] Datos a limpiar:', {
+		periodId: data.periodId,
+		periodWasCreated: data.periodWasCreated,
+		pdfFileIds: data.pdfFileIds.length,
+		contributionLineIds: data.contributionLineIds.length,
+		memberIdsCreated: data.memberIdsCreated.length,
+		hashEntries: data.hashEntries.length,
+		savedFilePaths: data.savedFilePaths.length
+	});
 
-	// 2. Eliminar archivos físicos de la carpeta analyzer
-	console.log('[CLEANUP][2] Eliminando archivos de', ANALYZER_DIR);
-	try {
-		const { readdir, unlink } = await import('node:fs/promises');
-		const files = await readdir(ANALYZER_DIR);
-		for (const file of files) {
-			if (file === 'hash-index.json') continue;
-			try {
-				await unlink(join(ANALYZER_DIR, file));
-				results.filesDeleted++;
-			} catch (unlinkErr) {
-				results.errors.push(`Error borrando ${file}: ${unlinkErr}`);
-			}
+	// ORDEN: Respetar foreign keys (de más dependiente a menos dependiente)
+
+	// 1. Eliminar ContributionLines específicas de esta sesión
+	if (data.contributionLineIds.length > 0) {
+		console.log('[SESSION_CLEANUP][1] Eliminando ContributionLines...');
+		try {
+			const deleted = await prisma.contributionLine.deleteMany({
+				where: { id: { in: data.contributionLineIds } }
+			});
+			results.contributionLinesDeleted = deleted.count;
+			console.log(`[SESSION_CLEANUP][1] ✓ ${deleted.count} ContributionLines eliminadas`);
+		} catch (e) {
+			const msg = `ContributionLines: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[SESSION_CLEANUP][1] ❌', msg);
 		}
-		console.log('[CLEANUP][2] ✓', results.filesDeleted, 'archivos eliminados');
-	} catch (e) {
-		const msg = `Error leyendo directorio: ${e instanceof Error ? e.message : e}`;
-		results.errors.push(msg);
-		console.error('[CLEANUP][2] ❌', msg);
 	}
 
-	// 3. Eliminar ContributionLines de la DB
-	console.log('[CLEANUP][3] Eliminando ContributionLines de DB...');
-	try {
-		const deleteResult = await prisma.contributionLine.deleteMany({});
-		results.contributionLinesDeleted = deleteResult.count;
-		console.log('[CLEANUP][3] ✓', results.contributionLinesDeleted, 'contribution lines eliminadas');
-	} catch (e) {
-		const msg = `Error eliminando ContributionLines: ${e instanceof Error ? e.message : e}`;
-		results.errors.push(msg);
-		console.error('[CLEANUP][3] ❌', msg);
+	// 2. Eliminar Members NUEVOS (creados en esta sesión, no los que ya existían)
+	if (data.memberIdsCreated.length > 0) {
+		console.log('[SESSION_CLEANUP][2] Eliminando Members nuevos...');
+		try {
+			const deleted = await prisma.member.deleteMany({
+				where: { id: { in: data.memberIdsCreated } }
+			});
+			results.membersDeleted = deleted.count;
+			console.log(`[SESSION_CLEANUP][2] ✓ ${deleted.count} Members nuevos eliminados`);
+		} catch (e) {
+			const msg = `Members: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[SESSION_CLEANUP][2] ❌', msg);
+		}
 	}
 
-	// 4. Eliminar PdfFiles de la DB
-	console.log('[CLEANUP][4] Eliminando PdfFiles de DB...');
-	try {
-		const deleteResult = await prisma.pdfFile.deleteMany({});
-		results.pdfFilesDeleted = deleteResult.count;
-		console.log('[CLEANUP][4] ✓', results.pdfFilesDeleted, 'pdf files eliminados');
-	} catch (e) {
-		const msg = `Error eliminando PdfFiles: ${e instanceof Error ? e.message : e}`;
-		results.errors.push(msg);
-		console.error('[CLEANUP][4] ❌', msg);
+	// 3. Eliminar PdfFiles de esta sesión
+	if (data.pdfFileIds.length > 0) {
+		console.log('[SESSION_CLEANUP][3] Eliminando PdfFiles...');
+		try {
+			const deleted = await prisma.pdfFile.deleteMany({
+				where: { id: { in: data.pdfFileIds } }
+			});
+			results.pdfFilesDeleted = deleted.count;
+			console.log(`[SESSION_CLEANUP][3] ✓ ${deleted.count} PdfFiles eliminados`);
+		} catch (e) {
+			const msg = `PdfFiles: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[SESSION_CLEANUP][3] ❌', msg);
+		}
 	}
 
-	// 5. Eliminar PayrollPeriods huérfanos de la DB
-	console.log('[CLEANUP][5] Eliminando PayrollPeriods huérfanos de DB...');
-	try {
-		const deleteResult = await prisma.payrollPeriod.deleteMany({
-			where: {
-				pdfFiles: {
-					none: {}
+	// 4. Eliminar PayrollPeriod SOLO si fue CREADO en esta sesión (no si ya existía)
+	if (data.periodId && data.periodWasCreated) {
+		console.log('[SESSION_CLEANUP][4] Eliminando PayrollPeriod creado en esta sesión...');
+		try {
+			// Verificar que no tenga otros PDFs asociados (por si algo quedó)
+			const period = await prisma.payrollPeriod.findUnique({
+				where: { id: data.periodId },
+				include: { pdfFiles: true }
+			});
+
+			if (period && period.pdfFiles.length === 0) {
+				await prisma.payrollPeriod.delete({ where: { id: data.periodId } });
+				results.periodDeleted = true;
+				console.log(`[SESSION_CLEANUP][4] ✓ PayrollPeriod eliminado`);
+			} else if (period) {
+				console.log(`[SESSION_CLEANUP][4] ⚠️ PayrollPeriod tiene ${period.pdfFiles.length} PDFs asociados, no se elimina`);
+			}
+		} catch (e) {
+			const msg = `PayrollPeriod: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[SESSION_CLEANUP][4] ❌', msg);
+		}
+	}
+
+	// 5. Limpiar entradas del hash-index.json de esta sesión
+	if (data.hashEntries.length > 0) {
+		console.log('[SESSION_CLEANUP][5] Limpiando hash-index.json...');
+		try {
+			const hashIndex = await loadHashIndex();
+			for (const hash of data.hashEntries) {
+				if (hashIndex[hash]) {
+					delete hashIndex[hash];
+					results.hashesRemoved++;
 				}
 			}
-		});
-		results.payrollPeriodsDeleted = deleteResult.count;
-		console.log('[CLEANUP][5] ✓', results.payrollPeriodsDeleted, 'payroll periods eliminados');
-	} catch (e) {
-		const msg = `Error eliminando PayrollPeriods: ${e instanceof Error ? e.message : e}`;
-		results.errors.push(msg);
-		console.error('[CLEANUP][5] ❌', msg);
+			await saveHashIndex(hashIndex);
+			console.log(`[SESSION_CLEANUP][5] ✓ ${results.hashesRemoved} entradas de hash eliminadas`);
+		} catch (e) {
+			const msg = `Hash index: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[SESSION_CLEANUP][5] ❌', msg);
+		}
 	}
 
+	// 6. Eliminar archivos físicos de esta sesión
+	if (data.savedFilePaths.length > 0) {
+		console.log('[SESSION_CLEANUP][6] Eliminando archivos físicos...');
+		const { unlink } = await import('node:fs/promises');
+		for (const filePath of data.savedFilePaths) {
+			try {
+				await unlink(filePath);
+				results.filesDeleted++;
+			} catch (e) {
+				// Ignorar si el archivo no existe
+				if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+					results.errors.push(`Archivo ${filePath}: ${e}`);
+				}
+			}
+		}
+		console.log(`[SESSION_CLEANUP][6] ✓ ${results.filesDeleted} archivos físicos eliminados`);
+	}
+
+	console.log('[SESSION_CLEANUP] ✓ Limpieza de sesión completada:', results);
 	return results;
 }
 
@@ -651,6 +718,19 @@ export const POST: RequestHandler = async (event) => {
 	if (auth.error) {
 		return json({ error: auth.error }, { status: auth.status || 401 });
 	}
+
+	// ============================================================================
+	// ROLLBACK DE SESIÓN: Inicializar tracking de datos creados
+	// ============================================================================
+	const sessionData: SessionCleanupData = {
+		periodId: null,
+		periodWasCreated: false,
+		pdfFileIds: [],
+		contributionLineIds: [],
+		memberIdsCreated: [],
+		hashEntries: [],
+		savedFilePaths: []
+	};
 
 	try {
 		console.log('\n\n========================================');
@@ -785,12 +865,16 @@ export const POST: RequestHandler = async (event) => {
 		console.log('[APORTES][8] Ruta:', savedPath);
 		await writeFile(savedPath, buffer);
 		console.log('[APORTES][8] ✓ Archivo guardado exitosamente');
+		// ROLLBACK: Registrar archivo físico guardado
+		sessionData.savedFilePaths.push(savedPath);
 
 		// Registrar en índice de hashes
 		console.log('[APORTES][9] Registrando en índice de hashes...');
 		hashIndex[bufferHash] = { fileName: file.name, savedName, savedPath };
 		await saveHashIndex(hashIndex);
 		console.log('[APORTES][9] ✓ Registrado en índice');
+		// ROLLBACK: Registrar hash agregado
+		sessionData.hashEntries.push(bufferHash);
 
 		// NOTE: El PdfFile se creará más adelante una vez detectemos el tipo (FOPID/SUELDO)
 		let pdfFileId: string | null = null;
@@ -1103,6 +1187,8 @@ export const POST: RequestHandler = async (event) => {
 			});
 			pdfFileId = createdPdf.id;
 			console.log('[APORTES][27] ✓ PdfFile creado:', { id: pdfFileId, fileName: createdPdf.fileName, type: pdfType, concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf, hasMetadata: !!pdfMetadata });
+			// ROLLBACK: Registrar PdfFile creado
+			sessionData.pdfFileIds.push(createdPdf.id);
 		} catch (pdfDbErr) {
 			console.error('[APORTES][27] ❌ Error al crear PdfFile en DB:', pdfDbErr);
 			throw pdfDbErr;
@@ -1143,6 +1229,8 @@ export const POST: RequestHandler = async (event) => {
 								member = { id: createdMember.id };
 								membersCreated++;
 								console.log(`[APORTES][28]   -> ✓ Miembro creado exitosamente: ${createdMember.id}`);
+								// ROLLBACK: Registrar Member NUEVO creado
+								sessionData.memberIdsCreated.push(createdMember.id);
 							} catch (cmErr: any) {
 								// Manejar race condition (unique constraint violation)
 								if (cmErr?.code === 'P2002') {
@@ -1188,7 +1276,7 @@ export const POST: RequestHandler = async (event) => {
 							console.log(`[APORTES][28]   -> ⏭️  ContributionLine ya existe para ${nombreUpperCase}, saltando...`);
 						} else {
 							// Crear ContributionLine solo si NO existe
-							await prisma.contributionLine.create({
+							const createdContributionLine = await prisma.contributionLine.create({
 								data: {
 									name: nombreUpperCase,
 									quantity: p.cantidadLegajos != null ?
@@ -1201,6 +1289,8 @@ export const POST: RequestHandler = async (event) => {
 								}
 							});
 							console.log(`[APORTES][28]   -> ✓ ContributionLine creada para ${nombreUpperCase}`);
+							// ROLLBACK: Registrar ContributionLine creada
+							sessionData.contributionLineIds.push(createdContributionLine.id);
 						}
 					} catch (clErr) {
 						console.error(`[APORTES][28]   -> ❌ Error creando ContributionLine:`, clErr);
@@ -1430,9 +1520,10 @@ export const POST: RequestHandler = async (event) => {
 
 				// Buscar o crear PayrollPeriod usando la restricción única
 				let createdPeriodId: string | null = null;
+				let periodWasCreated = false; // ROLLBACK: Flag para saber si fue creado en esta sesión
 
 				// Función helper para buscar o crear el período con retry en caso de race condition
-				const getOrCreatePeriod = async (retryCount = 0): Promise<string | null> => {
+				const getOrCreatePeriod = async (retryCount = 0): Promise<{ id: string; wasCreated: boolean } | null> => {
 					const maxRetries = 3;
 
 					try {
@@ -1451,7 +1542,7 @@ export const POST: RequestHandler = async (event) => {
 								month: period.month,
 								year: period.year
 							});
-							return period.id;
+							return { id: period.id, wasCreated: false };
 						}
 
 						// Si no existe, intentar crearlo
@@ -1469,7 +1560,7 @@ export const POST: RequestHandler = async (event) => {
 								month: period.month,
 								year: period.year
 							});
-							return period.id;
+							return { id: period.id, wasCreated: true };
 						} catch (createErr: any) {
 							// Si falla por constraint único (race condition), reintentar buscando
 							if (createErr?.code === 'P2002' && retryCount < maxRetries) {
@@ -1486,7 +1577,14 @@ export const POST: RequestHandler = async (event) => {
 					}
 				};
 
-				createdPeriodId = await getOrCreatePeriod();
+				const periodResult = await getOrCreatePeriod();
+				if (periodResult) {
+					createdPeriodId = periodResult.id;
+					periodWasCreated = periodResult.wasCreated;
+					// ROLLBACK: Registrar período
+					sessionData.periodId = createdPeriodId;
+					sessionData.periodWasCreated = periodWasCreated;
+				}
 
 				// Asociar el PDF al período
 				if (createdPeriodId && pdfFileId) {
@@ -1558,13 +1656,13 @@ export const POST: RequestHandler = async (event) => {
 		console.error('[APORTES] Stack:', err instanceof Error ? err.stack : 'N/A');
 		console.error('========================================');
 
-		// ROLLBACK AUTOMÁTICO: Limpiar todo cuando hay error
-		console.log('\n🧹 [APORTES] Ejecutando rollback automático...');
+		// ROLLBACK DE SESIÓN: Limpiar solo los datos creados en esta sesión
+		console.log('\n🧹 [APORTES] Ejecutando rollback de sesión...');
 		try {
-			const cleanupResults = await performCleanup();
-			console.log('🧹 [APORTES] Rollback completado:', cleanupResults);
+			const cleanupResults = await performSessionCleanup(sessionData);
+			console.log('🧹 [APORTES] Rollback de sesión completado:', cleanupResults);
 		} catch (cleanupErr) {
-			console.error('🧹 [APORTES] Error durante rollback:', cleanupErr);
+			console.error('🧹 [APORTES] Error durante rollback de sesión:', cleanupErr);
 		}
 		console.error('========================================\n\n');
 
@@ -1572,15 +1670,16 @@ export const POST: RequestHandler = async (event) => {
 			error: 'Error al procesar el archivo',
 			details: message,
 			rollback: true,
-			message: 'Se ejecutó limpieza automática. Puede reintentar la carga.'
+			message: 'Se ejecutó limpieza de sesión. Puede reintentar la carga.'
 		}, { status: 500 });
 	}
 };
 
 /**
  * DELETE /api/analyzer-pdf-aportes
- * Limpia todos los datos de análisis: archivos físicos, hash-index y registros de DB
- * Útil para reintentar después de un error - cualquier usuario autenticado puede usarlo
+ * Limpia TODOS los datos de análisis: archivos físicos, hash-index y registros de DB
+ * ADVERTENCIA: Esta es una limpieza completa, no por sesión
+ * Útil para reintentar después de un error grave - solo para ADMIN
  */
 export const DELETE: RequestHandler = async (event) => {
 	// Requerir autenticación
@@ -1589,23 +1688,101 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: auth.error }, { status: auth.status || 401 });
 	}
 
+	// Solo ADMIN puede hacer limpieza completa
+	if (auth.user?.role !== 'ADMIN') {
+		return json({ error: 'Solo administradores pueden ejecutar limpieza completa' }, { status: 403 });
+	}
+
 	console.log('\n========================================');
-	console.log('🧹 [CLEANUP] INICIO DE LIMPIEZA MANUAL');
+	console.log('🧹 [CLEANUP] INICIO DE LIMPIEZA COMPLETA (ADMIN)');
 	console.log(`🧹 [CLEANUP] Usuario: ${auth.user?.email} (${auth.user?.role})`);
 	console.log('========================================\n');
 
+	const results = {
+		hashIndexCleared: false,
+		filesDeleted: 0,
+		pdfFilesDeleted: 0,
+		contributionLinesDeleted: 0,
+		membersDeleted: 0,
+		payrollPeriodsDeleted: 0,
+		errors: [] as string[]
+	};
+
 	try {
-		const results = await performCleanup();
+		// 1. Limpiar hash-index.json
+		console.log('[CLEANUP][1] Limpiando hash-index.json...');
+		try {
+			await writeFile(HASH_INDEX, Buffer.from('{}', 'utf8'));
+			results.hashIndexCleared = true;
+			console.log('[CLEANUP][1] ✓ hash-index.json limpiado');
+		} catch (e) {
+			results.errors.push(`Hash index: ${e}`);
+		}
+
+		// 2. Eliminar archivos físicos de la carpeta analyzer
+		console.log('[CLEANUP][2] Eliminando archivos de', ANALYZER_DIR);
+		try {
+			const { readdir, unlink } = await import('node:fs/promises');
+			const files = await readdir(ANALYZER_DIR);
+			for (const file of files) {
+				if (file === 'hash-index.json') continue;
+				try {
+					await unlink(join(ANALYZER_DIR, file));
+					results.filesDeleted++;
+				} catch (unlinkErr) {
+					results.errors.push(`Archivo ${file}: ${unlinkErr}`);
+				}
+			}
+			console.log('[CLEANUP][2] ✓', results.filesDeleted, 'archivos eliminados');
+		} catch (e) {
+			results.errors.push(`Directorio: ${e}`);
+		}
+
+		// 3. Eliminar ContributionLines de la DB
+		console.log('[CLEANUP][3] Eliminando ContributionLines de DB...');
+		try {
+			const deleteResult = await prisma.contributionLine.deleteMany({});
+			results.contributionLinesDeleted = deleteResult.count;
+			console.log('[CLEANUP][3] ✓', results.contributionLinesDeleted, 'contribution lines eliminadas');
+		} catch (e) {
+			results.errors.push(`ContributionLines: ${e}`);
+		}
+
+		// 4. Eliminar PdfFiles de la DB
+		console.log('[CLEANUP][4] Eliminando PdfFiles de DB...');
+		try {
+			const deleteResult = await prisma.pdfFile.deleteMany({});
+			results.pdfFilesDeleted = deleteResult.count;
+			console.log('[CLEANUP][4] ✓', results.pdfFilesDeleted, 'pdf files eliminados');
+		} catch (e) {
+			results.errors.push(`PdfFiles: ${e}`);
+		}
+
+		// 5. Eliminar PayrollPeriods huérfanos de la DB
+		console.log('[CLEANUP][5] Eliminando PayrollPeriods huérfanos de DB...');
+		try {
+			const deleteResult = await prisma.payrollPeriod.deleteMany({
+				where: {
+					pdfFiles: {
+						none: {}
+					}
+				}
+			});
+			results.payrollPeriodsDeleted = deleteResult.count;
+			console.log('[CLEANUP][5] ✓', results.payrollPeriodsDeleted, 'payroll periods eliminados');
+		} catch (e) {
+			results.errors.push(`PayrollPeriods: ${e}`);
+		}
 
 		console.log('\n========================================');
-		console.log('✅ [CLEANUP] LIMPIEZA COMPLETADA');
+		console.log('✅ [CLEANUP] LIMPIEZA COMPLETA FINALIZADA');
 		console.log('========================================');
 		console.log('Resumen:', results);
 		console.log('========================================\n');
 
 		return json({
 			status: 'success',
-			message: 'Limpieza completada',
+			message: 'Limpieza completa ejecutada',
 			results
 		});
 
@@ -1615,7 +1792,8 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({
 			status: 'error',
 			message: 'Error durante la limpieza',
-			details: message
+			details: message,
+			partialResults: results
 		}, { status: 500 });
 	}
 };

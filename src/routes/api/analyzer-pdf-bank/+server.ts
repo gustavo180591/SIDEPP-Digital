@@ -15,6 +15,18 @@ import { analyzeTransferenciaIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 // Importar utilidades de CUIT
 import { normalizeCuit, formatCuit as formatCuitUtil } from '$lib/utils/cuit-utils.js';
 
+// ============================================================================
+// ROLLBACK DE SESIÓN: Interface y tipos para tracking de datos creados
+// ============================================================================
+interface SessionCleanupData {
+  periodId: string | null;           // PayrollPeriod creado/usado
+  periodWasCreated: boolean;         // true si fue CREADO en esta sesión
+  pdfFileIds: string[];              // PdfFiles creados
+  bankTransferId: string | null;     // BankTransfer creado
+  hashEntries: string[];             // Hashes agregados al índice
+  savedFilePaths: string[];          // Rutas de archivos físicos guardados
+}
+
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
 const HASH_INDEX = join(ANALYZER_DIR, 'hash-index.json');
@@ -592,12 +604,158 @@ async function findMemberByName(
 	}
 }
 
+/**
+ * Función de limpieza/rollback de SESIÓN que elimina SOLO los datos creados en esta sesión:
+ * - Archivos físicos específicos de esta sesión
+ * - Entradas del hash-index.json de esta sesión
+ * - Registros de la DB creados en esta sesión (BankTransfer, PdfFile, PayrollPeriod)
+ *
+ * Esta función implementa "borrón y cuenta nueva" - si falla cualquier archivo,
+ * se limpia TODO lo creado en la sesión actual.
+ */
+async function performSessionCleanup(data: SessionCleanupData): Promise<{
+	bankTransferDeleted: boolean;
+	pdfFilesDeleted: number;
+	periodDeleted: boolean;
+	hashesRemoved: number;
+	filesDeleted: number;
+	errors: string[];
+}> {
+	const results = {
+		bankTransferDeleted: false,
+		pdfFilesDeleted: 0,
+		periodDeleted: false,
+		hashesRemoved: 0,
+		filesDeleted: 0,
+		errors: [] as string[]
+	};
+
+	console.log('[BANK_SESSION_CLEANUP] Iniciando limpieza de sesión...');
+	console.log('[BANK_SESSION_CLEANUP] Datos a limpiar:', {
+		periodId: data.periodId,
+		periodWasCreated: data.periodWasCreated,
+		pdfFileIds: data.pdfFileIds.length,
+		bankTransferId: data.bankTransferId,
+		hashEntries: data.hashEntries.length,
+		savedFilePaths: data.savedFilePaths.length
+	});
+
+	// ORDEN: Respetar foreign keys (de más dependiente a menos dependiente)
+
+	// 1. Eliminar BankTransfer de esta sesión
+	if (data.bankTransferId) {
+		console.log('[BANK_SESSION_CLEANUP][1] Eliminando BankTransfer...');
+		try {
+			await prisma.bankTransfer.delete({ where: { id: data.bankTransferId } });
+			results.bankTransferDeleted = true;
+			console.log(`[BANK_SESSION_CLEANUP][1] ✓ BankTransfer eliminado`);
+		} catch (e) {
+			const msg = `BankTransfer: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[BANK_SESSION_CLEANUP][1] ❌', msg);
+		}
+	}
+
+	// 2. Eliminar PdfFiles de esta sesión
+	if (data.pdfFileIds.length > 0) {
+		console.log('[BANK_SESSION_CLEANUP][2] Eliminando PdfFiles...');
+		try {
+			const deleted = await prisma.pdfFile.deleteMany({
+				where: { id: { in: data.pdfFileIds } }
+			});
+			results.pdfFilesDeleted = deleted.count;
+			console.log(`[BANK_SESSION_CLEANUP][2] ✓ ${deleted.count} PdfFiles eliminados`);
+		} catch (e) {
+			const msg = `PdfFiles: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[BANK_SESSION_CLEANUP][2] ❌', msg);
+		}
+	}
+
+	// 3. Eliminar PayrollPeriod SOLO si fue CREADO en esta sesión (no si ya existía)
+	if (data.periodId && data.periodWasCreated) {
+		console.log('[BANK_SESSION_CLEANUP][3] Eliminando PayrollPeriod creado en esta sesión...');
+		try {
+			// Verificar que no tenga otros PDFs asociados (por si algo quedó)
+			const period = await prisma.payrollPeriod.findUnique({
+				where: { id: data.periodId },
+				include: { pdfFiles: true, bankTransfer: true }
+			});
+
+			if (period && period.pdfFiles.length === 0 && !period.bankTransfer) {
+				await prisma.payrollPeriod.delete({ where: { id: data.periodId } });
+				results.periodDeleted = true;
+				console.log(`[BANK_SESSION_CLEANUP][3] ✓ PayrollPeriod eliminado`);
+			} else if (period) {
+				console.log(`[BANK_SESSION_CLEANUP][3] ⚠️ PayrollPeriod tiene ${period.pdfFiles.length} PDFs y/o BankTransfer, no se elimina`);
+			}
+		} catch (e) {
+			const msg = `PayrollPeriod: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[BANK_SESSION_CLEANUP][3] ❌', msg);
+		}
+	}
+
+	// 4. Limpiar entradas del hash-index.json de esta sesión
+	if (data.hashEntries.length > 0) {
+		console.log('[BANK_SESSION_CLEANUP][4] Limpiando hash-index.json...');
+		try {
+			const hashIndex = await loadHashIndex();
+			for (const hash of data.hashEntries) {
+				if (hashIndex[hash]) {
+					delete hashIndex[hash];
+					results.hashesRemoved++;
+				}
+			}
+			await saveHashIndex(hashIndex);
+			console.log(`[BANK_SESSION_CLEANUP][4] ✓ ${results.hashesRemoved} entradas de hash eliminadas`);
+		} catch (e) {
+			const msg = `Hash index: ${e instanceof Error ? e.message : e}`;
+			results.errors.push(msg);
+			console.error('[BANK_SESSION_CLEANUP][4] ❌', msg);
+		}
+	}
+
+	// 5. Eliminar archivos físicos de esta sesión
+	if (data.savedFilePaths.length > 0) {
+		console.log('[BANK_SESSION_CLEANUP][5] Eliminando archivos físicos...');
+		const { unlink } = await import('node:fs/promises');
+		for (const filePath of data.savedFilePaths) {
+			try {
+				await unlink(filePath);
+				results.filesDeleted++;
+			} catch (e) {
+				// Ignorar si el archivo no existe
+				if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+					results.errors.push(`Archivo ${filePath}: ${e}`);
+				}
+			}
+		}
+		console.log(`[BANK_SESSION_CLEANUP][5] ✓ ${results.filesDeleted} archivos físicos eliminados`);
+	}
+
+	console.log('[BANK_SESSION_CLEANUP] ✓ Limpieza de sesión completada:', results);
+	return results;
+}
+
 export const POST: RequestHandler = async (event) => {
 	// Requerir autenticación
 	const auth = await requireAuth(event);
 	if (auth.error) {
 		return json({ error: auth.error }, { status: auth.status || 401 });
 	}
+
+	// ============================================================================
+	// ROLLBACK DE SESIÓN: Inicializar tracking de datos creados
+	// ============================================================================
+	const sessionData: SessionCleanupData = {
+		periodId: null,
+		periodWasCreated: false,
+		pdfFileIds: [],
+		bankTransferId: null,
+		hashEntries: [],
+		savedFilePaths: []
+	};
 
 	try {
 		const contentType = event.request.headers.get('content-type');
@@ -662,12 +820,16 @@ export const POST: RequestHandler = async (event) => {
 		console.log('[BANK][1] Nombre:', file.name);
 		console.log('[BANK][1] Ruta:', savedPath);
 		await writeFile(savedPath, buffer);
+		// TRACKING: Registrar archivo físico guardado para posible rollback
+		sessionData.savedFilePaths.push(savedPath);
 		console.log('[BANK][1] ✓ Archivo guardado exitosamente');
 
 		// Registrar en índice de hashes
 		console.log('[BANK][2] Registrando en índice de hashes...');
 		hashIndex[bufferHash] = { fileName: file.name, savedName, savedPath };
 		await saveHashIndex(hashIndex);
+		// TRACKING: Registrar hash para posible rollback
+		sessionData.hashEntries.push(bufferHash);
 		console.log('[BANK][2] ✓ Registrado en índice');
 
 		// Crear PdfFile en DB temprano (sin periodId aún)
@@ -683,6 +845,8 @@ export const POST: RequestHandler = async (event) => {
 			}
 		});
 			pdfFileId = createdPdf.id;
+			// TRACKING: Registrar PdfFile creado para posible rollback
+			sessionData.pdfFileIds.push(pdfFileId);
 			console.log('[BANK][3] ✓ PdfFile creado en DB:', { id: pdfFileId, fileName: createdPdf.fileName });
 		} catch (pdfDbErr) {
 			console.error('[BANK][3] ❌ Error al crear PdfFile en DB:', pdfDbErr);
@@ -741,6 +905,14 @@ export const POST: RequestHandler = async (event) => {
 		} catch (analyzerErr) {
 			console.error('[BANK][10] ❌ Error en analyzer IA:', analyzerErr);
 			// El analyzer IA es crítico, si falla retornamos error
+			// ROLLBACK: Limpiar archivo, hash y PdfFile creados antes del error
+			console.log('[BANK][10] Ejecutando rollback de sesión por error en analyzer...');
+			try {
+				const cleanupResult = await performSessionCleanup(sessionData);
+				console.log('[BANK][10] Rollback completado:', cleanupResult);
+			} catch (cleanupErr) {
+				console.error('[BANK][10] Error en rollback:', cleanupErr);
+			}
 			return json({
 				status: 'error',
 				message: 'Error al analizar el PDF con IA. Verifique que el archivo sea un comprobante de transferencia válido.',
@@ -849,6 +1021,8 @@ export const POST: RequestHandler = async (event) => {
 
 			if (!instCuitDigits || instCuitDigits.length !== 11) {
 				console.error('[BANK][institution] ❌ No se pudo determinar CUIT institucional');
+				// ROLLBACK: Limpiar datos creados antes del error
+				await performSessionCleanup(sessionData);
 				return json({
 					status: 'error',
 					message: 'No se pudo detectar el CUIT de la institución en el PDF.',
@@ -894,6 +1068,8 @@ export const POST: RequestHandler = async (event) => {
 						};
 					} else {
 						console.error('[BANK][institution] ❌ No existe institución con CUIT:', instCuit, 'ni', instCuitDigits);
+						// ROLLBACK: Limpiar datos creados antes del error
+						await performSessionCleanup(sessionData);
 						return json({
 							status: 'error',
 							message: 'No existe una institución con ese CUIT. Debe cargarla en Instituciones.',
@@ -1008,6 +1184,8 @@ export const POST: RequestHandler = async (event) => {
 				const useYear = selected?.year ?? detected.year ?? null;
 				const useMonth = selected?.month ?? detected.month ?? null;
 				if (!useYear || !useMonth) {
+					// ROLLBACK: Limpiar datos creados antes del error
+					await performSessionCleanup(sessionData);
 					return json({
 						status: 'error',
 						message: 'No se pudo determinar el período (mes/año). Seleccione un período o verifique el PDF.',
@@ -1039,6 +1217,7 @@ export const POST: RequestHandler = async (event) => {
 
 				// Intentar crear, si ya existe por combinación única, ignorar
 				let createdPeriodId: string | null = null;
+				let periodWasCreatedHere = false;
 				try {
 					const created = await prisma.payrollPeriod.create({
 						data: {
@@ -1049,6 +1228,10 @@ export const POST: RequestHandler = async (event) => {
 						}
 					});
 					createdPeriodId = created.id;
+					periodWasCreatedHere = true;
+					// TRACKING: Registrar PayrollPeriod creado para posible rollback
+					sessionData.periodId = createdPeriodId;
+					sessionData.periodWasCreated = true;
 					console.log('[BANK][period] ✓ PayrollPeriod creado:', { id: createdPeriodId, month: created.month, year: created.year });
 				} catch (perr: any) {
 					console.warn('[BANK][period] ⚠️ No se pudo crear PayrollPeriod (puede existir):', perr?.message);
@@ -1063,6 +1246,9 @@ export const POST: RequestHandler = async (event) => {
 						});
 						if (existing) {
 							createdPeriodId = existing.id;
+							// TRACKING: El período ya existía, NO se marca para rollback
+							sessionData.periodId = createdPeriodId;
+							sessionData.periodWasCreated = false; // No eliminar en rollback
 							console.log('[BANK][period] ✓ PayrollPeriod existente encontrado:', { id: createdPeriodId });
 						}
 					} catch {}
@@ -1162,6 +1348,9 @@ export const POST: RequestHandler = async (event) => {
 									}
 								});
 
+								// TRACKING: Registrar BankTransfer creado para posible rollback
+								sessionData.bankTransferId = bankTransfer.id;
+
 								console.log('[BANK][transfer] ✓ BankTransfer creado con datos completos del analyzer:', {
 									id: bankTransfer.id,
 									importe: importeDecimal,
@@ -1246,6 +1435,21 @@ export const POST: RequestHandler = async (event) => {
 		console.error('[BANK] Error:', message);
 		console.error('[BANK] Stack:', err instanceof Error ? err.stack : 'No stack trace');
 		console.error('========================================\n');
+
+		// ============================================================================
+		// ROLLBACK DE SESIÓN: Limpiar todo lo creado en esta sesión fallida
+		// ============================================================================
+		console.log('[BANK] Iniciando rollback de sesión...');
+		try {
+			const cleanupResult = await performSessionCleanup(sessionData);
+			console.log('[BANK] Rollback completado:', cleanupResult);
+			if (cleanupResult.errors.length > 0) {
+				console.warn('[BANK] Errores durante rollback:', cleanupResult.errors);
+			}
+		} catch (cleanupErr) {
+			console.error('[BANK] Error crítico durante rollback:', cleanupErr);
+		}
+
 		return json({ error: 'Error al procesar el archivo', details: message }, { status: 500 });
 	}
 };
