@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { PageHeader, SearchBox } from '$lib/components/shared';
   import { UserTable, UserModal } from '$lib/components/users';
   import type { UserListItem } from '$lib/db/models';
@@ -13,6 +13,7 @@
   let selectedUser: UserListItem | null = null;
   let searchTerm = data.filters.search || '';
   let searchTimeout: NodeJS.Timeout;
+  let togglingUserId: string | null = null;
 
   // Función para construir URL con filtros
   function buildUrl(filters: Record<string, string>) {
@@ -58,6 +59,28 @@
     showDeleteModal = false;
     selectedUser = null;
   }
+
+  // Función para activar/desactivar usuario
+  async function handleToggleActive(user: UserListItem) {
+    togglingUserId = user.id;
+    try {
+      const formData = new FormData();
+      formData.append('id', user.id);
+
+      const response = await fetch('?/toggleActive', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        await invalidateAll();
+      }
+    } catch (error) {
+      console.error('Error al cambiar estado:', error);
+    } finally {
+      togglingUserId = null;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -82,13 +105,14 @@
   />
 
   <!-- Tabla de usuarios -->
-  <UserTable 
-    users={data.users} 
+  <UserTable
+    users={data.users}
     pagination={data.pagination}
     {buildUrl}
     {goto}
-    onEdit={openEditModal} 
-    onDelete={openDeleteModal} 
+    onEdit={openEditModal}
+    onDelete={openDeleteModal}
+    onToggleActive={handleToggleActive}
   />
 
   <!-- Modales -->

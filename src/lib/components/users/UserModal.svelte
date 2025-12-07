@@ -163,7 +163,7 @@
   };
 </script>
 
-<Modal 
+<Modal
   {showModal}
   title={getTitle()}
   type={modalType}
@@ -175,6 +175,6 @@
   }}
   fields={modalType !== 'delete' ? fields : []}
   submitLabel={getSubmitLabel()}
-  deleteMessage={user ? `¿Estás seguro de que deseas eliminar al usuario ${user.name || user.email}? Esta acción no se puede deshacer.` : ''}
+  deleteMessage={user ? `¿Estás seguro de que deseas eliminar al usuario "${user.name || user.email}"?\n\nEl usuario será marcado como eliminado y no podrá acceder al sistema. Sus datos se conservarán en la base de datos por motivos de auditoría.\n\nNota: Si solo deseas impedir el acceso temporalmente, usa el botón "Desactivar" en su lugar.` : ''}
   deleteItemName={user ? `${user.name || user.email} (${user.email})` : ''}
 />

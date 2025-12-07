@@ -193,5 +193,22 @@ export const actions: Actions = {
       console.error('Error al eliminar usuario:', error);
       return fail(500, { error: 'Error interno del servidor' });
     }
+  },
+
+  toggleActive: async ({ request }: { request: Request }) => {
+    try {
+      const formData = await request.formData();
+      const id = formData.get('id') as string;
+
+      if (!id) {
+        return fail(400, { error: 'ID de usuario requerido' });
+      }
+
+      const user = await UserService.toggleActive(id);
+      return { success: true, user };
+    } catch (error) {
+      console.error('Error al cambiar estado del usuario:', error);
+      return fail(500, { error: 'Error interno del servidor' });
+    }
   }
 };

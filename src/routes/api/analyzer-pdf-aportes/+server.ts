@@ -13,6 +13,34 @@ import { readFile as fsReadFile } from 'node:fs/promises';
 import { analyzeAportesIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 // Importar utilidades de CUIT (formatCuit ya existe localmente en este archivo)
 import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
+// Librería para manejo preciso de montos monetarios
+import currency from 'currency.js';
+
+// Configuración de currency.js para pesos argentinos (ARS)
+// Formato: 1.234,56 (punto como separador de miles, coma como decimal)
+const ARS = (value: number | string) => currency(value, {
+	symbol: '$',
+	separator: '.',
+	decimal: ',',
+	precision: 2
+});
+
+// Función para parsear montos en formato argentino a número usando currency.js
+function parseMoneyARS(s?: string | null): number {
+	if (!s) return 0;
+	// Limpiar el string: remover espacios y símbolo $
+	const cleaned = s.replace(/\s/g, '').replace(/\$/g, '');
+	// currency.js espera formato americano internamente, así que convertimos
+	// formato argentino (1.234,56) a formato americano (1234.56)
+	const normalized = cleaned.replace(/\./g, '').replace(/,/g, '.');
+	const result = currency(normalized, { precision: 2 });
+	return result.value;
+}
+
+// Función para sumar montos usando currency.js (evita errores de punto flotante)
+function sumMoneyARS(amounts: number[]): number {
+	return amounts.reduce((acc, val) => currency(acc).add(val).value, 0);
+}
 
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
@@ -1217,12 +1245,26 @@ export const POST: RequestHandler = async (event) => {
 
 
 		if (rows.length > 0) {
-			
-			
-			
-			const sumTotal = rows.reduce((acc, r) => acc + (parseMoneyToNumber(r.importe) ?? 0), 0);
-			const declaredTotal = detectDeclaredTotal(fullText);
-			const totalMatches = declaredTotal != null ? Math.abs(sumTotal - declaredTotal) < 0.5 : false;
+			// PRIORIZAR analyzer IA sobre método legacy para el cálculo de totales
+			// Usando currency.js para precisión en cálculos monetarios
+			let sumTotal: number;
+			if (analyzerResult?.totales?.montoTotal) {
+				// Usar currency.js para asegurar precisión del monto del analyzer IA
+				sumTotal = currency(analyzerResult.totales.montoTotal, { precision: 2 }).value;
+				console.log('[APORTES] Usando sumTotal del analyzer IA (currency.js):', sumTotal);
+			} else {
+				// Fallback al método legacy usando currency.js para sumar
+				const amounts = rows.map(r => parseMoneyARS(r.importe));
+				sumTotal = sumMoneyARS(amounts);
+				console.log('[APORTES] Usando sumTotal del método legacy (currency.js):', sumTotal);
+			}
+			const declaredTotal = analyzerResult?.totales?.montoTotal
+				? currency(analyzerResult.totales.montoTotal, { precision: 2 }).value
+				: detectDeclaredTotal(fullText);
+			// Comparar con currency.js para evitar errores de punto flotante
+			const totalMatches = declaredTotal != null
+				? currency(sumTotal).subtract(declaredTotal).value === 0
+				: false;
 			
 			
 			
@@ -1291,9 +1333,13 @@ export const POST: RequestHandler = async (event) => {
 				? (selectedPeriod.year === detectedPeriod.year && selectedPeriod.month === detectedPeriod.month)
 				: null;
 
-			// Usar totales del analyzer IA si están disponibles
-			const sumTotal = analyzerResult?.totales?.montoTotal ?? 0;
-			const declaredTotal = analyzerResult?.totales?.montoTotal ?? null;
+			// Usar totales del analyzer IA si están disponibles (con currency.js)
+			const sumTotal = analyzerResult?.totales?.montoTotal
+				? currency(analyzerResult.totales.montoTotal, { precision: 2 }).value
+				: 0;
+			const declaredTotal = analyzerResult?.totales?.montoTotal
+				? currency(analyzerResult.totales.montoTotal, { precision: 2 }).value
+				: null;
 			const totalMatches = declaredTotal != null;
 
 			checks = { sumTotal, declaredTotal, totalMatches, detectedPeriod, selectedPeriod, periodMatches };

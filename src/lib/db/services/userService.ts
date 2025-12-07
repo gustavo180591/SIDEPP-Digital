@@ -112,7 +112,9 @@ export class UserService {
       const { search, role, isActive, institutionId } = filters;
 
       // Construir condiciones WHERE
-      const where: any = {};
+      const where: any = {
+        deletedAt: null // Excluir usuarios eliminados (soft delete)
+      };
 
       if (search) {
         where.OR = [
@@ -189,23 +191,28 @@ export class UserService {
       delete updateData.institutionIds;
       delete updateData.institutionId;
 
-      // Si hay nuevas instituciones, actualizar la relación
+      // Si hay nuevas instituciones, actualizar la relación usando transacción
       const institutionIds = data.institutionIds || (data.institutionId ? [data.institutionId] : null);
 
       if (institutionIds !== null) {
-        // Eliminar relaciones existentes y crear nuevas
-        await prisma.userInstitution.deleteMany({
-          where: { userId: id }
-        });
-
-        if (institutionIds.length > 0) {
-          await prisma.userInstitution.createMany({
-            data: institutionIds.map(instId => ({
-              userId: id,
-              institutionId: instId
-            }))
+        // Usar transacción para evitar race conditions y errores de unique constraint
+        await prisma.$transaction(async (tx) => {
+          // Eliminar relaciones existentes
+          await tx.userInstitution.deleteMany({
+            where: { userId: id }
           });
-        }
+
+          // Crear nuevas relaciones
+          if (institutionIds.length > 0) {
+            await tx.userInstitution.createMany({
+              data: institutionIds.map(instId => ({
+                userId: id,
+                institutionId: instId
+              })),
+              skipDuplicates: true
+            });
+          }
+        });
       }
 
       const user = await prisma.user.update({
@@ -221,9 +228,10 @@ export class UserService {
       });
 
       return user;
-    } catch (error) {
-      console.error('Error al actualizar usuario:', error);
-      throw new Error('No se pudo actualizar el usuario');
+    } catch (error: any) {
+      console.error('Error al actualizar usuario:', error?.message || error);
+      console.error('Stack:', error?.stack);
+      throw new Error(`No se pudo actualizar el usuario: ${error?.message || 'Error desconocido'}`);
     }
   }
 
