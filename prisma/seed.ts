@@ -10,26 +10,6 @@ async function main() {
   const defaultPassword = '123456';
   const hashed = await hash(defaultPassword, 10);
 
-  // Crear institución EFA San Bonifacio
-  console.log('🏢 Creando institución...');
-
-  const institution = await prisma.institution.upsert({
-    where: { id: 'inst-efa-san-bonifacio' },
-    update: {
-      name: 'EFA San Bonifacio',
-      cuit: '30-64012797-6',
-      address: 'Ruta Nac. 14 Km 1200'
-    },
-    create: {
-      id: 'inst-efa-san-bonifacio',
-      name: 'EFA San Bonifacio',
-      cuit: '30-64012797-6',
-      address: 'Ruta Nac. 14 Km 1200'
-    }
-  });
-
-  console.log('✅ Institución creada:', institution.name);
-
   // Crear usuario ADMIN
   console.log('👤 Creando usuarios...');
 
@@ -125,70 +105,8 @@ async function main() {
   });
   console.log('  ✓ Liquidador 3:', liquidador3.email);
 
-  // Crear relaciones Usuario-Institución para Liquidadores
-  console.log('🔗 Asignando instituciones a liquidadores...');
-
-  // Todos los liquidadores asignados a EFA San Bonifacio
-  await prisma.userInstitution.upsert({
-    where: {
-      userId_institutionId: {
-        userId: liquidador1.id,
-        institutionId: institution.id
-      }
-    },
-    update: {},
-    create: {
-      userId: liquidador1.id,
-      institutionId: institution.id
-    }
-  });
-  console.log('  ✓ Liquidador 1 → EFA San Bonifacio');
-
-  await prisma.userInstitution.upsert({
-    where: {
-      userId_institutionId: {
-        userId: liquidador2.id,
-        institutionId: institution.id
-      }
-    },
-    update: {},
-    create: {
-      userId: liquidador2.id,
-      institutionId: institution.id
-    }
-  });
-  console.log('  ✓ Liquidador 2 → EFA San Bonifacio');
-
-  await prisma.userInstitution.upsert({
-    where: {
-      userId_institutionId: {
-        userId: liquidador3.id,
-        institutionId: institution.id
-      }
-    },
-    update: {},
-    create: {
-      userId: liquidador3.id,
-      institutionId: institution.id
-    }
-  });
-  console.log('  ✓ Liquidador 3 → EFA San Bonifacio');
 
   console.log('\n✅ Seed completado exitosamente!\n');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('USUARIOS CREADOS (contraseña: 123456)');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log('ADMIN:');
-  console.log('  • admin@sidepp.com        → Acceso total');
-  console.log('');
-  console.log('FINANZAS:');
-  console.log('  • finanzas@sidepp.com     → Ve instituciones y afiliados');
-  console.log('');
-  console.log('LIQUIDADOR:');
-  console.log('  • liquidador1@sidepp.com  → EFA San Bonifacio');
-  console.log('  • liquidador2@sidepp.com  → EFA San Bonifacio');
-  console.log('  • liquidador3@sidepp.com  → EFA San Bonifacio');
-  console.log('═══════════════════════════════════════════════════════════════');
 }
 
 main()
