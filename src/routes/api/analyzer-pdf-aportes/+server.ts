@@ -1382,8 +1382,23 @@ export const POST: RequestHandler = async (event) => {
 			const periodMatches = selectedPeriod && detectedPeriod.year && detectedPeriod.month
 				? (selectedPeriod.year === detectedPeriod.year && selectedPeriod.month === detectedPeriod.month)
 				: null;
-			
 
+			// Validar que el período del PDF coincida con el seleccionado
+			if (periodMatches === false) {
+				console.error('[APORTES] ❌ El período del PDF no coincide con el seleccionado:', {
+					detectedPeriod: `${detectedPeriod.month}/${detectedPeriod.year}`,
+					selectedPeriod: `${selectedPeriod?.month}/${selectedPeriod?.year}`
+				});
+				await performSessionCleanup(sessionData);
+				return json({
+					status: 'error',
+					message: `El período detectado en el PDF (${detectedPeriod.month}/${detectedPeriod.year}) no coincide con el período seleccionado (${selectedPeriod?.month}/${selectedPeriod?.year})`,
+					details: {
+						detectedPeriod,
+						selectedPeriod
+					}
+				}, { status: 400 });
+			}
 
 			preview = { 
 				listado: { 
@@ -1423,6 +1438,23 @@ export const POST: RequestHandler = async (event) => {
 			const periodMatches = selectedPeriod && detectedPeriod.year && detectedPeriod.month
 				? (selectedPeriod.year === detectedPeriod.year && selectedPeriod.month === detectedPeriod.month)
 				: null;
+
+			// Validar que el período del PDF coincida con el seleccionado
+			if (periodMatches === false) {
+				console.error('[APORTES] ❌ El período del PDF no coincide con el seleccionado:', {
+					detectedPeriod: `${detectedPeriod.month}/${detectedPeriod.year}`,
+					selectedPeriod: `${selectedPeriod?.month}/${selectedPeriod?.year}`
+				});
+				await performSessionCleanup(sessionData);
+				return json({
+					status: 'error',
+					message: `El período detectado en el PDF (${detectedPeriod.month}/${detectedPeriod.year}) no coincide con el período seleccionado (${selectedPeriod?.month}/${selectedPeriod?.year})`,
+					details: {
+						detectedPeriod,
+						selectedPeriod
+					}
+				}, { status: 400 });
+			}
 
 			// Usar totales del analyzer IA si están disponibles (con currency.js)
 			const sumTotal = analyzerResult?.totales?.montoTotal
