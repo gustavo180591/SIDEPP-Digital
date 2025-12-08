@@ -7,7 +7,10 @@ export interface AuthResult {
     email: string;
     name: string | null;
     role: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
+    institutions: { id: string; name: string | null }[];
+    // Compatibilidad temporal - primera institución
     institutionId: string | null;
+    institutionName: string | null;
   };
   error?: string;
   status?: number;

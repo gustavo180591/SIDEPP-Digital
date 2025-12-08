@@ -1031,19 +1031,20 @@ export const POST: RequestHandler = async (event) => {
 					console.log('[APORTES][23] ✓ Institución encontrada:', { id: existing.id, cuit: existing.cuit, name: existing.name });
 					institution = { id: existing.id, name: existing.name ?? null, cuit: existing.cuit ?? null, address: existing.address ?? null };
 
-					// Validar que usuarios LIQUIDADOR solo puedan subir PDFs de su institución
-					if (auth.user.role === 'LIQUIDADOR') {
-						if (!auth.user.institutionId) {
-							console.error('[APORTES][23] ❌ Usuario LIQUIDADOR sin institución asignada');
+					// Validar que usuarios LIQUIDADOR solo puedan subir PDFs de sus instituciones asignadas
+					if (auth.user?.role === 'LIQUIDADOR') {
+						const userInstitutionIds = auth.user.institutions?.map((i: { id: string }) => i.id) || [];
+						if (userInstitutionIds.length === 0) {
+							console.error('[APORTES][23] ❌ Usuario LIQUIDADOR sin instituciones asignadas');
 							return json({
 								status: 'error',
 								message: 'Usuario sin institución asignada',
 								details: {}
 							}, { status: 403 });
 						}
-						if (auth.user.institutionId !== institution.id) {
-							console.error('[APORTES][23] ❌ Usuario intenta subir PDF de otra institución:', {
-								userInstitutionId: auth.user.institutionId,
+						if (!userInstitutionIds.includes(institution.id)) {
+							console.error('[APORTES][23] ❌ Usuario intenta subir PDF de institución no autorizada:', {
+								userInstitutionIds,
 								pdfInstitutionId: institution.id
 							});
 							return json({
