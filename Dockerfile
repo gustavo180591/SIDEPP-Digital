@@ -1,8 +1,8 @@
 # ==========================================
 # Etapa base común para desarrollo y producción
 # ==========================================
-# Use a specific Node.js LTS version with security updates
-FROM node:20.18.1-slim-bookworm AS base
+# Use Node.js 20 LTS (bookworm slim)
+FROM node:20-bookworm-slim AS base
 
 # Instalar pnpm globalmente
 RUN npm install -g pnpm
