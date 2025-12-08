@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { PageHeader, SearchBox, DataTable } from '$lib/components/shared';
+  import { MemberModal } from '$lib/components/members';
   import type { Member, Institution } from '@prisma/client';
 
   type MemberWithInstitution = Member & {
@@ -18,12 +19,24 @@
     };
     search: string;
     institutionId?: string;
+    canEdit: boolean;
+    institutions: Array<{ id: string; name: string }>;
+    user: { role: string };
   };
 
   let searchTerm = data.search || '';
   let searchTimeout: NodeJS.Timeout;
 
-  // Funci�n para construir URL con filtros
+  // Estado para modales
+  let showCreateModal = false;
+  let showEditModal = false;
+  let showDeleteModal = false;
+  let selectedMember: MemberWithInstitution | null = null;
+
+  // Control de acceso
+  $: canEdit = data.canEdit;
+
+  // Función para construir URL con filtros
   function buildUrl(filters: Record<string, string>) {
     const url = new URL($page.url);
     Object.entries(filters).forEach(([key, value]) => {
@@ -36,7 +49,7 @@
     return url.toString();
   }
 
-  // Funci�n para b�squeda autom�tica con debounce
+  // Función para búsqueda automática con debounce
   function handleSearch() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
@@ -48,11 +61,33 @@
     }, 500);
   }
 
-  // Funci�n para navegar al detalle del miembro
+  // Función para navegar al detalle del miembro
   function viewMemberDetail(member: MemberWithInstitution) {
     if (member.institucionId) {
       goto(`/dashboard/instituciones/${member.institucionId}/${member.id}`);
     }
+  }
+
+  // Funciones para modales
+  function openCreateModal() {
+    showCreateModal = true;
+  }
+
+  function openEditModal(member: MemberWithInstitution) {
+    selectedMember = member;
+    showEditModal = true;
+  }
+
+  function openDeleteModal(member: MemberWithInstitution) {
+    selectedMember = member;
+    showDeleteModal = true;
+  }
+
+  function closeModals() {
+    showCreateModal = false;
+    showEditModal = false;
+    showDeleteModal = false;
+    selectedMember = null;
   }
 
   // Columnas de la tabla
@@ -63,9 +98,6 @@
       render: (member: MemberWithInstitution) => `
         <div class="font-medium text-gray-900">
           ${member.fullName || '-'}
-        </div>
-        <div class="text-xs text-gray-500">
-          DNI: ${member.documentoIdentidad || '-'}
         </div>
       `
     },
@@ -79,43 +111,38 @@
                class="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200">
               ${member.institucion.name || '-'}
             </a>
-            <div class="text-xs text-gray-500">
-              CUIT: ${member.institucion.cuit || '-'}
-            </div>
           `;
         }
         return '<span class="text-sm text-gray-400">Sin institución</span>';
       }
     },
     {
-      key: 'email',
-      label: 'Email',
+      key: 'documentoIdentidad',
+      label: 'DNI',
+      render: (member: MemberWithInstitution) => `
+        <span class="text-sm text-gray-700 font-medium">${member.documentoIdentidad || '-'}</span>
+      `
+    },
+    {
+      key: 'numeroMatricula',
+      label: 'Nro. Afiliado',
+      render: (member: MemberWithInstitution) => `
+        <span class="badge badge-info text-xs">${member.numeroMatricula || '-'}</span>
+      `
+    },
+    {
+      key: 'phone',
+      label: 'Teléfono',
       render: (member: MemberWithInstitution) => {
-        if (member.email) {
+        if (member.phone) {
           return `
-            <a href="mailto:${member.email}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
-              ${member.email}
+            <a href="tel:${member.phone}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
+              ${member.phone}
             </a>
           `;
         }
         return '<span class="text-sm text-gray-400">-</span>';
       }
-    },
-    {
-      key: 'numeroOrden',
-      label: 'N° Orden',
-      render: (member: MemberWithInstitution) => `
-        <span class="badge badge-outline text-xs">${member.numeroOrden || '-'}</span>
-      `
-    },
-    {
-      key: 'membershipStartDate',
-      label: 'Fecha de Ingreso',
-      render: (member: MemberWithInstitution) => `
-        <div class="text-sm text-gray-600">
-          ${member.membershipStartDate ? new Date(member.membershipStartDate).toLocaleDateString('es-AR') : '-'}
-        </div>
-      `
     },
     {
       key: 'status',
@@ -129,7 +156,26 @@
   ];
 
   // Acciones de la tabla
-  const actions = [
+  $: actions = canEdit ? [
+    {
+      label: 'Ver Detalle',
+      icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+      color: 'btn-primary',
+      onClick: viewMemberDetail
+    },
+    {
+      label: 'Editar',
+      icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+      color: 'btn-info',
+      onClick: openEditModal
+    },
+    {
+      label: 'Eliminar',
+      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+      color: 'btn-error',
+      onClick: openDeleteModal
+    }
+  ] : [
     {
       label: 'Ver Detalle',
       icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
@@ -138,12 +184,15 @@
     }
   ];
 
-  // Estado vac�o
+  // Estado vacío
   const emptyState = {
     icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
     title: 'No hay afiliados',
     description: 'No se encontraron afiliados registrados en el sistema',
-    action: {
+    action: canEdit ? {
+      label: 'Agregar Afiliado',
+      onClick: openCreateModal
+    } : {
       label: 'Ir a Instituciones',
       onClick: () => goto('/dashboard/instituciones')
     }
@@ -156,14 +205,21 @@
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Header -->
-    <PageHeader
-      title="Afiliados"
-      description="Listado completo de todos los afiliados registrados en el sistema"
-      actionLabel="Ir a Instituciones"
-      onAction={() => goto('/dashboard/instituciones')}
-    />
+    {#if canEdit}
+      <PageHeader
+        title="Afiliados"
+        description="Listado completo de todos los afiliados registrados en el sistema"
+        actionLabel="Nuevo Afiliado"
+        onAction={openCreateModal}
+      />
+    {:else}
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Afiliados</h1>
+        <p class="mt-2 text-gray-600">Vista de auditoría - Solo lectura</p>
+      </div>
+    {/if}
 
-    <!-- Estad�sticas -->
+    <!-- Estadísticas -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <div class="card bg-white shadow-sm p-4 rounded-2xl">
         <div class="card-body">
@@ -223,13 +279,24 @@
       <div class="p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-bold text-gray-900">Listado de Afiliados</h2>
+          {#if canEdit}
+            <button
+              class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg transition-all"
+              on:click={openCreateModal}
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Agregar Afiliado
+            </button>
+          {/if}
         </div>
 
         <!-- Buscador -->
         <SearchBox
           bind:searchTerm
           onSearch={handleSearch}
-          placeholder="Buscar por nombre, DNI, email, N° orden o matrícula..."
+          placeholder="Buscar por nombre, DNI, N° afiliado o teléfono..."
           label="Buscar afiliado"
         />
 
@@ -247,3 +314,37 @@
       </div>
     </div>
 </div>
+
+<!-- Modales -->
+{#if canEdit}
+  <!-- Modal Crear -->
+  <MemberModal
+    showModal={showCreateModal}
+    modalType="create"
+    member={null}
+    institutionId=""
+    showInstitutionSelector={true}
+    institutions={data.institutions}
+    onClose={closeModals}
+  />
+
+  <!-- Modal Editar -->
+  <MemberModal
+    showModal={showEditModal}
+    modalType="edit"
+    member={selectedMember}
+    institutionId={selectedMember?.institucionId || ''}
+    showInstitutionSelector={false}
+    institutions={data.institutions}
+    onClose={closeModals}
+  />
+
+  <!-- Modal Eliminar -->
+  <MemberModal
+    showModal={showDeleteModal}
+    modalType="delete"
+    member={selectedMember}
+    institutionId={selectedMember?.institucionId || ''}
+    onClose={closeModals}
+  />
+{/if}

@@ -1,21 +1,26 @@
 <script lang="ts">
   import { Modal } from '$lib/components/shared';
   import type { Member } from '@prisma/client';
-  
+
   export let showModal: boolean;
   export let modalType: 'create' | 'edit' | 'delete';
   export let member: Member | null = null;
   export let onClose: () => void;
   export let institutionId: string;
+  // Nuevas props para selector de institución
+  export let showInstitutionSelector: boolean = false;
+  export let institutions: Array<{ id: string; name: string }> = [];
 
   let formData = {
     fullName: member?.fullName || '',
     email: member?.email || '',
+    phone: member?.phone || '',
     numeroOrden: member?.numeroOrden || '',
     numeroMatricula: member?.numeroMatricula || '',
     documentoIdentidad: member?.documentoIdentidad || '',
     membershipStartDate: member?.membershipStartDate ? new Date(member.membershipStartDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    status: member?.status || 'active'
+    status: member?.status || 'active',
+    selectedInstitutionId: institutionId || ''
   };
 
   // Reset form data when member changes or modal opens
@@ -23,11 +28,13 @@
     formData = {
       fullName: member.fullName || '',
       email: member.email || '',
+      phone: member.phone || '',
       numeroOrden: member.numeroOrden || '',
       numeroMatricula: member.numeroMatricula || '',
       documentoIdentidad: member.documentoIdentidad || '',
       membershipStartDate: member.membershipStartDate ? new Date(member.membershipStartDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      status: member.status || 'active'
+      status: member.status || 'active',
+      selectedInstitutionId: member.institucionId || institutionId || ''
     };
   }
 
@@ -37,11 +44,13 @@
       formData = {
         fullName: '',
         email: '',
+        phone: '',
         numeroOrden: '',
         numeroMatricula: '',
         documentoIdentidad: '',
         membershipStartDate: new Date().toISOString().split('T')[0],
-        status: 'active'
+        status: 'active',
+        selectedInstitutionId: institutionId || ''
       };
     }
   }
@@ -50,25 +59,41 @@
     formData = {
       fullName: '',
       email: '',
+      phone: '',
       numeroOrden: '',
       numeroMatricula: '',
       documentoIdentidad: '',
       membershipStartDate: new Date().toISOString().split('T')[0],
-      status: 'active'
+      status: 'active',
+      selectedInstitutionId: institutionId || ''
     };
     onClose();
   }
 
+  // Determinar el institutionId a usar (el seleccionado o el fijo)
+  $: effectiveInstitutionId = showInstitutionSelector
+    ? formData.selectedInstitutionId
+    : institutionId;
+
   // Hacer los campos reactivos para que se actualicen cuando cambie formData
   $: fields = [
+    // Campo de institución (solo si showInstitutionSelector es true y es create)
+    ...(showInstitutionSelector && modalType === 'create' ? [{
+      name: 'institutionId',
+      label: 'Institución',
+      type: 'select',
+      placeholder: 'Seleccionar institución',
+      required: true,
+      value: formData.selectedInstitutionId,
+      options: institutions.map(inst => ({ value: inst.id, label: inst.name }))
+    }] : []),
     {
       name: 'fullName',
       label: 'Nombre Completo',
       type: 'text',
       placeholder: 'Nombre completo del miembro',
       required: true,
-      value: formData.fullName,
-      readonly: modalType === 'edit' // Solo lectura al editar
+      value: formData.fullName
     },
     {
       name: 'email',
@@ -76,6 +101,13 @@
       type: 'email',
       placeholder: 'email@ejemplo.com',
       value: formData.email
+    },
+    {
+      name: 'phone',
+      label: 'Teléfono',
+      type: 'text',
+      placeholder: 'Número de teléfono',
+      value: formData.phone
     },
     {
       name: 'documentoIdentidad',
@@ -150,7 +182,7 @@
   };
 </script>
 
-<Modal 
+<Modal
   {showModal}
   title={getTitle()}
   type={modalType}
@@ -158,7 +190,7 @@
   formAction={getFormAction()}
   formData={{
     ...formData,
-    institutionId,
+    institutionId: effectiveInstitutionId,
     ...(member?.id && { id: member.id })
   }}
   fields={modalType !== 'delete' ? fields : []}

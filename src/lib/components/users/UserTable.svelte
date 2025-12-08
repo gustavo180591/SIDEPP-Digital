@@ -1,7 +1,7 @@
 <script lang="ts">
   import { DataTable } from '$lib/components/shared';
   import type { UserListItem } from '$lib/db/models';
-  
+
   export let users: UserListItem[];
   export let pagination: {
     currentPage: number;
@@ -13,6 +13,7 @@
   export let goto: (url: string) => void;
   export let onEdit: (user: UserListItem) => void;
   export let onDelete: (user: UserListItem) => void;
+  export let onToggleActive: (user: UserListItem) => void;
   export let loading: boolean = false;
 
   const columns = [
@@ -30,12 +31,17 @@
     },
     {
       key: 'institution',
-      label: 'Institución',
+      label: 'Instituciones',
       render: (user: UserListItem) => {
-        if (user.institution) {
+        if (user.userInstitutions && user.userInstitutions.length > 0) {
+          const names = user.userInstitutions.map(ui => ui.institution.name || 'Sin nombre');
+          if (names.length === 1) {
+            return `<div class="text-sm text-gray-900">${names[0]}</div>`;
+          }
           return `
             <div class="text-sm text-gray-900">
-              ${user.institution.name}
+              ${names[0]}
+              <span class="text-xs text-blue-600 ml-1">+${names.length - 1} más</span>
             </div>
           `;
         }
@@ -46,15 +52,15 @@
       key: 'role',
       label: 'Rol',
       render: (user: UserListItem) => {
-        const roleLabels = {
+        const roleLabels: Record<string, string> = {
           'ADMIN': 'Administrador',
-          'OPERATOR': 'Operador',
-          'INTITUTION': 'Institución'
+          'FINANZAS': 'Finanzas',
+          'LIQUIDADOR': 'Liquidador'
         };
-        const roleColors = {
+        const roleColors: Record<string, string> = {
           'ADMIN': 'badge-error',
-          'OPERATOR': 'badge-warning',
-          'INTITUTION': 'badge-info'
+          'FINANZAS': 'badge-warning',
+          'LIQUIDADOR': 'badge-info'
         };
         return `
           <span class="badge ${roleColors[user.role]} text-xs">
@@ -92,12 +98,22 @@
     }
   ];
 
+  // Función helper para obtener el label dinámico del toggle
+  const getToggleLabel = (user: UserListItem) => user.isActive ? 'Desactivar' : 'Activar';
+  const getToggleColor = (user: UserListItem) => user.isActive ? 'btn-warning' : 'btn-success';
+
   const actions = [
     {
       label: 'Editar',
       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
       color: 'btn-info',
       onClick: onEdit
+    },
+    {
+      labelFn: getToggleLabel,
+      icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636',
+      colorFn: getToggleColor,
+      onClick: onToggleActive
     },
     {
       label: 'Eliminar',

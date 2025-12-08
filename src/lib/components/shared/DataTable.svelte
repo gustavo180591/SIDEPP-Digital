@@ -7,12 +7,24 @@
     render?: (item: any) => any;
   }>;
   export let actions: Array<{
-    label: string;
+    label?: string;
+    labelFn?: (item: any) => string;
     icon: string;
-    color: string;
+    color?: string;
+    colorFn?: (item: any) => string;
     onClick?: (item: any) => void;
     href?: (item: any) => string;
   }> = [];
+
+  // Helper para obtener label (estático o dinámico)
+  function getActionLabel(action: typeof actions[0], item: any): string {
+    return action.labelFn ? action.labelFn(item) : (action.label || '');
+  }
+
+  // Helper para obtener color (estático o dinámico)
+  function getActionColor(action: typeof actions[0], item: any): string {
+    return action.colorFn ? action.colorFn(item) : (action.color || '');
+  }
   export let emptyState: {
     icon: string;
     title: string;
@@ -89,24 +101,24 @@
                     <div class="flex gap-2">
                       {#each actions as action}
                         {#if action.href}
-                          <a 
+                          <a
                             href={action.href(item)}
-                            class="btn btn-sm btn-outline {action.color}"
+                            class="btn btn-sm btn-outline {getActionColor(action, item)}"
                           >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={action.icon}></path>
                             </svg>
-                            {action.label}
+                            {getActionLabel(action, item)}
                           </a>
                         {:else if action.onClick}
                           <button
-                            class="btn btn-sm btn-outline {action.color}"
-                            on:click={() => action.onClick(item)}
+                            class="btn btn-sm btn-outline {getActionColor(action, item)}"
+                            on:click={() => action.onClick && action.onClick(item)}
                           >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={action.icon}></path>
                             </svg>
-                            {action.label}
+                            {getActionLabel(action, item)}
                           </button>
                         {/if}
                       {/each}

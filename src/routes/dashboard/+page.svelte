@@ -27,7 +27,8 @@
           <h3 class="text-xl font-bold text-gray-900">Acciones Rápidas</h3>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {#if data.user && data.user.role === 'ADMIN'}
+          <!-- Usuarios: Solo ADMIN -->
+          {#if data.user?.role === 'ADMIN'}
             <a href="/dashboard/usuarios" class="relative group bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
               <div>
                 <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md">
@@ -46,7 +47,10 @@
                 </p>
               </div>
             </a>
+          {/if}
 
+          <!-- Instituciones: ADMIN y FINANZAS -->
+          {#if data.user?.role === 'ADMIN' || data.user?.role === 'FINANZAS'}
             <a href="/dashboard/instituciones" class="relative group bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
               <div>
                 <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-md">
@@ -65,10 +69,30 @@
                 </p>
               </div>
             </a>
+
+            <a href="/dashboard/afiliados" class="relative group bg-gradient-to-br from-purple-50 to-violet-50 p-6 rounded-xl border-2 border-purple-200 hover:border-purple-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <div>
+                <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-md">
+                  <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  </svg>
+                </span>
+              </div>
+              <div class="mt-4">
+                <h3 class="text-lg font-bold text-gray-900 group-hover:text-purple-700 transition-colors">
+                  <span class="absolute inset-0" aria-hidden="true"></span>
+                  Afiliados
+                </h3>
+                <p class="mt-2 text-sm text-gray-700">
+                  Ver listado de todos los afiliados
+                </p>
+              </div>
+            </a>
           {/if}
 
-          {#if data.user && data.user.role === 'INTITUTION'}
-            <a href="/dashboard/instituciones/{data.user.institutionId}" class="relative group bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
+          <!-- Mis Instituciones: Solo LIQUIDADOR -->
+          {#if data.user?.role === 'LIQUIDADOR'}
+            <a href="/dashboard/instituciones" class="relative group bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
               <div>
                 <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-green-500 to-green-600 text-white shadow-md">
                   <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,33 +103,36 @@
               <div class="mt-4">
                 <h3 class="text-lg font-bold text-gray-900 group-hover:text-green-700 transition-colors">
                   <span class="absolute inset-0" aria-hidden="true"></span>
-                  Mi Institución
+                  Mis Instituciones
                 </h3>
                 <p class="mt-2 text-sm text-gray-700">
-                  Ver y gestionar los datos de mi institución
+                  Ver las instituciones asignadas
                 </p>
               </div>
             </a>
           {/if}
 
-          <a href="/dashboard/upload" class="relative group bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
-            <div>
-              <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-md">
-                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                </svg>
-              </span>
-            </div>
-            <div class="mt-4">
-              <h3 class="text-lg font-bold text-gray-900 group-hover:text-yellow-700 transition-colors">
-                <span class="absolute inset-0" aria-hidden="true"></span>
-                Subir Archivos
-              </h3>
-              <p class="mt-2 text-sm text-gray-700">
-                Procesar documentos y archivos del sistema
-              </p>
-            </div>
-          </a>
+          <!-- Subir Archivos: ADMIN y LIQUIDADOR -->
+          {#if data.user?.role === 'ADMIN' || data.user?.role === 'LIQUIDADOR'}
+            <a href="/dashboard/upload" class="relative group bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <div>
+                <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-md">
+                  <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                  </svg>
+                </span>
+              </div>
+              <div class="mt-4">
+                <h3 class="text-lg font-bold text-gray-900 group-hover:text-yellow-700 transition-colors">
+                  <span class="absolute inset-0" aria-hidden="true"></span>
+                  Subir Archivos
+                </h3>
+                <p class="mt-2 text-sm text-gray-700">
+                  Procesar documentos y archivos del sistema
+                </p>
+              </div>
+            </a>
+          {/if}
         </div>
       </div>
     </div>

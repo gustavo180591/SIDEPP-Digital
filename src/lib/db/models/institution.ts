@@ -32,10 +32,13 @@ export type InstitutionListItem = Pick<
   | 'id'
   | 'name'
   | 'cuit'
+  | 'address'
   | 'city'
   | 'state'
+  | 'country'
   | 'responsibleName'
   | 'responsibleEmail'
+  | 'responsablePhone'
   | 'createdAt'
   | 'updatedAt'
 >;

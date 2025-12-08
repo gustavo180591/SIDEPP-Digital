@@ -2,12 +2,19 @@
 // Esta declaración le dice a SvelteKit qué guarda en event.locals
 declare global {
   namespace App {
+    interface UserInstitution {
+      id: string;
+      name: string | null;
+    }
+
     interface Locals {
       user?: {
         id: string;
         email: string;
         name?: string | null;
-        role: 'ADMIN' | 'OPERATOR' | 'INTITUTION';
+        role: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
+        institutions: UserInstitution[];
+        // Para compatibilidad temporal - primera institución si hay
         institutionId?: string | null;
         institutionName?: string | null;
       };

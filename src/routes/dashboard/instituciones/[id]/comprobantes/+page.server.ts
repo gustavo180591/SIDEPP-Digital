@@ -4,6 +4,13 @@ import { PayrollService } from '$lib/db/services/payrollService';
 import { PdfService } from '$lib/db/services/pdfService';
 import type { PageServerLoad } from './$types';
 
+// Helper para verificar acceso a institución
+function hasAccessToInstitution(user: App.Locals['user'], institutionId: string): boolean {
+  if (!user) return false;
+  if (user.role === 'ADMIN' || user.role === 'FINANZAS') return true;
+  return user.institutions?.some(inst => inst.id === institutionId) || false;
+}
+
 export const load: PageServerLoad = async ({ params, url, locals }) => {
   const institutionId = params.id;
 
@@ -11,12 +18,12 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
     throw error(400, 'ID de institución requerido');
   }
 
-  // Validar que usuarios INTITUTION solo puedan acceder a su propia institución
-  if (locals.user?.role === 'INTITUTION') {
-    if (!locals.user.institutionId) {
+  // Validar que usuarios LIQUIDADOR solo puedan acceder a sus instituciones
+  if (locals.user?.role === 'LIQUIDADOR') {
+    if (!locals.user.institutions || locals.user.institutions.length === 0) {
       throw error(403, 'Usuario sin institución asignada');
     }
-    if (institutionId !== locals.user.institutionId) {
+    if (!hasAccessToInstitution(locals.user, institutionId)) {
       throw error(403, 'No tiene permiso para ver esta institución');
     }
   }

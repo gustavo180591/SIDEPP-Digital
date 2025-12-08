@@ -8,13 +8,19 @@
   export let institutions: Array<{ id: string; name: string | null }> = [];
   export let onClose: () => void;
 
+  // Helper para obtener IDs de instituciones del usuario
+  function getUserInstitutionIds(u: UserListItem | null): string[] {
+    if (!u?.userInstitutions) return [];
+    return u.userInstitutions.map(ui => ui.institution.id);
+  }
+
   let formData = {
     name: user?.name || '',
     email: user?.email || '',
     password: '',
     confirmPassword: '',
-    institutionId: user?.institutionId || '',
-    role: user?.role || 'INTITUTION' as UserRole,
+    institutionIds: getUserInstitutionIds(user),
+    role: user?.role || 'LIQUIDADOR' as UserRole,
     isActive: user?.isActive ?? true
   };
 
@@ -25,7 +31,7 @@
       email: user.email || '',
       password: '',
       confirmPassword: '',
-      institutionId: user.institutionId || '',
+      institutionIds: getUserInstitutionIds(user),
       role: user.role,
       isActive: user.isActive
     };
@@ -39,8 +45,8 @@
         email: '',
         password: '',
         confirmPassword: '',
-        institutionId: '',
-        role: 'INTITUTION',
+        institutionIds: [],
+        role: 'LIQUIDADOR',
         isActive: true
       };
     }
@@ -52,8 +58,8 @@
       email: '',
       password: '',
       confirmPassword: '',
-      institutionId: '',
-      role: 'INTITUTION',
+      institutionIds: [],
+      role: 'LIQUIDADOR',
       isActive: true
     };
     onClose();
@@ -93,18 +99,15 @@
       value: formData.confirmPassword
     }] : []),
     {
-      name: 'institutionId',
-      label: 'Institución',
-      type: 'select',
-      placeholder: 'Seleccionar institución',
-      value: formData.institutionId,
-      options: [
-        { value: '', label: 'Sin institución' },
-        ...institutions.map(inst => ({
-          value: inst.id,
-          label: inst.name || 'Sin nombre'
-        }))
-      ]
+      name: 'institutionIds',
+      label: 'Instituciones',
+      type: 'multiselect',
+      placeholder: 'Seleccionar instituciones',
+      value: formData.institutionIds,
+      options: institutions.map(inst => ({
+        value: inst.id,
+        label: inst.name || 'Sin nombre'
+      }))
     },
     {
       name: 'role',
@@ -115,8 +118,8 @@
       value: formData.role,
       options: [
         { value: 'ADMIN', label: 'Administrador' },
-        { value: 'OPERATOR', label: 'Operador' },
-        { value: 'INTITUTION', label: 'Institución' }
+        { value: 'FINANZAS', label: 'Finanzas' },
+        { value: 'LIQUIDADOR', label: 'Liquidador' }
       ]
     },
     {
@@ -160,7 +163,7 @@
   };
 </script>
 
-<Modal 
+<Modal
   {showModal}
   title={getTitle()}
   type={modalType}
@@ -172,6 +175,6 @@
   }}
   fields={modalType !== 'delete' ? fields : []}
   submitLabel={getSubmitLabel()}
-  deleteMessage={user ? `¿Estás seguro de que deseas eliminar al usuario ${user.name || user.email}? Esta acción no se puede deshacer.` : ''}
+  deleteMessage={user ? `¿Estás seguro de que deseas eliminar al usuario "${user.name || user.email}"?\n\nEl usuario será marcado como eliminado y no podrá acceder al sistema. Sus datos se conservarán en la base de datos por motivos de auditoría.\n\nNota: Si solo deseas impedir el acceso temporalmente, usa el botón "Desactivar" en su lugar.` : ''}
   deleteItemName={user ? `${user.name || user.email} (${user.email})` : ''}
 />

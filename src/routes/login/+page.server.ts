@@ -48,12 +48,15 @@ export const actions: Actions = {
         return fail(401, { error: 'Credenciales inválidas' });
       }
 
+      // Extraer IDs de instituciones de la relación N:N
+      const institutionIds = user.userInstitutions?.map(ui => ui.institution.id) || [];
+
       // Generar token JWT usando la utilidad centralizada
       const token = generateToken(
         user.id,
         user.email,
         user.role,
-        user.institutionId
+        institutionIds
       );
 
       // Configurar cookie de sesión

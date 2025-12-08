@@ -3,6 +3,14 @@ import { InstitutionService } from '$lib/db/services/institutionService';
 import { MemberService } from '$lib/db/services/memberService';
 import type { PageServerLoad, Actions } from './$types';
 
+// Helper para verificar acceso a institución
+function hasAccessToInstitution(user: App.Locals['user'], institutionId: string): boolean {
+  if (!user) return false;
+  if (user.role === 'ADMIN' || user.role === 'FINANZAS') return true;
+  // LIQUIDADOR solo puede acceder a sus instituciones asignadas
+  return user.institutions?.some(inst => inst.id === institutionId) || false;
+}
+
 export const load: PageServerLoad = async ({ params, url, locals }) => {
   // Validar que el usuario esté autenticado
   if (!locals.user) {
@@ -15,12 +23,12 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
     throw error(400, 'ID de institución requerido');
   }
 
-  // Validar que usuarios INTITUTION solo puedan acceder a su propia institución
-  if (locals.user.role === 'INTITUTION') {
-    if (!locals.user.institutionId) {
+  // Validar que usuarios LIQUIDADOR solo puedan acceder a sus instituciones asignadas
+  if (locals.user.role === 'LIQUIDADOR') {
+    if (!locals.user.institutions || locals.user.institutions.length === 0) {
       throw error(403, 'Usuario sin institución asignada');
     }
-    if (institutionId !== locals.user.institutionId) {
+    if (!hasAccessToInstitution(locals.user, institutionId)) {
       throw error(403, 'No tiene permiso para ver esta institución');
     }
   }
@@ -71,12 +79,14 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
-    // Validar que usuarios INTITUTION solo puedan crear miembros en su institución
-    if (locals.user?.role === 'INTITUTION') {
-      if (!locals.user.institutionId) {
-        throw error(403, 'Usuario sin institución asignada');
-      }
-      if (institutionId !== locals.user.institutionId) {
+    // FINANZAS no puede crear miembros (solo lectura)
+    if (locals.user?.role === 'FINANZAS') {
+      return { success: false, message: 'No tiene permisos para crear miembros' };
+    }
+
+    // Validar que usuarios LIQUIDADOR solo puedan crear miembros en sus instituciones
+    if (locals.user?.role === 'LIQUIDADOR') {
+      if (!hasAccessToInstitution(locals.user, institutionId)) {
         throw error(403, 'No tiene permiso para modificar esta institución');
       }
     }
@@ -87,6 +97,7 @@ export const actions: Actions = {
       const memberData = {
         fullName: formData.get('fullName') as string,
         email: formData.get('email') as string,
+        phone: (formData.get('phone') as string) || undefined,
         numeroOrden: formData.get('numeroOrden') as string,
         numeroMatricula: formData.get('numeroMatricula') as string,
         documentoIdentidad: formData.get('documentoIdentidad') as string,
@@ -130,12 +141,14 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
-    // Validar que usuarios INTITUTION solo puedan actualizar miembros de su institución
-    if (locals.user?.role === 'INTITUTION') {
-      if (!locals.user.institutionId) {
-        throw error(403, 'Usuario sin institución asignada');
-      }
-      if (institutionId !== locals.user.institutionId) {
+    // FINANZAS no puede actualizar miembros (solo lectura)
+    if (locals.user?.role === 'FINANZAS') {
+      return { success: false, message: 'No tiene permisos para actualizar miembros' };
+    }
+
+    // Validar que usuarios LIQUIDADOR solo puedan actualizar miembros de sus instituciones
+    if (locals.user?.role === 'LIQUIDADOR') {
+      if (!hasAccessToInstitution(locals.user, institutionId)) {
         throw error(403, 'No tiene permiso para modificar esta institución');
       }
     }
@@ -148,15 +161,10 @@ export const actions: Actions = {
         return { success: false, message: 'ID de miembro requerido' };
       }
 
-      // Obtener el miembro actual para preservar el fullName original
-      const currentMember = await MemberService.findById(memberId);
-      if (!currentMember) {
-        return { success: false, message: 'Miembro no encontrado' };
-      }
-
       const memberData = {
-        fullName: currentMember.fullName, // Preservar el nombre original (no editable)
+        fullName: formData.get('fullName') as string,
         email: formData.get('email') as string,
+        phone: (formData.get('phone') as string) || undefined,
         numeroOrden: formData.get('numeroOrden') as string,
         numeroMatricula: formData.get('numeroMatricula') as string,
         documentoIdentidad: formData.get('documentoIdentidad') as string,
@@ -199,12 +207,14 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
-    // Validar que usuarios INTITUTION solo puedan eliminar miembros de su institución
-    if (locals.user?.role === 'INTITUTION') {
-      if (!locals.user.institutionId) {
-        throw error(403, 'Usuario sin institución asignada');
-      }
-      if (institutionId !== locals.user.institutionId) {
+    // FINANZAS no puede eliminar miembros (solo lectura)
+    if (locals.user?.role === 'FINANZAS') {
+      return { success: false, message: 'No tiene permisos para eliminar miembros' };
+    }
+
+    // Validar que usuarios LIQUIDADOR solo puedan eliminar miembros de sus instituciones
+    if (locals.user?.role === 'LIQUIDADOR') {
+      if (!hasAccessToInstitution(locals.user, institutionId)) {
         throw error(403, 'No tiene permiso para modificar esta institución');
       }
     }
@@ -234,14 +244,9 @@ export const actions: Actions = {
       throw error(400, 'ID de institución requerido');
     }
 
-    // Validar que usuarios INTITUTION solo puedan actualizar su propia institución
-    if (locals.user?.role === 'INTITUTION') {
-      if (!locals.user.institutionId) {
-        throw error(403, 'Usuario sin institución asignada');
-      }
-      if (institutionId !== locals.user.institutionId) {
-        throw error(403, 'No tiene permiso para modificar esta institución');
-      }
+    // Solo ADMIN puede actualizar instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return { success: false, message: 'No tiene permisos para actualizar instituciones' };
     }
 
     try {
@@ -265,11 +270,16 @@ export const actions: Actions = {
   },
 
   // Eliminar institución
-  delete: async ({ params }) => {
+  delete: async ({ params, locals }) => {
     const institutionId = params.id;
-    
+
     if (!institutionId) {
       throw error(400, 'ID de institución requerido');
+    }
+
+    // Solo ADMIN puede eliminar instituciones
+    if (locals.user?.role !== 'ADMIN') {
+      return { success: false, message: 'No tiene permisos para eliminar instituciones' };
     }
 
     try {
