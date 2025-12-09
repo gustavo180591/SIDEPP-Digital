@@ -75,6 +75,9 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/static ./static
 COPY --from=builder /app/prisma ./prisma
 
+# Generar Prisma Client con el schema correcto
+RUN npx prisma generate
+
 # Variables de entorno
 ENV NODE_ENV=production
 ENV PORT=3000
