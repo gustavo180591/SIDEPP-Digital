@@ -36,6 +36,7 @@ services:
       EXTRACTION_DIR: ${EXTRACTION_DIR:-/data/extractions}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://vps-5478319-x.dattaweb.com:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "3000:3000"
     volumes:

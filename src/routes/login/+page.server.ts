@@ -63,7 +63,7 @@ export const actions: Actions = {
       cookies.set('auth_token', token, {
         path: '/',
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.COOKIE_SECURE === 'true',
         sameSite: 'strict',
         maxAge: 60 * 60 * 24 * 7 // 7 días
       });
