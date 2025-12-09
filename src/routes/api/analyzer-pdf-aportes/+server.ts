@@ -161,12 +161,14 @@ function detectDeclaredTotal(text: string): number | null {
 const MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','setiembre','octubre','noviembre','diciembre'];
 
 function detectPeriod(text: string): { month?: number | null; year?: number | null; raw?: string | null } {
-	const m1 = text.match(/\b(0?[1-9]|1[0-2])[\/\-](\d{4})\b/);
+	// Buscar formato MM/YYYY pero EXCLUIR si hay otro número antes (evita DD/MM/YYYY o MM/DD/YYYY)
+	// Negative lookbehind: no debe haber dígito+separador antes del mes
+	const m1 = text.match(/(?<!\d[\/\-])\b(0?[1-9]|1[0-2])[\/\-](\d{4})\b/);
 	if (m1) {
 		return { month: Number(m1[1]), year: Number(m1[2]), raw: m1[0] };
 	}
 	const monthsAlt = MONTHS_ES.join('|');
-	const re2 = new RegExp(`(?:^|[^a-záéíóúñ])(?:periodo|período)?\s*:?\s*(${monthsAlt})\s*[\-–—\/]?\s*(\\d{4})(?=$|[^0-9])`, 'i');
+	const re2 = new RegExp(`(?:^|[^a-záéíóúñ])(?:periodo|período)?\\s*:?\\s*(${monthsAlt})\\s*[\\-–—\\/]?\\s*(\\d{4})(?=$|[^0-9])`, 'i');
 	const m2 = text.match(re2);
 	if (m2) {
 		const monthName = m2[1].toLowerCase();
@@ -1377,6 +1379,18 @@ export const POST: RequestHandler = async (event) => {
 					console.log('[APORTES] Período detectado del analyzer IA:', detectedPeriod);
 				}
 			}
+			// Fallback: si no hay período pero hay fecha, extraer mes de la fecha (formato MM/DD/YYYY)
+			else if (analyzerResult && analyzerResult.fecha && (!detectedPeriod.month || !detectedPeriod.year)) {
+				const fechaMatch = analyzerResult.fecha.match(/^(\d{1,2})\/\d{1,2}\/(\d{4})$/);
+				if (fechaMatch) {
+					detectedPeriod = {
+						month: parseInt(fechaMatch[1]),
+						year: parseInt(fechaMatch[2]),
+						raw: `${fechaMatch[1]}/${fechaMatch[2]}`
+					};
+					console.log('[APORTES] Período extraído de fecha del analyzer IA:', detectedPeriod);
+				}
+			}
 
 			const selectedPeriod = parseSelectedPeriod(selectedPeriodRaw);
 			const periodMatches = selectedPeriod && detectedPeriod.year && detectedPeriod.month
@@ -1431,6 +1445,18 @@ export const POST: RequestHandler = async (event) => {
 						raw: analyzerResult.periodo
 					};
 					console.log('[APORTES] Período detectado del analyzer IA (else):', detectedPeriod);
+				}
+			}
+			// Fallback: si no hay período pero hay fecha, extraer mes de la fecha (formato MM/DD/YYYY)
+			else if (analyzerResult && analyzerResult.fecha && (!detectedPeriod.month || !detectedPeriod.year)) {
+				const fechaMatch = analyzerResult.fecha.match(/^(\d{1,2})\/\d{1,2}\/(\d{4})$/);
+				if (fechaMatch) {
+					detectedPeriod = {
+						month: parseInt(fechaMatch[1]),
+						year: parseInt(fechaMatch[2]),
+						raw: `${fechaMatch[1]}/${fechaMatch[2]}`
+					};
+					console.log('[APORTES] Período extraído de fecha del analyzer IA (else):', detectedPeriod);
 				}
 			}
 

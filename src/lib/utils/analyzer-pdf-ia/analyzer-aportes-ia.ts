@@ -45,7 +45,7 @@ INSTRUCCIONES:
 CAMPOS A EXTRAER:
 - escuela: nombre (en MAYUSCULAS), direccion (buscar "Ruta" o similar), cuit (formato XX-XXXXXXXX-X)
 - fecha: formato MM/DD/YYYY (como viene en el PDF)
-- periodo: formato MM/YYYY o "FOPID"
+- periodo: formato MM/YYYY o "FOPID" - IMPORTANTE: el periodo es el MES de la fecha (ejemplo: si fecha es "11/07/2024", el periodo es "11/2024")
 - concepto: descripcion del concepto (ej: "Apte. Sindical SIDEPP (1%)")
 - personas: array con cada persona y sus datos
 - totales: cantidad de personas y monto total
