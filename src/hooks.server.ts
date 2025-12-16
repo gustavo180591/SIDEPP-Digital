@@ -69,7 +69,7 @@ const auth: Handle = async ({ event, resolve }) => {
     console.log('🔐 Verificando autorización - Ruta:', path, 'Rol:', userRole);
 
     // Rutas exclusivas para ADMIN
-    const adminOnlyRoutes = ['/dashboard/usuarios'];
+    const adminOnlyRoutes = ['/dashboard/usuarios', '/dashboard/admin'];
 
     // Rutas para subir - ADMIN y LIQUIDADOR
     const uploadRoutes = ['/dashboard/upload'];

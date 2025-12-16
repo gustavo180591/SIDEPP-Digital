@@ -32,12 +32,20 @@
     label: inst.name || 'Sin nombre'
   }));
 
+  // ============================================================================
+  // ESTADO DEL FORMULARIO - NUEVO FLUJO DE 2 PASOS
+  // ============================================================================
+
+  type UploadState = 'idle' | 'analyzing' | 'preview' | 'confirming' | 'success' | 'error';
+
+  let state: UploadState = 'idle';
+  let stageMessage: string = '';
+
   let fileInputSueldos: HTMLInputElement | null = null;
   let fileInputFopid: HTMLInputElement | null = null;
   let fileInputAguinaldo: HTMLInputElement | null = null;
   let fileInputTransfer: HTMLInputElement | null = null;
-  let uploading = false;
-  let uploadingStage: string = '';
+
   let selectedMonth: string = '';
   let selectedYear: string = '';
   let selectedInstitutionId: string = '';
@@ -52,291 +60,284 @@
 
   // Mostrar input de Aguinaldo solo en Junio (06) o Diciembre (12)
   $: showAguinaldo = selectedMonth === '06' || selectedMonth === '12';
-  type Checks = {
-    sumTotal?: number;
-    declaredTotal?: number | null;
-    totalMatches?: boolean;
-    detectedPeriod?: { month?: number | null; year?: number | null; raw?: string | null };
-    selectedPeriod?: { month?: number | null; year?: number | null } | null;
-    periodMatches?: boolean | null;
+
+  // ============================================================================
+  // TIPOS PARA EL NUEVO FLUJO
+  // ============================================================================
+
+  type PreviewResult = {
+    success: boolean;
+    type?: 'APORTES' | 'TRANSFERENCIA';
+    fileName?: string;
+    bufferHash?: string;
+    bufferBase64?: string;
+    isDuplicate?: boolean;
+    duplicateInfo?: { pdfFileId: string; existingFileName: string };
+    analysis?: any;
+    institution?: { id: string; name: string | null; cuit: string | null } | null;
+    peopleCount?: number;
+    totalAmount?: number;
+    conceptType?: 'FOPID' | 'SUELDO' | 'DESCONOCIDO';
+    transferAmount?: number;
+    isMultiple?: boolean;
+    transferCount?: number;
+    error?: string;
+    details?: string;
   };
 
-  type AnalyzerResult = {
-    fileName: string;
-    savedName: string;
-    savedPath: string;
-    size: number;
-    mimeType: string;
-    status: string;
-    classification?: 'comprobante' | 'listado' | 'desconocido';
-    preview?: {
-      listado?: {
-        count: number;
-        total: number;
-        rows: Array<{ lineNumber: number; cuit?: string; fecha?: string; importe?: string; nombre?: string }>;
-        tableData?: {
-          personas?: number;
-          totalRemunerativo?: number;
-          cantidadLegajos?: number;
-          montoConcepto?: number;
-        };
-        personas?: Array<{
-          nombre: string;
-          totRemunerativo: number;
-          cantidadLegajos: number;
-          montoConcepto: number;
-        }>;
-      };
+  type BatchPreviewResult = {
+    sessionId: string;
+    previews: {
+      sueldos?: PreviewResult;
+      fopid?: PreviewResult;
+      aguinaldo?: PreviewResult;
+      transferencia?: PreviewResult;
     };
-    checks?: Checks;
-    transferAmount?: number | null;
+    validation: {
+      totalAportes: number;
+      totalTransferencia: number;
+      diferencia: number;
+      coinciden: boolean;
+      porcentajeDiferencia: number;
+      warnings: string[];
+    };
+    allFilesValid: boolean;
   };
 
-  let resultSueldos: AnalyzerResult | null = null;
-  let resultFopid: AnalyzerResult | null = null;
-  let resultAguinaldo: AnalyzerResult | null = null;
-  let resultTransfer: AnalyzerResult | null = null;
+  type BatchSaveResult = {
+    success: boolean;
+    error?: string;
+    periodId: string | null;
+    savedFiles: {
+      sueldos?: { pdfFileId: string; contributionLineCount: number };
+      fopid?: { pdfFileId: string; contributionLineCount: number };
+      aguinaldo?: { pdfFileId: string; contributionLineCount: number };
+      transferencia?: { pdfFileId: string; bankTransferId: string };
+    };
+  };
 
-  let aportesTotal: number | null = null;
-  let transferImporte: number | null = null;
-  let totalsMatch: boolean | null = null;
+  // ============================================================================
+  // RESULTADOS
+  // ============================================================================
+
+  let previewResult: BatchPreviewResult | null = null;
+  let saveResult: BatchSaveResult | null = null;
   let errorMessage: string | null = null;
   let personCountWarning: string | null = null;
-
-  const sumFromResult = (r: AnalyzerResult | null): number => {
-    if (!r) return 0;
-
-    // PRIORIDAD 1: Usar checks.sumTotal (viene calculado del backend con los totales del analyzer IA)
-    const checksTotal = r.checks?.sumTotal;
-    if (typeof checksTotal === 'number' && Number.isFinite(checksTotal) && checksTotal > 0) {
-      console.log('Usando checks.sumTotal:', checksTotal);
-      return checksTotal;
-    }
-
-    // PRIORIDAD 2: Usar checks.declaredTotal como alternativa
-    const declaredTotal = r.checks?.declaredTotal;
-    if (typeof declaredTotal === 'number' && Number.isFinite(declaredTotal) && declaredTotal > 0) {
-      console.log('Usando checks.declaredTotal:', declaredTotal);
-      return declaredTotal;
-    }
-
-    // PRIORIDAD 3: Usar tableData.montoConcepto si existe
-    const tableAmount = r.preview?.listado?.tableData?.montoConcepto;
-    if (typeof tableAmount === 'number' && Number.isFinite(tableAmount) && tableAmount > 0) {
-      console.log('Usando tableData.montoConcepto:', tableAmount);
-      return tableAmount;
-    }
-
-    // PRIORIDAD 4: Sumar desde el array de personas si existe
-    const personas = r.preview?.listado?.personas || [];
-    if (Array.isArray(personas) && personas.length > 0) {
-      const total = personas.reduce((acc, p) => acc + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
-      if (total > 0) {
-        console.log('Sumando desde personas:', total, '(', personas.length, 'personas)');
-        return total;
-      }
-    }
-
-    console.warn('No se pudo extraer monto del concepto del resultado');
-    return 0;
-  };
 
   // Detectar diferencias en cantidad de personas entre archivos
   $: {
     personCountWarning = null;
 
-    const sueldosCount = resultSueldos?.preview?.listado?.tableData?.personas || resultSueldos?.preview?.listado?.count || 0;
-    const fopidCount = resultFopid?.preview?.listado?.tableData?.personas || resultFopid?.preview?.listado?.count || 0;
-    const aguinaldoCount = resultAguinaldo?.preview?.listado?.tableData?.personas || resultAguinaldo?.preview?.listado?.count || 0;
+    if (previewResult?.previews) {
+      const sueldosCount = (previewResult.previews.sueldos as any)?.peopleCount || 0;
+      const fopidCount = (previewResult.previews.fopid as any)?.peopleCount || 0;
+      const aguinaldoCount = (previewResult.previews.aguinaldo as any)?.peopleCount || 0;
 
-    // Crear lista de contadores no-cero con sus etiquetas
-    const countData: {label: string, count: number}[] = [];
-    if (sueldosCount > 0) countData.push({label: 'Sueldos', count: sueldosCount});
-    if (fopidCount > 0) countData.push({label: 'FOPID', count: fopidCount});
-    if (showAguinaldo && aguinaldoCount > 0) countData.push({label: 'Aguinaldo', count: aguinaldoCount});
+      const countData: {label: string, count: number}[] = [];
+      if (sueldosCount > 0) countData.push({label: 'Sueldos', count: sueldosCount});
+      if (fopidCount > 0) countData.push({label: 'FOPID', count: fopidCount});
+      if (showAguinaldo && aguinaldoCount > 0) countData.push({label: 'Aguinaldo', count: aguinaldoCount});
 
-    // Verificar si hay diferencias
-    if (countData.length > 1) {
-      const counts = countData.map(d => d.count);
-      const minCount = Math.min(...counts);
-      const maxCount = Math.max(...counts);
+      if (countData.length > 1) {
+        const counts = countData.map(d => d.count);
+        const minCount = Math.min(...counts);
+        const maxCount = Math.max(...counts);
 
-      if (minCount !== maxCount) {
-        const differences = countData
-          .map(d => `${d.label}: ${d.count} ${d.count === 1 ? 'persona' : 'personas'}`)
-          .join(', ');
-        personCountWarning = `Se detectaron diferencias en la cantidad de personas entre archivos. ${differences}`;
+        if (minCount !== maxCount) {
+          const differences = countData
+            .map(d => `${d.label}: ${d.count} ${d.count === 1 ? 'persona' : 'personas'}`)
+            .join(', ');
+          personCountWarning = `Se detectaron diferencias en la cantidad de personas entre archivos. ${differences}`;
+        }
       }
     }
   }
 
-  async function onSubmit(e: Event) {
+  // ============================================================================
+  // FUNCIONES PRINCIPALES
+  // ============================================================================
+
+  /**
+   * PASO 1: Analizar archivos (sin guardar)
+   */
+  async function analyzeFiles(e: Event) {
     e.preventDefault();
     errorMessage = null;
-    resultSueldos = null;
-    resultFopid = null;
-    resultAguinaldo = null;
-    resultTransfer = null;
-    aportesTotal = null;
-    transferImporte = null;
-    totalsMatch = null;
+    previewResult = null;
+    saveResult = null;
 
     const fileSueldos = fileInputSueldos?.files?.[0];
     const fileFopid = fileInputFopid?.files?.[0];
     const fileAguinaldo = fileInputAguinaldo?.files?.[0];
     const fileTransfer = fileInputTransfer?.files?.[0];
 
-    // Validar período (mes y año requeridos)
+    // Validaciones
     if (!selectedMonth || !selectedYear) {
       errorMessage = 'Debes seleccionar el mes y año del período.';
       return;
     }
 
-    // Validar institución seleccionada
     if (!selectedInstitutionId) {
       errorMessage = 'Debes seleccionar una institución.';
       return;
     }
 
-    // Validar archivos requeridos
     if (!fileSueldos || !fileFopid) {
       errorMessage = 'Debes subir los archivos: Aportes Sueldos y Aportes FOPID.';
       return;
     }
 
-    // Validar aguinaldo si es Junio o Diciembre
     if (showAguinaldo && !fileAguinaldo) {
       errorMessage = 'Debes subir el archivo de Aportes Aguinaldo para Junio o Diciembre.';
       return;
     }
 
-    // Validar transferencia bancaria
     if (!fileTransfer) {
       errorMessage = 'Debes subir el archivo de Transferencia Bancaria.';
       return;
     }
 
-    uploading = true;
-    uploadingStage = 'Preparando archivos...';
+    state = 'analyzing';
+    stageMessage = 'Preparando archivos para análisis...';
+
     try {
-      const makeForm = (file: File) => {
-        const f = new FormData();
-        f.append('file', file);
-        if (selectedPeriod) f.append('selectedPeriod', selectedPeriod);
-        f.append('institutionId', selectedInstitutionId);
-        return f;
-      };
-
-      // Preparar todas las promesas
-      const promises: Promise<Response>[] = [
-        fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileSueldos) }),
-        fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileFopid) }),
-        fetch('/api/analyzer-pdf-bank', { method: 'POST', body: makeForm(fileTransfer) })
-      ];
-
-      // Agregar Aguinaldo si corresponde
+      const formData = new FormData();
+      formData.append('files', fileSueldos);
+      formData.append('files', fileFopid);
       if (showAguinaldo && fileAguinaldo) {
-        promises.splice(2, 0, fetch('/api/analyzer-pdf-aportes', { method: 'POST', body: makeForm(fileAguinaldo) }));
+        formData.append('files', fileAguinaldo);
+      }
+      formData.append('files', fileTransfer);
+      formData.append('selectedPeriod', selectedPeriod);
+      formData.append('institutionId', selectedInstitutionId);
+
+      stageMessage = 'Analizando archivos con IA...';
+
+      const response = await fetch('/api/analyzer-pdf-preview', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Error al analizar los archivos');
       }
 
-      uploadingStage = `Analizando ${promises.length} archivo${promises.length > 1 ? 's' : ''}...`;
-      const responses = await Promise.all(promises);
+      previewResult = data;
+      state = 'preview';
 
-      uploadingStage = 'Procesando resultados...';
-      const dataArray = await Promise.all(responses.map(r => r.json()));
+      console.log('=== PREVIEW RESULT ===');
+      console.log('Session ID:', previewResult?.sessionId);
+      console.log('Validation:', previewResult?.validation);
+      console.log('=====================');
 
-      // Asignar resultados según orden
-      let idx = 0;
-      resultSueldos = dataArray[idx++];
-      resultFopid = dataArray[idx++];
-      if (showAguinaldo && fileAguinaldo) {
-        resultAguinaldo = dataArray[idx++];
-      }
-      resultTransfer = dataArray[idx++];
-
-      // Validar errores
-      if (!responses[0].ok) {
-        throw new Error(resultSueldos?.error || resultSueldos?.message || 'Error en Aportes Sueldos');
-      }
-      if (!responses[1].ok) {
-        throw new Error(resultFopid?.error || resultFopid?.message || 'Error en Aportes FOPID');
-      }
-      if (showAguinaldo && fileAguinaldo && !responses[2].ok) {
-        throw new Error(resultAguinaldo?.error || resultAguinaldo?.message || 'Error en Aportes Aguinaldo');
-      }
-      const transferResponseIdx = showAguinaldo && fileAguinaldo ? 3 : 2;
-      if (!responses[transferResponseIdx].ok) {
-        throw new Error(resultTransfer?.error || resultTransfer?.message || 'Error en Transferencia Bancaria');
-      }
-
-      // Calcular totales
-      uploadingStage = 'Calculando totales y validaciones...';
-      const totalSueldos = sumFromResult(resultSueldos);
-      const totalFopid = sumFromResult(resultFopid);
-      const totalAguinaldo = showAguinaldo ? sumFromResult(resultAguinaldo) : 0;
-      aportesTotal = totalSueldos + totalFopid + totalAguinaldo;
-
-      console.log('=== RESUMEN DE TOTALES ===');
-      console.log('Total Aportes Sueldos:', totalSueldos);
-      console.log('Total Aportes FOPID:', totalFopid);
-      if (showAguinaldo) console.log('Total Aportes Aguinaldo:', totalAguinaldo);
-      console.log('SUMA TOTAL APORTES:', aportesTotal);
-
-      // Buscar importe de transferencia con múltiples fallbacks
-      transferImporte =
-        (typeof resultTransfer?.transferAmount === 'number' ? resultTransfer.transferAmount : null)
-        ?? resultTransfer?.checks?.sumTotal
-        ?? resultTransfer?.checks?.declaredTotal
-        ?? null;
-      console.log('Importe Transferencia Bancaria:', transferImporte);
-
-      if (aportesTotal != null && transferImporte != null) {
-        const diferencia = Math.abs(aportesTotal - transferImporte);
-        totalsMatch = diferencia < 0.5;
-        console.log('Diferencia:', diferencia);
-        console.log('¿Coinciden?:', totalsMatch ? 'SÍ' : 'NO');
-      }
-      console.log('=========================');
     } catch (err) {
+      state = 'error';
       errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-    } finally {
-      uploading = false;
     }
   }
 
+  /**
+   * PASO 2: Confirmar y guardar
+   */
+  async function confirmAndSave() {
+    if (!previewResult) return;
+
+    state = 'confirming';
+    stageMessage = 'Guardando archivos...';
+
+    try {
+      // Obtener la institución detectada de los previews
+      let detectedInstitutionId = selectedInstitutionId;
+      for (const preview of Object.values(previewResult.previews)) {
+        if (preview && preview.success && preview.institution) {
+          detectedInstitutionId = preview.institution.id;
+          break;
+        }
+      }
+
+      const response = await fetch('/api/analyzer-pdf-confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sessionId: previewResult.sessionId,
+          selectedPeriod: {
+            month: parseInt(selectedMonth),
+            year: parseInt(selectedYear)
+          },
+          institutionId: detectedInstitutionId,
+          previews: previewResult.previews,
+          forceConfirm: !previewResult.validation.coinciden
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Error al guardar los archivos');
+      }
+
+      saveResult = data;
+      state = 'success';
+
+      console.log('=== SAVE RESULT ===');
+      console.log('Period ID:', saveResult?.periodId);
+      console.log('Saved Files:', saveResult?.savedFiles);
+      console.log('==================');
+
+    } catch (err) {
+      state = 'error';
+      errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+    }
+  }
+
+  /**
+   * Cancelar y volver al inicio
+   */
+  function cancelPreview() {
+    state = 'idle';
+    previewResult = null;
+    errorMessage = null;
+  }
+
+  /**
+   * Resetear todo el formulario
+   */
   function resetForm() {
-    // Limpiar resultados
-    resultSueldos = null;
-    resultFopid = null;
-    resultAguinaldo = null;
-    resultTransfer = null;
-
-    // Limpiar cálculos
-    aportesTotal = null;
-    transferImporte = null;
-    totalsMatch = null;
-
-    // Limpiar errores y advertencias
+    state = 'idle';
+    stageMessage = '';
+    previewResult = null;
+    saveResult = null;
     errorMessage = null;
     personCountWarning = null;
 
-    // Resetear estado de carga
-    uploading = false;
-    uploadingStage = '';
-
-    // Limpiar archivos seleccionados
     if (fileInputSueldos) fileInputSueldos.value = '';
     if (fileInputFopid) fileInputFopid.value = '';
     if (fileInputAguinaldo) fileInputAguinaldo.value = '';
     if (fileInputTransfer) fileInputTransfer.value = '';
 
-    // Scroll al inicio
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Helper para formatear moneda
+  function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
+  }
+
+  // Helper para obtener nombre de mes
+  function getMonthName(month: string): string {
+    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return months[parseInt(month) - 1] || month;
   }
 </script>
 
-<form class="bg-white shadow-xl rounded-xl border border-gray-100" on:submit|preventDefault={onSubmit}>
+<form class="bg-white shadow-xl rounded-xl border border-gray-100" on:submit|preventDefault={analyzeFiles}>
   <div class="p-6 space-y-4">
+    <!-- Header -->
     <div class="flex items-center gap-3 mb-4">
       <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,203 +346,207 @@
       </div>
       <div>
         <h2 class="text-xl font-bold text-gray-900">Analizador de PDF</h2>
-        <p class="text-sm text-gray-600">Sube un PDF y lo clasificamos como comprobante o listado.</p>
+        <p class="text-sm text-gray-600">
+          {#if state === 'idle'}
+            Sube los archivos para analizarlos antes de guardar.
+          {:else if state === 'analyzing'}
+            Analizando archivos...
+          {:else if state === 'preview'}
+            Revisa el análisis y confirma para guardar.
+          {:else if state === 'confirming'}
+            Guardando archivos...
+          {:else if state === 'success'}
+            ¡Archivos guardados exitosamente!
+          {:else if state === 'error'}
+            Error en el procesamiento.
+          {/if}
+        </p>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div>
-        <label for="period" class="mb-1 block text-sm font-medium text-gray-700">Mes/Año <span class="text-red-500">*</span></label>
-        <div class="grid grid-cols-2 gap-2">
+    <!-- ========== ESTADO: IDLE - Formulario de selección ========== -->
+    {#if state === 'idle' || state === 'analyzing'}
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label for="period" class="mb-1 block text-sm font-medium text-gray-700">Mes/Año <span class="text-red-500">*</span></label>
+          <div class="grid grid-cols-2 gap-2">
+            <SearchableSelect
+              options={monthOptions}
+              bind:value={selectedMonth}
+              placeholder="Buscar mes..."
+              required
+              name="month"
+              disabled={state === 'analyzing'}
+            />
+            <SearchableSelect
+              options={yearOptions}
+              bind:value={selectedYear}
+              placeholder="Buscar año..."
+              required
+              name="year"
+              disabled={state === 'analyzing'}
+            />
+          </div>
+        </div>
+        <div>
+          <label for="institution" class="mb-1 block text-sm font-medium text-gray-700">Institución <span class="text-red-500">*</span></label>
           <SearchableSelect
-            options={monthOptions}
-            bind:value={selectedMonth}
-            placeholder="Buscar mes..."
+            options={institutionOptions}
+            bind:value={selectedInstitutionId}
+            placeholder={institutions.length === 0 ? 'No hay instituciones asignadas' : 'Buscar institución...'}
             required
-            name="month"
+            disabled={institutions.length <= 1 || state === 'analyzing'}
+            name="institution"
           />
-          <SearchableSelect
-            options={yearOptions}
-            bind:value={selectedYear}
-            placeholder="Buscar año..."
-            required
-            name="year"
-          />
+          {#if institutions.length === 1}
+            <p class="mt-1 text-xs text-gray-500">Institución asignada automáticamente</p>
+          {/if}
         </div>
       </div>
-      <div>
-        <label for="institution" class="mb-1 block text-sm font-medium text-gray-700">Institución <span class="text-red-500">*</span></label>
-        <SearchableSelect
-          options={institutionOptions}
-          bind:value={selectedInstitutionId}
-          placeholder={institutions.length === 0 ? 'No hay instituciones asignadas' : 'Buscar institución...'}
-          required
-          disabled={institutions.length <= 1}
-          name="institution"
-        />
-        {#if institutions.length === 1}
-          <p class="mt-1 text-xs text-gray-500">Institución asignada automáticamente</p>
-        {/if}
-      </div>
-    </div>
 
-    <div class="flex flex-col gap-4">
-      <div>
-        <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF) <span class="text-red-500">*</span></label>
-        <input
-          id="pdf-sueldos"
-          bind:this={fileInputSueldos}
-          type="file"
-          accept="application/pdf"
-          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
-          disabled={uploading}
-          required
-        />
-      </div>
-      <div>
-        <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF) <span class="text-red-500">*</span></label>
-        <input
-          id="pdf-fopid"
-          bind:this={fileInputFopid}
-          type="file"
-          accept="application/pdf"
-          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
-          disabled={uploading}
-          required
-        />
-      </div>
-      {#if showAguinaldo}
+      <div class="flex flex-col gap-4">
         <div>
-          <label for="pdf-aguinaldo" class="mb-1 block text-sm font-medium text-gray-700">
-            Aportes Aguinaldo (PDF) <span class="text-red-500">*</span>
-            <span class="text-xs text-gray-500">(Solo Junio/Diciembre)</span>
-          </label>
+          <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF) <span class="text-red-500">*</span></label>
           <input
-            id="pdf-aguinaldo"
-            bind:this={fileInputAguinaldo}
+            id="pdf-sueldos"
+            bind:this={fileInputSueldos}
             type="file"
             accept="application/pdf"
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
-            disabled={uploading}
+            disabled={state === 'analyzing'}
             required
           />
         </div>
-      {/if}
-      <div>
-        <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia Bancaria (PDF) <span class="text-red-500">*</span></label>
-        <input
-          id="pdf-transfer"
-          bind:this={fileInputTransfer}
-          type="file"
-          accept="application/pdf"
-          class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
-          disabled={uploading}
-          required
-        />
-      </div>
-    </div>
-
-    <div class="flex justify-end pt-4 border-t border-gray-200">
-      <button class="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100" disabled={uploading}>
-        {#if uploading}
-          <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          {uploadingStage || 'Subiendo...'}
-        {:else}
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-          </svg>
-          Subir y analizar
+        <div>
+          <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF) <span class="text-red-500">*</span></label>
+          <input
+            id="pdf-fopid"
+            bind:this={fileInputFopid}
+            type="file"
+            accept="application/pdf"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+            disabled={state === 'analyzing'}
+            required
+          />
+        </div>
+        {#if showAguinaldo}
+          <div>
+            <label for="pdf-aguinaldo" class="mb-1 block text-sm font-medium text-gray-700">
+              Aportes Aguinaldo (PDF) <span class="text-red-500">*</span>
+              <span class="text-xs text-gray-500">(Solo Junio/Diciembre)</span>
+            </label>
+            <input
+              id="pdf-aguinaldo"
+              bind:this={fileInputAguinaldo}
+              type="file"
+              accept="application/pdf"
+              class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+              disabled={state === 'analyzing'}
+              required
+            />
+          </div>
         {/if}
-      </button>
-    </div>
-
-    {#if errorMessage}
-      <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span>{errorMessage}</span>
+        <div>
+          <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia Bancaria (PDF) <span class="text-red-500">*</span></label>
+          <input
+            id="pdf-transfer"
+            bind:this={fileInputTransfer}
+            type="file"
+            accept="application/pdf"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+            disabled={state === 'analyzing'}
+            required
+          />
         </div>
       </div>
 
-      <!-- Botón de Reset después de error -->
-      <div class="mt-4 flex justify-center">
+      <div class="flex justify-end pt-4 border-t border-gray-200">
         <button
-          type="button"
-          on:click={resetForm}
-          class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+          type="submit"
+          class="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          disabled={state === 'analyzing'}
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          Intentar Nuevamente
+          {#if state === 'analyzing'}
+            <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {stageMessage || 'Analizando...'}
+          {:else}
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            Analizar Archivos
+          {/if}
         </button>
       </div>
     {/if}
 
-      {#if resultSueldos || resultFopid || resultAguinaldo || resultTransfer}
+    <!-- ========== ESTADO: PREVIEW - Mostrar resultados del análisis ========== -->
+    {#if state === 'preview' && previewResult}
       <div class="my-4 border-t border-gray-200 pt-4"></div>
 
-      <!-- Card de Resumen Ejecutivo -->
-      <div class="mb-6 rounded-xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg p-6">
+      <!-- Card de Resumen del Preview -->
+      <div class="mb-6 rounded-xl border-2 {previewResult.validation.coinciden ? 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50' : 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50'} shadow-lg p-6">
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
+          <div class="w-12 h-12 {previewResult.validation.coinciden ? 'bg-green-500' : 'bg-yellow-500'} rounded-full flex items-center justify-center">
+            {#if previewResult.validation.coinciden}
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            {:else}
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            {/if}
           </div>
           <div>
-            <h3 class="text-xl font-bold text-green-900">Procesamiento Exitoso</h3>
-            <p class="text-sm text-green-700">Todos los archivos fueron analizados correctamente</p>
+            <h3 class="text-xl font-bold {previewResult.validation.coinciden ? 'text-green-900' : 'text-yellow-900'}">
+              {previewResult.validation.coinciden ? 'Análisis Exitoso' : 'Atención: Diferencias Detectadas'}
+            </h3>
+            <p class="text-sm {previewResult.validation.coinciden ? 'text-green-700' : 'text-yellow-700'}">
+              {previewResult.validation.coinciden
+                ? 'Los totales coinciden. Puede confirmar para guardar.'
+                : `Diferencia de ${formatCurrency(previewResult.validation.diferencia)}`}
+            </p>
           </div>
         </div>
+
+        <!-- Warnings -->
+        {#if previewResult.validation.warnings.length > 0}
+          <div class="mb-4 p-3 bg-yellow-100 rounded-lg border border-yellow-300">
+            <p class="text-sm font-medium text-yellow-800 mb-1">Advertencias:</p>
+            <ul class="text-sm text-yellow-700 list-disc list-inside">
+              {#each previewResult.validation.warnings as warning}
+                <li>{warning}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <!-- Columna Izquierda -->
           <div class="space-y-3">
-            {#if resultSueldos?.preview?.listado?.tableData?.institucion || resultTransfer?.preview?.listado?.tableData?.institucion}
-              <div class="flex items-start gap-2">
-                <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-                <div class="flex-1">
-                  <p class="text-xs font-medium text-gray-600">Institución</p>
-                  <p class="text-sm font-semibold text-gray-900">
-                    {resultSueldos?.preview?.listado?.tableData?.institucion?.nombre || resultTransfer?.preview?.listado?.tableData?.institucion?.nombre || 'No detectada'}
-                  </p>
-                  {#if resultSueldos?.preview?.listado?.tableData?.institucion?.cuit || resultTransfer?.preview?.listado?.tableData?.institucion?.cuit}
-                    <p class="text-xs text-gray-500">
-                      CUIT: {resultSueldos?.preview?.listado?.tableData?.institucion?.cuit || resultTransfer?.preview?.listado?.tableData?.institucion?.cuit}
-                    </p>
-                  {/if}
-                </div>
-              </div>
-            {/if}
-
             <div class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
               </svg>
               <div class="flex-1">
                 <p class="text-xs font-medium text-gray-600">Período</p>
                 <p class="text-sm font-semibold text-gray-900">
-                  {selectedMonth && selectedYear ? `${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(selectedMonth)-1]} ${selectedYear}` : 'No especificado'}
+                  {getMonthName(selectedMonth)} {selectedYear}
                 </p>
               </div>
             </div>
 
             <div class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              <svg class="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
               <div class="flex-1">
-                <p class="text-xs font-medium text-gray-600">Personas Procesadas</p>
-                <p class="text-sm font-semibold text-gray-900">
-                  {resultSueldos?.preview?.listado?.tableData?.personas || resultSueldos?.preview?.listado?.personas?.length || resultSueldos?.preview?.listado?.count || 0}
+                <p class="text-xs font-medium text-gray-600">Total Aportes</p>
+                <p class="text-lg font-bold text-gray-900">
+                  {formatCurrency(previewResult.validation.totalAportes)}
                 </p>
               </div>
             </div>
@@ -550,41 +555,21 @@
           <!-- Columna Derecha -->
           <div class="space-y-3">
             <div class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <div class="flex-1">
-                <p class="text-xs font-medium text-gray-600">Total Aportes</p>
-                <p class="text-lg font-bold text-green-700">
-                  {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(aportesTotal || 0)}
-                </p>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
               </svg>
               <div class="flex-1">
                 <p class="text-xs font-medium text-gray-600">Transferencia Bancaria</p>
-                <p class="text-lg font-bold text-green-700">
-                  {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(transferImporte || 0)}
+                <p class="text-lg font-bold text-gray-900">
+                  {formatCurrency(previewResult.validation.totalTransferencia)}
                 </p>
               </div>
             </div>
 
             <div class="flex items-start gap-2">
-              {#if aportesTotal === 0 && (transferImporte === 0 || transferImporte === null)}
-                <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-              {:else if totalsMatch}
+              {#if previewResult.validation.coinciden}
                 <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              {:else if totalsMatch === null}
-                <svg class="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
               {:else}
                 <svg class="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -592,20 +577,10 @@
                 </svg>
               {/if}
               <div class="flex-1">
-                <p class="text-xs font-medium text-gray-600">Estado de Validación</p>
-                {#if aportesTotal === 0 && (transferImporte === 0 || transferImporte === null)}
-                  <p class="text-sm font-semibold text-yellow-700">⚠️ No se detectaron montos</p>
-                  <p class="text-xs text-yellow-600">Verifique que los archivos contengan datos válidos</p>
-                {:else if totalsMatch === null}
-                  <p class="text-sm font-semibold text-gray-500">— Sin comparar</p>
-                {:else if totalsMatch}
-                  <p class="text-sm font-semibold text-green-700">✅ Totales Coinciden</p>
-                {:else}
-                  <p class="text-sm font-semibold text-red-700">❌ Discrepancia Detectada</p>
-                  <p class="text-xs text-red-600">
-                    Diferencia: {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Math.abs((aportesTotal || 0) - (transferImporte || 0)))}
-                  </p>
-                {/if}
+                <p class="text-xs font-medium text-gray-600">Diferencia</p>
+                <p class="text-sm font-semibold {previewResult.validation.coinciden ? 'text-green-700' : 'text-red-700'}">
+                  {previewResult.validation.coinciden ? 'Totales coinciden' : formatCurrency(previewResult.validation.diferencia)}
+                </p>
               </div>
             </div>
           </div>
@@ -622,160 +597,273 @@
               </svg>
             </div>
             <div class="flex-1">
-              <h4 class="text-base font-bold text-yellow-900 mb-1">Atención: Diferencias Detectadas</h4>
+              <h4 class="text-base font-bold text-yellow-900 mb-1">Atención: Diferencias en Personas</h4>
               <p class="text-sm text-yellow-800">{personCountWarning}</p>
-              <p class="text-xs text-yellow-700 mt-2">
-                Esto podría indicar que hay personas nuevas, personas que salieron, o inconsistencias en los archivos. Revise cuidadosamente las tablas abajo.
-              </p>
             </div>
           </div>
         </div>
       {/if}
 
+      <!-- Detalles de cada archivo -->
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
-        {#if resultSueldos}
-          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm font-semibold text-gray-600 mb-2">Aportes Sueldos</div>
-            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultSueldos.fileName}>{resultSueldos.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{fileInputSueldos?.files?.[0]?.size ? (fileInputSueldos.files[0].size / 1024).toFixed(1) : '—'} KB</div>
+        {#if previewResult.previews.sueldos}
+          <div class="rounded-lg border {previewResult.previews.sueldos.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} shadow-sm p-4">
+            <div class="flex items-center gap-2 mb-2">
+              {#if previewResult.previews.sueldos.success}
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              {:else}
+                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              {/if}
+              <span class="text-sm font-semibold text-gray-600">Aportes Sueldos</span>
+            </div>
+            <div class="text-base font-medium text-gray-900 truncate" title={previewResult.previews.sueldos.fileName}>{previewResult.previews.sueldos.fileName}</div>
+            {#if previewResult.previews.sueldos.success}
+              <div class="mt-1 text-sm text-gray-600">{(previewResult.previews.sueldos as any).peopleCount || 0} personas</div>
+              <div class="text-sm font-semibold text-gray-900">{formatCurrency((previewResult.previews.sueldos as any).totalAmount || 0)}</div>
+            {:else}
+              <div class="mt-1 text-sm text-red-600">{previewResult.previews.sueldos.error}</div>
+            {/if}
           </div>
         {/if}
-        {#if resultFopid}
-          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm font-semibold text-gray-600 mb-2">Aportes FOPID</div>
-            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultFopid.fileName}>{resultFopid.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{fileInputFopid?.files?.[0]?.size ? (fileInputFopid.files[0].size / 1024).toFixed(1) : '—'} KB</div>
+
+        {#if previewResult.previews.fopid}
+          <div class="rounded-lg border {previewResult.previews.fopid.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} shadow-sm p-4">
+            <div class="flex items-center gap-2 mb-2">
+              {#if previewResult.previews.fopid.success}
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              {:else}
+                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              {/if}
+              <span class="text-sm font-semibold text-gray-600">Aportes FOPID</span>
+            </div>
+            <div class="text-base font-medium text-gray-900 truncate" title={previewResult.previews.fopid.fileName}>{previewResult.previews.fopid.fileName}</div>
+            {#if previewResult.previews.fopid.success}
+              <div class="mt-1 text-sm text-gray-600">{(previewResult.previews.fopid as any).peopleCount || 0} personas</div>
+              <div class="text-sm font-semibold text-gray-900">{formatCurrency((previewResult.previews.fopid as any).totalAmount || 0)}</div>
+            {:else}
+              <div class="mt-1 text-sm text-red-600">{previewResult.previews.fopid.error}</div>
+            {/if}
           </div>
         {/if}
-        {#if resultAguinaldo}
-          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm font-semibold text-gray-600 mb-2">Aportes Aguinaldo</div>
-            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultAguinaldo.fileName}>{resultAguinaldo.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{fileInputAguinaldo?.files?.[0]?.size ? (fileInputAguinaldo.files[0].size / 1024).toFixed(1) : '—'} KB</div>
+
+        {#if previewResult.previews.aguinaldo}
+          <div class="rounded-lg border {previewResult.previews.aguinaldo.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} shadow-sm p-4">
+            <div class="flex items-center gap-2 mb-2">
+              {#if previewResult.previews.aguinaldo.success}
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              {:else}
+                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              {/if}
+              <span class="text-sm font-semibold text-gray-600">Aportes Aguinaldo</span>
+            </div>
+            <div class="text-base font-medium text-gray-900 truncate" title={previewResult.previews.aguinaldo.fileName}>{previewResult.previews.aguinaldo.fileName}</div>
+            {#if previewResult.previews.aguinaldo.success}
+              <div class="mt-1 text-sm text-gray-600">{(previewResult.previews.aguinaldo as any).peopleCount || 0} personas</div>
+              <div class="text-sm font-semibold text-gray-900">{formatCurrency((previewResult.previews.aguinaldo as any).totalAmount || 0)}</div>
+            {:else}
+              <div class="mt-1 text-sm text-red-600">{previewResult.previews.aguinaldo.error}</div>
+            {/if}
           </div>
         {/if}
-        {#if resultTransfer}
-          <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm font-semibold text-gray-600 mb-2">Transferencia Bancaria</div>
-            <div class="mt-1 text-base font-medium text-gray-900 truncate max-w-[22rem]" title={resultTransfer.fileName}>{resultTransfer.fileName}</div>
-            <div class="mt-1 text-sm text-gray-500">{fileInputTransfer?.files?.[0]?.size ? (fileInputTransfer.files[0].size / 1024).toFixed(1) : '—'} KB</div>
+
+        {#if previewResult.previews.transferencia}
+          <div class="rounded-lg border {previewResult.previews.transferencia.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} shadow-sm p-4">
+            <div class="flex items-center gap-2 mb-2">
+              {#if previewResult.previews.transferencia.success}
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              {:else}
+                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              {/if}
+              <span class="text-sm font-semibold text-gray-600">Transferencia</span>
+            </div>
+            <div class="text-base font-medium text-gray-900 truncate" title={previewResult.previews.transferencia.fileName}>{previewResult.previews.transferencia.fileName}</div>
+            {#if previewResult.previews.transferencia.success}
+              <div class="text-sm font-semibold text-gray-900">{formatCurrency((previewResult.previews.transferencia as any).transferAmount || 0)}</div>
+              {#if (previewResult.previews.transferencia as any).isMultiple}
+                <div class="mt-1 text-xs text-gray-500">{(previewResult.previews.transferencia as any).transferCount} transferencias</div>
+              {/if}
+            {:else}
+              <div class="mt-1 text-sm text-red-600">{previewResult.previews.transferencia.error}</div>
+            {/if}
           </div>
         {/if}
       </div>
 
-      {#if resultSueldos?.preview?.listado}
+      <!-- Tablas de detalle (si hay datos de personas) -->
+      {#if previewResult.previews.sueldos?.success && (previewResult.previews.sueldos as any).analysis?.personas?.length > 0}
         <div class="mt-4">
           <AnalysisTable
-            title="TOTALES POR CONCEPTO - PERSONAS"
+            title="TOTALES POR CONCEPTO - SUELDOS"
             concept="Apte. Sindical SIDEPP (1%)"
-            personas={resultSueldos.preview.listado.personas || []}
-            tableData={resultSueldos.preview.listado.tableData}
+            personas={(previewResult.previews.sueldos as any).analysis.personas || []}
+            tableData={{
+              personas: (previewResult.previews.sueldos as any).peopleCount,
+              montoConcepto: (previewResult.previews.sueldos as any).totalAmount
+            }}
           />
         </div>
       {/if}
-      {#if resultFopid?.preview?.listado}
+
+      {#if previewResult.previews.fopid?.success && (previewResult.previews.fopid as any).analysis?.personas?.length > 0}
         <div class="mt-4">
           <AnalysisTable
-            title="TOTALES POR CONCEPTO - PERSONAS (FOPID)"
+            title="TOTALES POR CONCEPTO - FOPID"
             concept="FOPID"
-            personas={resultFopid.preview.listado.personas || []}
-            tableData={resultFopid.preview.listado.tableData}
-          />
-        </div>
-      {/if}
-      {#if resultAguinaldo?.preview?.listado}
-        <div class="mt-4">
-          <AnalysisTable
-            title="TOTALES POR CONCEPTO - PERSONAS (AGUINALDO)"
-            concept="Aguinaldo"
-            personas={resultAguinaldo.preview.listado.personas || []}
-            tableData={resultAguinaldo.preview.listado.tableData}
+            personas={(previewResult.previews.fopid as any).analysis.personas || []}
+            tableData={{
+              personas: (previewResult.previews.fopid as any).peopleCount,
+              montoConcepto: (previewResult.previews.fopid as any).totalAmount
+            }}
           />
         </div>
       {/if}
 
-      {#if aportesTotal != null || transferImporte != null}
-        <div class="mt-6 border-t border-gray-200 pt-4">
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-6">
-            <div class="text-sm font-semibold text-gray-700 mb-2">Comparación de Totales</div>
-            <div class="mt-2 text-sm space-y-2">
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Aportes Sueldos:</span>
-                <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultSueldos))}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-gray-600">Aportes FOPID:</span>
-                <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultFopid))}</span>
-              </div>
-              {#if resultAguinaldo}
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-600">Aportes Aguinaldo:</span>
-                  <span class="font-medium">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(sumFromResult(resultAguinaldo))}</span>
-                </div>
-              {/if}
-              <div class="border-t border-gray-200 pt-2 flex justify-between items-center">
-                <span class="text-gray-700 font-medium">Total Aportes:</span>
-                <span class="font-semibold text-lg">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(aportesTotal ?? 0)}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-gray-700 font-medium">Transferencia Bancaria:</span>
-                <span class="font-semibold text-lg">{transferImporte == null ? '—' : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(transferImporte)}</span>
-              </div>
-              {#if totalsMatch !== null}
-                <div class="mt-3 pt-2 border-t border-gray-200">
-                  <div class="flex justify-between items-center">
-                    <span class="text-gray-700 font-medium">Estado:</span>
-                    {#if totalsMatch}
-                      <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">✓ Coinciden</span>
-                    {:else}
-                      <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-800">✗ No coinciden</span>
-                    {/if}
-                  </div>
-                  {#if !totalsMatch}
-                    <div class="mt-2 text-sm text-red-700 bg-red-50 p-2 rounded">
-                      <span class="font-medium">Diferencia:</span> {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Math.abs((aportesTotal || 0) - (transferImporte || 0)))}
-                    </div>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          </div>
-          {#if resultSueldos?.checks}
-            <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-6">
-              <div class="text-sm text-gray-500">Comparación de período</div>
-              <div class="mt-2 text-sm">
-                <div>Detectado en PDF: <span class="font-medium">{resultSueldos.checks.detectedPeriod?.raw || `${resultSueldos.checks.detectedPeriod?.month ?? '—'}/${resultSueldos.checks.detectedPeriod?.year ?? '—'}`}</span></div>
-                <div>Seleccionado: <span class="font-medium">{resultSueldos.checks.selectedPeriod ? `${resultSueldos.checks.selectedPeriod.month?.toString().padStart(2,'0')}/${resultSueldos.checks.selectedPeriod.year}` : '—'}</span></div>
-                <div class="mt-2">Coincide: 
-                  {#if resultSueldos.checks.periodMatches}
-                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Sí</span>
-                  {:else}
-                    <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">No</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          {/if}
-          </div>
+      <!-- Botones de acción -->
+      <div class="mt-6 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-center gap-4">
+        <button
+          type="button"
+          on:click={cancelPreview}
+          class="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-gray-300"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+          </svg>
+          Cancelar y Corregir
+        </button>
 
-          <!-- Botón de Reset -->
-          <div class="mt-6 pt-4 border-t border-gray-200 flex justify-center">
-            <button
-              type="button"
-              on:click={resetForm}
-              class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              Nuevo Análisis
-            </button>
+        <button
+          type="button"
+          on:click={confirmAndSave}
+          class="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white {previewResult.validation.coinciden ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-yellow-600 to-orange-600'} rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          {previewResult.validation.coinciden ? 'Confirmar y Guardar' : 'Guardar de Todos Modos'}
+        </button>
+      </div>
+    {/if}
+
+    <!-- ========== ESTADO: CONFIRMING - Guardando ========== -->
+    {#if state === 'confirming'}
+      <div class="my-8 flex flex-col items-center justify-center">
+        <svg class="animate-spin h-12 w-12 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-lg font-medium text-gray-700">{stageMessage}</p>
+        <p class="text-sm text-gray-500 mt-2">Por favor espere...</p>
+      </div>
+    {/if}
+
+    <!-- ========== ESTADO: SUCCESS - Guardado exitoso ========== -->
+    {#if state === 'success' && saveResult}
+      <div class="my-4 border-t border-gray-200 pt-4"></div>
+
+      <div class="mb-6 rounded-xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-green-900">¡Guardado Exitoso!</h3>
+            <p class="text-sm text-green-700">Todos los archivos fueron guardados correctamente.</p>
           </div>
         </div>
-      {/if}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <p class="text-xs font-medium text-gray-600">Período</p>
+            <p class="text-sm font-semibold text-gray-900">{getMonthName(selectedMonth)} {selectedYear}</p>
+          </div>
+          <div>
+            <p class="text-xs font-medium text-gray-600">ID del Período</p>
+            <p class="text-sm font-mono text-gray-700">{saveResult.periodId}</p>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-green-200">
+          <p class="text-xs font-medium text-gray-600 mb-2">Archivos guardados:</p>
+          <div class="flex flex-wrap gap-2">
+            {#if saveResult.savedFiles.sueldos}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Sueldos ({saveResult.savedFiles.sueldos.contributionLineCount} personas)
+              </span>
+            {/if}
+            {#if saveResult.savedFiles.fopid}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                FOPID ({saveResult.savedFiles.fopid.contributionLineCount} personas)
+              </span>
+            {/if}
+            {#if saveResult.savedFiles.aguinaldo}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Aguinaldo ({saveResult.savedFiles.aguinaldo.contributionLineCount} personas)
+              </span>
+            {/if}
+            {#if saveResult.savedFiles.transferencia}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Transferencia
+              </span>
+            {/if}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-center">
+        <button
+          type="button"
+          on:click={resetForm}
+          class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+          Nuevo Análisis
+        </button>
+      </div>
+    {/if}
+
+    <!-- ========== ESTADO: ERROR ========== -->
+    {#if state === 'error' || errorMessage}
+      <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>{errorMessage}</span>
+        </div>
+      </div>
+
+      <div class="mt-4 flex justify-center">
+        <button
+          type="button"
+          on:click={resetForm}
+          class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Intentar Nuevamente
+        </button>
+      </div>
     {/if}
   </div>
 </form>
-
-

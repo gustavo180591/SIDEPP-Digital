@@ -13,10 +13,12 @@
   let highlightedIndex = -1;
   let inputElement: HTMLInputElement;
   let containerElement: HTMLDivElement;
+  let hasTyped = false; // Nuevo: trackear si el usuario escribió algo
 
   // Encuentra el label de la opción seleccionada
   $: selectedOption = options.find((opt) => opt.value === value);
-  $: displayValue = isOpen ? searchQuery : (selectedOption?.label ?? '');
+  // Fix: Mostrar el label seleccionado a menos que el usuario esté escribiendo activamente
+  $: displayValue = (isOpen && hasTyped) ? searchQuery : (selectedOption?.label ?? '');
 
   // Filtra opciones basado en la búsqueda
   $: filteredOptions = searchQuery
@@ -28,7 +30,8 @@
   function handleInputFocus() {
     if (disabled) return;
     isOpen = true;
-    searchQuery = '';
+    // No resetear searchQuery aquí - solo resetear hasTyped
+    hasTyped = false;
     highlightedIndex = -1;
   }
 
@@ -44,6 +47,7 @@
   function closeDropdown() {
     isOpen = false;
     searchQuery = '';
+    hasTyped = false;
     highlightedIndex = -1;
   }
 
@@ -112,7 +116,7 @@
     type="text"
     bind:this={inputElement}
     value={displayValue}
-    on:input={(e) => (searchQuery = e.currentTarget.value)}
+    on:input={(e) => { searchQuery = e.currentTarget.value; hasTyped = true; }}
     on:focus={handleInputFocus}
     on:blur={handleInputBlur}
     on:keydown={handleKeydown}

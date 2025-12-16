@@ -90,7 +90,18 @@
           Subir Aportes
         </a>
       {/if}
-      
+
+      <!-- Gestión de Archivos: Solo ADMIN -->
+      {#if user?.role === 'ADMIN'}
+        <a
+          href="/dashboard/admin/archivos"
+          on:click={closeMenu}
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/admin/archivos') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+        >
+          Gestión de Archivos
+        </a>
+      {/if}
+
       <!-- Información del usuario en móvil -->
       <div class="pt-4 pb-3 border-t border-gray-200">
         <div class="flex items-center px-3">
