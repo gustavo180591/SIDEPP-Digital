@@ -486,11 +486,34 @@
     {#if state === 'preview' && previewResult}
       <div class="my-4 border-t border-gray-200 pt-4"></div>
 
+      <!-- Alerta de Error Bloqueante (si hay archivos con error) -->
+      {#if !previewResult.allFilesValid}
+        <div class="mb-6 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 shadow-lg p-6">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold text-red-900">Error: No se puede guardar</h3>
+              <p class="text-sm text-red-700">
+                Uno o más archivos tienen errores de análisis. Revisa los archivos marcados en rojo abajo y vuelve a subirlos.
+              </p>
+            </div>
+          </div>
+        </div>
+      {/if}
+
       <!-- Card de Resumen del Preview -->
-      <div class="mb-6 rounded-xl border-2 {previewResult.validation.coinciden ? 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50' : 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50'} shadow-lg p-6">
+      <div class="mb-6 rounded-xl border-2 {!previewResult.allFilesValid ? 'border-red-200 bg-gradient-to-br from-red-50/50 to-rose-50/50' : previewResult.validation.coinciden ? 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50' : 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50'} shadow-lg p-6">
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-12 h-12 {previewResult.validation.coinciden ? 'bg-green-500' : 'bg-yellow-500'} rounded-full flex items-center justify-center">
-            {#if previewResult.validation.coinciden}
+          <div class="w-12 h-12 {!previewResult.allFilesValid ? 'bg-red-500' : previewResult.validation.coinciden ? 'bg-green-500' : 'bg-yellow-500'} rounded-full flex items-center justify-center">
+            {#if !previewResult.allFilesValid}
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            {:else if previewResult.validation.coinciden}
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
               </svg>
@@ -501,13 +524,23 @@
             {/if}
           </div>
           <div>
-            <h3 class="text-xl font-bold {previewResult.validation.coinciden ? 'text-green-900' : 'text-yellow-900'}">
-              {previewResult.validation.coinciden ? 'Análisis Exitoso' : 'Atención: Diferencias Detectadas'}
+            <h3 class="text-xl font-bold {!previewResult.allFilesValid ? 'text-red-900' : previewResult.validation.coinciden ? 'text-green-900' : 'text-yellow-900'}">
+              {#if !previewResult.allFilesValid}
+                Análisis con Errores
+              {:else if previewResult.validation.coinciden}
+                Análisis Exitoso
+              {:else}
+                Atención: Diferencias Detectadas
+              {/if}
             </h3>
-            <p class="text-sm {previewResult.validation.coinciden ? 'text-green-700' : 'text-yellow-700'}">
-              {previewResult.validation.coinciden
-                ? 'Los totales coinciden. Puede confirmar para guardar.'
-                : `Diferencia de ${formatCurrency(previewResult.validation.diferencia)}`}
+            <p class="text-sm {!previewResult.allFilesValid ? 'text-red-700' : previewResult.validation.coinciden ? 'text-green-700' : 'text-yellow-700'}">
+              {#if !previewResult.allFilesValid}
+                Revisa los archivos con error antes de continuar.
+              {:else if previewResult.validation.coinciden}
+                Los totales coinciden. Puede confirmar para guardar.
+              {:else}
+                Diferencia de {formatCurrency(previewResult.validation.diferencia)}
+              {/if}
             </p>
           </div>
         </div>
@@ -747,16 +780,26 @@
           Cancelar y Corregir
         </button>
 
-        <button
-          type="button"
-          on:click={confirmAndSave}
-          class="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white {previewResult.validation.coinciden ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-yellow-600 to-orange-600'} rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          {previewResult.validation.coinciden ? 'Confirmar y Guardar' : 'Guardar de Todos Modos'}
-        </button>
+        {#if !previewResult.allFilesValid}
+          <!-- Bloquear guardado si hay errores en archivos -->
+          <div class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-red-700 bg-red-100 border border-red-300 rounded-lg">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <span>No se puede guardar: corrige los archivos con error</span>
+          </div>
+        {:else}
+          <button
+            type="button"
+            on:click={confirmAndSave}
+            class="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white {previewResult.validation.coinciden ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-yellow-600 to-orange-600'} rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500/50"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            {previewResult.validation.coinciden ? 'Confirmar y Guardar' : 'Guardar de Todos Modos'}
+          </button>
+        {/if}
       </div>
     {/if}
 
