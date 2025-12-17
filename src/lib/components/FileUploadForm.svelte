@@ -212,7 +212,7 @@
       formData.append('selectedPeriod', selectedPeriod);
       formData.append('institutionId', selectedInstitutionId);
 
-      stageMessage = 'Analizando archivos con IA...';
+      stageMessage = 'Analizando archivos...';
 
       const response = await fetch('/api/analyzer-pdf-preview', {
         method: 'POST',
