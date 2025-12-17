@@ -9,8 +9,9 @@
 # La base de datos PostgreSQL debe estar corriendo
 # externamente (no incluida en este compose).
 #
-# IMPORTANTE: Los archivos se guardan en ../data/
-# (fuera del contenedor, en el servidor físico)
+# IMPORTANTE: Los archivos se guardan en el SERVIDOR en:
+# /root/apps/sidepp-digital/data/
+# docker system prune -a -f NO borra esta carpeta.
 # ===========================================
 
 name: sidepp-digital
@@ -38,7 +39,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Bind mount: carpeta física del servidor -> carpeta dentro del contenedor
-      # ../data es relativo al docker-compose.yml (o sea ~/apps/sidepp-digital/data)
-      - ../data:/data
+      # Bind mount: carpeta del SERVIDOR -> carpeta del contenedor
+      # docker system prune -a -f NO toca esta carpeta
+      - /root/apps/sidepp-digital/data:/data
     restart: unless-stopped
