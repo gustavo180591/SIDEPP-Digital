@@ -90,6 +90,10 @@ export interface MultiTransferenciaPDFResult {
   resumen: {
     cantidadTransferencias: number;
     importeTotal: number;
+    /** Número total de páginas que se intentaron analizar */
+    paginasAnalizadas?: number;
+    /** Número de páginas que fallaron el análisis */
+    paginasConError?: number;
   };
 }
 

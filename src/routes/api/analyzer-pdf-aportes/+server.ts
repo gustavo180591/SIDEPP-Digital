@@ -11,8 +11,8 @@ import { createHash } from 'node:crypto';
 import { readFile as fsReadFile } from 'node:fs/promises';
 // Importar analyzer de PDFs con IA (Claude)
 import { analyzeAportesIA } from '$lib/utils/analyzer-pdf-ia/index.js';
-// Importar utilidades de CUIT (formatCuit ya existe localmente en este archivo)
-import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
+// Importar utilidades de CUIT centralizadas
+import { normalizeCuit as normalizeCuitUtil, formatCuit as formatCuitUtil } from '$lib/utils/cuit-utils.js';
 // Librería para manejo preciso de montos monetarios
 import currency from 'currency.js';
 
@@ -244,17 +244,7 @@ function extractInstitutionCuit(text: string): string | null {
   return null;
 }
 
-function formatCuit(cuitDigits?: string | null): string | null {
-  if (!cuitDigits) return null;
-  const digits = cuitDigits.replace(/\D/g, '');
-  if (digits.length !== 11) return null;
-  // Mostrar también con 3-8-? si prefijo tiene 3 dígitos
-  const pref = digits.slice(0, 3);
-  const alt = `${pref}-${digits.slice(3, 11)}-${digits.slice(11)}`; // no se usa aún, pero dejamos trazabilidad
-  const standard = `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
-  // Preferimos estándar 2-8-1
-  return standard;
-}
+// formatCuit se usa desde cuit-utils.js (importado como formatCuitUtil)
 
 function extractInstitutionName(text: string, normalizedCuit: string | null): string | null {
   if (!normalizedCuit) return null;
@@ -1006,8 +996,8 @@ export const POST: RequestHandler = async (event) => {
 				instCuitDigits = extractInstitutionCuit(fullText);
 				console.log('[APORTES][21] CUIT extraído (crudo - método legacy):', instCuitDigits);
 			}
-			const instCuit = formatCuit(instCuitDigits);
-			console.log('[APORTES][21] CUIT normalizado:', instCuit);
+			const instCuit = formatCuitUtil(instCuitDigits);
+			console.log('[APORTES][21] CUIT normalizado (usando utilidad centralizada):', instCuit);
 			
 			if (!instCuit) {
 				console.error('[APORTES][21] ❌ No se pudo determinar CUIT institucional desde el PDF');

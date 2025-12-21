@@ -11,6 +11,8 @@ import { fileTypeFromBuffer } from 'file-type';
 import { prisma } from '$lib/server/db';
 import { analyzeAportesIA, analyzeTransferenciaIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 import type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult } from '$lib/utils/analyzer-pdf-ia/types/index.js';
+import { sumarMontos, diferenciaMonto, calcularTolerancia, porcentajeMonto, redondearMonto } from '$lib/utils/currency.js';
+import { formatCuit, normalizeCuit } from '$lib/utils/cuit-utils.js';
 
 // ============================================================================
 // TIPOS
@@ -124,16 +126,6 @@ function detectConceptType(analysis: ListadoPDFResult): 'FOPID' | 'SUELDO' | 'DE
 }
 
 /**
- * Formatea un CUIT de 11 dígitos al formato XX-XXXXXXXX-X
- */
-function formatCuit(cuitDigits: string | null): string | null {
-  if (!cuitDigits) return null;
-  const digits = cuitDigits.replace(/\D/g, '');
-  if (digits.length !== 11) return null;
-  return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
-}
-
-/**
  * Busca una institución por CUIT
  */
 async function findInstitutionByCuit(cuit: string | null): Promise<{
@@ -143,8 +135,9 @@ async function findInstitutionByCuit(cuit: string | null): Promise<{
 } | null> {
   if (!cuit) return null;
 
-  const digits = cuit.replace(/\D/g, '');
-  const formattedCuit = formatCuit(digits);
+  // Usar utilidades centralizadas de CUIT
+  const digits = normalizeCuit(cuit);
+  const formattedCuit = formatCuit(cuit);
 
   // Buscar con formato con guiones
   let institution = await prisma.institution.findUnique({
@@ -153,7 +146,7 @@ async function findInstitutionByCuit(cuit: string | null): Promise<{
   });
 
   // Fallback: buscar sin guiones
-  if (!institution && digits.length === 11) {
+  if (!institution && digits && digits.length === 11) {
     institution = await prisma.institution.findUnique({
       where: { cuit: digits },
       select: { id: true, name: true, cuit: true }
@@ -431,31 +424,40 @@ export async function analyzeBatchPreview(
     }
   }
 
-  // Calcular totales para validación
-  let totalAportes = 0;
-  let totalTransferencia = 0;
+  // Calcular totales para validación usando currency.js para precisión decimal
+  const montosAportes: number[] = [];
 
-  // Sumar aportes de todos los listados válidos
+  // Recolectar montos de aportes de todos los listados válidos
   for (const key of ['sueldos', 'fopid', 'aguinaldo'] as const) {
     const preview = previews[key];
     if (preview && preview.success && preview.type === 'APORTES') {
-      totalAportes += (preview as AportesPreviewResult).totalAmount;
+      montosAportes.push((preview as AportesPreviewResult).totalAmount);
     }
   }
 
+  // Sumar con precisión usando currency.js
+  const totalAportes = sumarMontos(...montosAportes);
+
   // Obtener total de transferencia
+  let totalTransferencia = 0;
   if (previews.transferencia?.success && previews.transferencia.type === 'TRANSFERENCIA') {
     totalTransferencia = (previews.transferencia as TransferenciaPreviewResult).transferAmount;
   }
 
-  // Calcular diferencia
-  const diferencia = Math.abs(totalAportes - totalTransferencia);
-  const porcentajeDiferencia = totalTransferencia > 0
-    ? (diferencia / totalTransferencia) * 100
-    : (totalAportes > 0 ? 100 : 0);
+  // Calcular diferencia con precisión usando currency.js
+  const diferencia = diferenciaMonto(totalAportes, totalTransferencia);
 
-  // Determinar si coinciden (tolerancia de $0.50)
-  const coinciden = diferencia <= 0.5;
+  // Calcular porcentaje de diferencia
+  const porcentajeDiferencia = porcentajeMonto(diferencia, Math.max(totalAportes, totalTransferencia));
+
+  // Calcular tolerancia escalable:
+  // - Mínimo $1 absoluto
+  // - O 0.1% del monto mayor (para montos grandes)
+  const montoMayor = Math.max(totalAportes, totalTransferencia);
+  const tolerancia = calcularTolerancia(montoMayor, 0.001, 1); // 0.1% o $1 mínimo
+
+  // Determinar si coinciden usando tolerancia escalable
+  const coinciden = diferencia <= tolerancia;
 
   // Generar warnings
   if (!coinciden) {

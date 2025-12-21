@@ -2,6 +2,17 @@ import { z } from 'zod';
 import { openai, MODEL_CONFIG } from './openai-config.js';
 import { cleanTextForAI } from './pdf-extractor.js';
 import type { ListadoPDFResult } from './types/index.js';
+import { withRetry } from '$lib/server/utils/retry.js';
+import {
+	validateAportesTotales,
+	validateAporteConceptoPorcentaje,
+	validateAporteAmount,
+	getErrors,
+	getWarnings,
+	formatValidationResults,
+	type ValidationResult,
+	type PersonaAporte
+} from './validator.js';
 
 // Schema de validacion con Zod
 const PersonaAporteSchema = z.object({
@@ -37,7 +48,13 @@ const SYSTEM_PROMPT = `Eres un asistente especializado en extraer datos estructu
 INSTRUCCIONES:
 1. Analiza el texto del PDF que contiene un listado de aportes sindicales SIDEPP
 2. Extrae TODA la informacion siguiendo el esquema JSON exacto
-3. Los numeros deben ser tipo number (sin comillas), usando punto como separador decimal
+3. FORMATO DE MONEDA ARGENTINA (MUY IMPORTANTE):
+   - En Argentina, el PUNTO es separador de MILES (no decimal)
+   - En Argentina, la COMA es separador DECIMAL
+   - Ejemplo: "$2.285.254,37" significa DOS MILLONES doscientos ochenta y cinco mil...
+   - En JSON debes retornar: 2285254.37 (usando punto como decimal, SIN separador de miles)
+   - Otro ejemplo: "$54.755,35" en JSON es: 54755.35
+   - NUNCA confundas el punto de miles con un decimal
 4. Los nombres de personas vienen en formato "APELLIDO  NOMBRE" (con doble espacio)
 5. El CUIT tiene formato XX-XXXXXXXX-X
 6. El periodo puede ser "MM/YYYY" o "FOPID" si es Fondo Fopid
@@ -97,23 +114,108 @@ REGLAS IMPORTANTES:
 - RECUERDA: totalRemunerativo > montoConcepto SIEMPRE`;
 
 /**
+ * Verifica si un error de OpenAI es recuperable (se puede reintentar)
+ */
+function isOpenAIRetryableError(error: unknown): boolean {
+	if (error && typeof error === 'object' && 'status' in error) {
+		const status = (error as { status: number }).status;
+		// Rate limit (429) o errores del servidor (5xx)
+		return status === 429 || status >= 500;
+	}
+	// Errores de red también son recuperables
+	const message = String(error).toLowerCase();
+	return message.includes('timeout') || message.includes('network') || message.includes('econnreset');
+}
+
+/**
+ * Valida el resultado de un listado de aportes y registra advertencias
+ */
+function validateAportesResult(
+	result: ListadoPDFResult,
+	filename: string
+): ValidationResult[] {
+	const validations: ValidationResult[] = [];
+
+	// Validar que la suma de personas coincida con el total reportado
+	const personas: PersonaAporte[] = result.personas.map(p => ({
+		nombre: p.nombre,
+		totalRemunerativo: p.totalRemunerativo,
+		cantidadLegajos: p.cantidadLegajos,
+		montoConcepto: p.montoConcepto
+	}));
+
+	validations.push(
+		...validateAportesTotales(personas, result.totales.montoTotal, filename)
+	);
+
+	// Validar montos individuales y porcentajes de concepto
+	for (const persona of result.personas) {
+		// Validar que montoConcepto sea razonable
+		validations.push(
+			...validateAporteAmount(persona.montoConcepto, 'montoConcepto', `${filename} - ${persona.nombre}`)
+		);
+
+		// Validar que totalRemunerativo sea razonable
+		validations.push(
+			...validateAporteAmount(persona.totalRemunerativo, 'totalRemunerativo', `${filename} - ${persona.nombre}`)
+		);
+
+		// Validar porcentaje (montoConcepto debería ser ~1% de totalRemunerativo)
+		validations.push(
+			...validateAporteConceptoPorcentaje(
+				{
+					nombre: persona.nombre,
+					totalRemunerativo: persona.totalRemunerativo,
+					cantidadLegajos: persona.cantidadLegajos,
+					montoConcepto: persona.montoConcepto
+				},
+				filename
+			)
+		);
+	}
+
+	// Loguear warnings
+	const warnings = getWarnings(validations);
+	if (warnings.length > 0) {
+		console.warn(`[analyzeAportesWithAI] Warnings para ${filename}:\n${formatValidationResults(warnings)}`);
+	}
+
+	// Si hay errores críticos, lanzar excepción
+	const errors = getErrors(validations);
+	if (errors.length > 0) {
+		throw new Error(`Validación fallida para ${filename}:\n${formatValidationResults(errors)}`);
+	}
+
+	return validations;
+}
+
+/**
  * Analiza un PDF de listado de aportes usando OpenAI
+ * Incluye retry logic y validaciones post-OpenAI
  */
 export async function analyzeAportesWithAI(
   pdfText: string,
   filename: string
 ): Promise<ListadoPDFResult> {
-  const response = await openai.chat.completions.create({
-    ...MODEL_CONFIG,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `Analiza el siguiente texto extraido de un PDF y extrae la informacion estructurada:\n\n${cleanTextForAI(pdfText)}`,
-      },
-    ],
-    response_format: { type: 'json_object' },
-  });
+  // Usar retry logic para llamadas a OpenAI
+  const response = await withRetry(
+    () => openai.chat.completions.create({
+      ...MODEL_CONFIG,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Analiza el siguiente texto extraido de un PDF y extrae la informacion estructurada:\n\n${cleanTextForAI(pdfText)}`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+    }),
+    {
+      maxRetries: 3,
+      initialDelayMs: 1000,
+      shouldRetry: isOpenAIRetryableError
+    }
+  );
 
   const content = response.choices[0]?.message?.content;
   if (!content) {
@@ -123,13 +225,18 @@ export async function analyzeAportesWithAI(
   try {
     const parsed = JSON.parse(content);
     const validated = ListadoAportesSchema.parse(parsed);
-    return {
+    const result: ListadoPDFResult = {
       ...validated,
       archivo: filename,
     };
+
+    // Validar el resultado antes de retornarlo
+    validateAportesResult(result, filename);
+
+    return result;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      console.error('Errores de validacion:', err.issues);
+      console.error(`[analyzeAportesWithAI] Errores de validacion para ${filename}:`, err.issues);
       throw new Error(`Validacion fallida: ${JSON.stringify(err.issues)}`);
     }
     throw err;
