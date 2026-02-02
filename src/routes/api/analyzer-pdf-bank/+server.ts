@@ -1,7 +1,4 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { writeFile } from 'node:fs/promises';
-import { mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { CONFIG } from '$lib/server/config';
 import { requireAuth } from '$lib/server/auth/middleware';
@@ -9,11 +6,12 @@ import { requireAuth } from '$lib/server/auth/middleware';
 import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
-import { readFile as fsReadFile } from 'node:fs/promises';
 // Importar analyzer de transferencias con IA (Claude)
 import { analyzeTransferenciaIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 // Importar utilidades de CUIT
 import { normalizeCuit, formatCuit as formatCuitUtil } from '$lib/utils/cuit-utils.js';
+// Storage centralizado
+import { saveAnalyzerFile, deleteFile } from '$lib/server/storage';
 
 // ============================================================================
 // ROLLBACK DE SESIÓN: Interface y tipos para tracking de datos creados
@@ -23,30 +21,10 @@ interface SessionCleanupData {
   periodWasCreated: boolean;         // true si fue CREADO en esta sesión
   pdfFileIds: string[];              // PdfFiles creados
   bankTransferId: string | null;     // BankTransfer creado
-  hashEntries: string[];             // Hashes agregados al índice
   savedFilePaths: string[];          // Rutas de archivos físicos guardados
 }
 
-const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
-const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
-const HASH_INDEX = join(ANALYZER_DIR, 'hash-index.json');
-
-if (!existsSync(ANALYZER_DIR)) {
-	mkdirSync(ANALYZER_DIR, { recursive: true, mode: 0o755 });
-}
-// Cargar/crear índice de hashes
-async function loadHashIndex(): Promise<Record<string, { fileName: string; savedName: string; savedPath: string }>> {
-  try {
-    const buf = await fsReadFile(HASH_INDEX, 'utf8');
-    return JSON.parse(buf) as Record<string, { fileName: string; savedName: string; savedPath: string }>;
-  } catch {
-    return {};
-  }
-}
-
-async function saveHashIndex(index: Record<string, { fileName: string; savedName: string; savedPath: string }>): Promise<void> {
-  await writeFile(HASH_INDEX, Buffer.from(JSON.stringify(index, null, 2), 'utf8'));
-}
+const { MAX_FILE_SIZE } = CONFIG;
 
 async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 	try {
@@ -597,7 +575,6 @@ async function findMemberByName(
 /**
  * Función de limpieza/rollback de SESIÓN que elimina SOLO los datos creados en esta sesión:
  * - Archivos físicos específicos de esta sesión
- * - Entradas del hash-index.json de esta sesión
  * - Registros de la DB creados en esta sesión (BankTransfer, PdfFile, PayrollPeriod)
  *
  * Esta función implementa "borrón y cuenta nueva" - si falla cualquier archivo,
@@ -607,7 +584,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 	bankTransferDeleted: boolean;
 	pdfFilesDeleted: number;
 	periodDeleted: boolean;
-	hashesRemoved: number;
 	filesDeleted: number;
 	errors: string[];
 }> {
@@ -615,7 +591,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		bankTransferDeleted: false,
 		pdfFilesDeleted: 0,
 		periodDeleted: false,
-		hashesRemoved: 0,
 		filesDeleted: 0,
 		errors: [] as string[]
 	};
@@ -626,7 +601,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		periodWasCreated: data.periodWasCreated,
 		pdfFileIds: data.pdfFileIds.length,
 		bankTransferId: data.bankTransferId,
-		hashEntries: data.hashEntries.length,
 		savedFilePaths: data.savedFilePaths.length
 	});
 
@@ -686,42 +660,16 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		}
 	}
 
-	// 4. Limpiar entradas del hash-index.json de esta sesión
-	if (data.hashEntries.length > 0) {
-		console.log('[BANK_SESSION_CLEANUP][4] Limpiando hash-index.json...');
-		try {
-			const hashIndex = await loadHashIndex();
-			for (const hash of data.hashEntries) {
-				if (hashIndex[hash]) {
-					delete hashIndex[hash];
-					results.hashesRemoved++;
-				}
-			}
-			await saveHashIndex(hashIndex);
-			console.log(`[BANK_SESSION_CLEANUP][4] ✓ ${results.hashesRemoved} entradas de hash eliminadas`);
-		} catch (e) {
-			const msg = `Hash index: ${e instanceof Error ? e.message : e}`;
-			results.errors.push(msg);
-			console.error('[BANK_SESSION_CLEANUP][4] ❌', msg);
-		}
-	}
-
-	// 5. Eliminar archivos físicos de esta sesión
+	// 4. Eliminar archivos físicos de esta sesión
 	if (data.savedFilePaths.length > 0) {
-		console.log('[BANK_SESSION_CLEANUP][5] Eliminando archivos físicos...');
-		const { unlink } = await import('node:fs/promises');
+		console.log('[BANK_SESSION_CLEANUP][4] Eliminando archivos físicos...');
 		for (const filePath of data.savedFilePaths) {
-			try {
-				await unlink(filePath);
+			const deleted = await deleteFile(filePath);
+			if (deleted) {
 				results.filesDeleted++;
-			} catch (e) {
-				// Ignorar si el archivo no existe
-				if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-					results.errors.push(`Archivo ${filePath}: ${e}`);
-				}
 			}
 		}
-		console.log(`[BANK_SESSION_CLEANUP][5] ✓ ${results.filesDeleted} archivos físicos eliminados`);
+		console.log(`[BANK_SESSION_CLEANUP][4] ✓ ${results.filesDeleted} archivos físicos eliminados`);
 	}
 
 	console.log('[BANK_SESSION_CLEANUP] ✓ Limpieza de sesión completada:', results);
@@ -743,7 +691,6 @@ export const POST: RequestHandler = async (event) => {
 		periodWasCreated: false,
 		pdfFileIds: [],
 		bankTransferId: null,
-		hashEntries: [],
 		savedFilePaths: []
 	};
 
@@ -768,22 +715,12 @@ export const POST: RequestHandler = async (event) => {
 		// Calcular hash SHA-256 para deduplicación
 		const bufferHash = createHash('sha256').update(buffer).digest('hex');
 		console.log('[analyzer][hash] SHA-256:', bufferHash);
-		const hashIndex = await loadHashIndex();
-		if (hashIndex[bufferHash]) {
-			console.warn('[analyzer][hash] Duplicado detectado, no se guarda:', hashIndex[bufferHash]);
-			return json({
-				status: 'duplicate',
-				message: 'El archivo ya fue cargado anteriormente',
-				bufferHash,
-				previous: hashIndex[bufferHash]
-			}, { status: 409 });
-		}
-		// Deduplicación en DB por hash
+		// Deduplicación en DB por hash (fuente de verdad)
 		try {
 			const existingPdf = await prisma.pdfFile.findUnique({ where: { bufferHash } });
 			if (existingPdf) {
 				console.warn('[analyzer][hash][db] Duplicado en DB, no se guarda:', { id: existingPdf.id, fileName: existingPdf.fileName });
-				return json({ status: 'duplicate', message: 'El archivo ya fue cargado (DB)', bufferHash, pdfFileId: existingPdf.id }, { status: 409 });
+				return json({ status: 'duplicate', message: 'El archivo ya fue cargado anteriormente', bufferHash, pdfFileId: existingPdf.id }, { status: 409 });
 			}
 		} catch (dbDupErr) {
 			console.warn('[analyzer][hash][db] Error verificando duplicado:', dbDupErr);
@@ -801,26 +738,12 @@ export const POST: RequestHandler = async (event) => {
 		console.log('🚀 [BANK] INICIO DE PROCESAMIENTO');
 		console.log('========================================\n');
 
-		const timestamp = Date.now();
-		const ext = file.name.split('.').pop() || 'pdf';
-		const savedName = `${timestamp}.${ext}`;
-		const savedPath = join(ANALYZER_DIR, savedName);
-
-		console.log('[BANK][1] Guardando archivo...');
-		console.log('[BANK][1] Nombre:', file.name);
-		console.log('[BANK][1] Ruta:', savedPath);
-		await writeFile(savedPath, buffer);
+		console.log('[BANK][1] Guardando archivo con UUID...');
+		console.log('[BANK][1] Nombre original:', file.name);
+		const savedPath = await saveAnalyzerFile(buffer, file.name);
 		// TRACKING: Registrar archivo físico guardado para posible rollback
 		sessionData.savedFilePaths.push(savedPath);
-		console.log('[BANK][1] ✓ Archivo guardado exitosamente');
-
-		// Registrar en índice de hashes
-		console.log('[BANK][2] Registrando en índice de hashes...');
-		hashIndex[bufferHash] = { fileName: file.name, savedName, savedPath };
-		await saveHashIndex(hashIndex);
-		// TRACKING: Registrar hash para posible rollback
-		sessionData.hashEntries.push(bufferHash);
-		console.log('[BANK][2] ✓ Registrado en índice');
+		console.log('[BANK][1] ✓ Archivo guardado:', savedPath);
 
 		// Crear PdfFile en DB temprano (sin periodId aún)
 		console.log('[BANK][3] 💾 Creando registro PdfFile en DB...');
@@ -830,6 +753,7 @@ export const POST: RequestHandler = async (event) => {
 			data: {
 				fileName: file.name,
 				bufferHash,
+				storagePath: savedPath,
 				type: 'COMPROBANTE',
 				concept: 'Transferencia Bancaria'
 			}
@@ -1203,7 +1127,7 @@ export const POST: RequestHandler = async (event) => {
 				const totalAmount = Number.isFinite(totalAmountNumber) && totalAmountNumber > 0 ? String(totalAmountNumber) : null;
 
 				// Fallback para transferId requerido
-				const fallbackTransferId = bufferHash || savedName;
+				const fallbackTransferId = bufferHash || `bank-${Date.now()}`;
 
 				// Intentar crear, si ya existe por combinación única, ignorar
 				let createdPeriodId: string | null = null;
@@ -1392,8 +1316,7 @@ export const POST: RequestHandler = async (event) => {
 
 		return json({
 			fileName: file.name,
-			savedName,
-			savedPath,
+			storagePath: savedPath,
 			size: file.size,
 			mimeType: detected.mime,
 			status: 'saved',

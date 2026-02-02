@@ -1,29 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { unlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
 import { requireAdmin } from '$lib/server/auth/middleware';
 import { prisma } from '$lib/server/db';
-import { CONFIG } from '$lib/server/config';
-
-const ANALYZER_DIR = join(CONFIG.UPLOAD_DIR, 'analyzer');
-const HASH_INDEX = join(ANALYZER_DIR, 'hash-index.json');
-
-// Cargar índice de hashes
-async function loadHashIndex(): Promise<Record<string, { fileName: string; savedName: string; savedPath: string }>> {
-  try {
-    const buf = await readFile(HASH_INDEX, 'utf8');
-    return JSON.parse(buf) as Record<string, { fileName: string; savedName: string; savedPath: string }>;
-  } catch {
-    return {};
-  }
-}
-
-// Guardar índice de hashes
-async function saveHashIndex(index: Record<string, { fileName: string; savedName: string; savedPath: string }>): Promise<void> {
-  await writeFile(HASH_INDEX, Buffer.from(JSON.stringify(index, null, 2), 'utf8'));
-}
+import { deleteFile } from '$lib/server/storage';
 
 export const DELETE: RequestHandler = async (event) => {
   // Verificar que es ADMIN
@@ -60,21 +38,10 @@ export const DELETE: RequestHandler = async (event) => {
     console.log(`[DELETE PERIOD] Iniciando eliminación de período: ${period.month}/${period.year} - ${period.institution?.name || 'Sin institución'}`);
     console.log(`[DELETE PERIOD] Archivos a eliminar: ${period.pdfFiles.length}`);
 
-    // Cargar hash index una sola vez
-    const hashIndex = await loadHashIndex();
-    const hashesToRemove: string[] = [];
-    const filesToDelete: string[] = [];
-
-    // 1. Recopilar información de archivos físicos y hashes
-    for (const pdfFile of period.pdfFiles) {
-      if (pdfFile.bufferHash) {
-        const hashEntry = hashIndex[pdfFile.bufferHash];
-        if (hashEntry?.savedPath) {
-          filesToDelete.push(hashEntry.savedPath);
-          hashesToRemove.push(pdfFile.bufferHash);
-        }
-      }
-    }
+    // 1. Recopilar paths de archivos físicos desde la DB
+    const filesToDelete = period.pdfFiles
+      .filter(f => f.storagePath)
+      .map(f => f.storagePath!);
 
     // 2. Eliminar todas las ContributionLines de todos los PdfFiles
     const contributionLineIds = period.pdfFiles.flatMap(f => f.contributionLine.map(cl => cl.id));
@@ -110,24 +77,11 @@ export const DELETE: RequestHandler = async (event) => {
     // 6. Eliminar archivos físicos del disco
     let filesDeletedCount = 0;
     for (const filePath of filesToDelete) {
-      try {
-        if (existsSync(filePath)) {
-          await unlink(filePath);
-          filesDeletedCount++;
-          console.log(`[DELETE PERIOD] Archivo físico eliminado: ${filePath}`);
-        }
-      } catch (err) {
-        console.error(`[DELETE PERIOD] Error al eliminar archivo físico: ${filePath}`, err);
+      const deleted = await deleteFile(filePath);
+      if (deleted) {
+        filesDeletedCount++;
+        console.log(`[DELETE PERIOD] Archivo físico eliminado: ${filePath}`);
       }
-    }
-
-    // 7. Limpiar hash-index.json
-    for (const hash of hashesToRemove) {
-      delete hashIndex[hash];
-    }
-    if (hashesToRemove.length > 0) {
-      await saveHashIndex(hashIndex);
-      console.log(`[DELETE PERIOD] ${hashesToRemove.length} entradas eliminadas del hash index`);
     }
 
     console.log(`[DELETE PERIOD] Eliminación completada exitosamente`);

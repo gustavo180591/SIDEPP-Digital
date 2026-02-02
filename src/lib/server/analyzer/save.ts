@@ -3,28 +3,15 @@
  *
  * Este módulo guarda todos los datos de una sesión de preview en una transacción atómica.
  * Si algo falla, se hace rollback automático de todo.
+ *
+ * Los archivos se guardan en disco y su storagePath se persiste en la DB.
+ * No se usa hash-index.json - la DB es la fuente de verdad.
  */
 
-import { writeFile, unlink, readFile as fsReadFile } from 'node:fs/promises';
-import { mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { prisma } from '$lib/server/db';
-import { CONFIG } from '$lib/server/config';
+import { saveAnalyzerFile, deleteFile } from '$lib/server/storage';
 import type { AportesPreviewResult, TransferenciaPreviewResult } from './preview';
-import type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult } from '$lib/utils/analyzer-pdf-ia/types/index.js';
-
-// ============================================================================
-// CONFIGURACIÓN
-// ============================================================================
-
-const { UPLOAD_DIR } = CONFIG;
-const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
-const HASH_INDEX = join(ANALYZER_DIR, 'hash-index.json');
-
-// Asegurar que el directorio existe
-if (!existsSync(ANALYZER_DIR)) {
-  mkdirSync(ANALYZER_DIR, { recursive: true, mode: 0o755 });
-}
+import type { ListadoPDFResult } from '$lib/utils/analyzer-pdf-ia/types/index.js';
 
 // ============================================================================
 // TIPOS
@@ -51,7 +38,7 @@ export interface BatchSaveInput {
   };
   selectedPeriod: { month: number; year: number };
   institutionId: string;
-  forceConfirm?: boolean; // Guardar aunque no coincidan los totales
+  forceConfirm?: boolean;
 }
 
 export interface SaveResult {
@@ -80,19 +67,6 @@ type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0
 // FUNCIONES AUXILIARES
 // ============================================================================
 
-async function loadHashIndex(): Promise<Record<string, { fileName: string; savedName: string; savedPath: string }>> {
-  try {
-    const buf = await fsReadFile(HASH_INDEX, 'utf8');
-    return JSON.parse(buf) as Record<string, { fileName: string; savedName: string; savedPath: string }>;
-  } catch {
-    return {};
-  }
-}
-
-async function saveHashIndex(index: Record<string, { fileName: string; savedName: string; savedPath: string }>): Promise<void> {
-  await writeFile(HASH_INDEX, Buffer.from(JSON.stringify(index, null, 2), 'utf8'));
-}
-
 /**
  * Busca un miembro por nombre dentro de una institución
  */
@@ -110,15 +84,32 @@ async function findMemberByName(
   return m ? { id: m.id } : null;
 }
 
+/**
+ * Detecta si un error de Prisma es por violación de constraint unique (P2002)
+ */
+function isPrismaUniqueConstraintError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code: string }).code === 'P2002'
+  );
+}
+
 // ============================================================================
 // FUNCIÓN PRINCIPAL DE GUARDADO BATCH
 // ============================================================================
 
 /**
- * Guarda todos los datos de una sesión de preview en una transacción atómica
+ * Guarda todos los datos de una sesión de preview en una transacción atómica.
+ *
+ * Flujo:
+ * 1. Guardar archivos en disco (con UUID para evitar colisiones)
+ * 2. Crear registros en DB con storagePath (dentro de transacción Prisma)
+ * 3. Si la transacción falla, limpiar archivos del disco
  */
 export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveResult> {
-  const { previews, selectedPeriod, institutionId, forceConfirm } = input;
+  const { previews, selectedPeriod, institutionId } = input;
 
   console.log('[saveBatchAtomic] Iniciando guardado atómico...');
   console.log('[saveBatchAtomic] Período:', selectedPeriod);
@@ -127,10 +118,9 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
 
   // Archivos físicos guardados (para cleanup en caso de error)
   const savedFilePaths: string[] = [];
-  const hashEntries: string[] = [];
 
   try {
-    // Usar transacción de Prisma para atomicidad
+    // Usar transacción de Prisma para atomicidad en DB
     const result = await prisma.$transaction(async (tx) => {
       const savedFiles: BatchSaveResult['savedFiles'] = {};
       let periodId: string | null = null;
@@ -146,7 +136,6 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
       });
 
       if (!period) {
-        // Crear nuevo período
         const fallbackTransferId = `batch-${Date.now()}`;
         period = await tx.payrollPeriod.create({
           data: {
@@ -174,7 +163,6 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
             periodId,
             institutionId,
             savedFilePaths,
-            hashEntries,
             tx
           );
 
@@ -189,7 +177,6 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
           previews.transferencia as TransferenciaPreviewResult,
           periodId,
           savedFilePaths,
-          hashEntries,
           tx
         );
 
@@ -198,16 +185,8 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
 
       return { periodId, savedFiles };
     }, {
-      timeout: 60000 // 60 segundos para transacciones complejas
+      timeout: 60000
     });
-
-    // Si llegamos aquí, la transacción fue exitosa
-    // Guardar en hash-index DESPUÉS de la transacción exitosa
-    const hashIndex = await loadHashIndex();
-    for (const hash of hashEntries) {
-      // Los archivos ya fueron guardados, solo necesitamos registrar los hashes
-      // La info del archivo está en savedFilePaths
-    }
 
     console.log('[saveBatchAtomic] ✓ Guardado atómico completado exitosamente');
 
@@ -222,29 +201,21 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
 
     // Limpiar archivos físicos guardados
     for (const filePath of savedFilePaths) {
-      try {
-        await unlink(filePath);
+      const deleted = await deleteFile(filePath);
+      if (deleted) {
         console.log(`[saveBatchAtomic] ✓ Archivo eliminado: ${filePath}`);
-      } catch (unlinkErr) {
-        // Ignorar si el archivo no existe
-        if ((unlinkErr as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.error(`[saveBatchAtomic] Error eliminando archivo: ${filePath}`, unlinkErr);
-        }
       }
     }
 
-    // Limpiar entradas del hash-index
-    if (hashEntries.length > 0) {
-      try {
-        const hashIndex = await loadHashIndex();
-        for (const hash of hashEntries) {
-          delete hashIndex[hash];
-        }
-        await saveHashIndex(hashIndex);
-        console.log(`[saveBatchAtomic] ✓ ${hashEntries.length} entradas de hash eliminadas`);
-      } catch (hashErr) {
-        console.error('[saveBatchAtomic] Error limpiando hash-index:', hashErr);
-      }
+    // Detectar error de duplicado (bufferHash unique constraint)
+    if (isPrismaUniqueConstraintError(error)) {
+      return {
+        success: false,
+        error: 'Archivo duplicado detectado',
+        details: 'Este archivo ya fue cargado anteriormente. Si necesita recargarlo, primero elimine el archivo existente.',
+        periodId: null,
+        savedFiles: {}
+      };
     }
 
     return {
@@ -265,33 +236,22 @@ async function saveAportesFile(
   periodId: string,
   institutionId: string,
   savedFilePaths: string[],
-  hashEntries: string[],
   tx: TransactionClient
 ): Promise<{ pdfFileId: string; contributionLineCount: number }> {
-  // 1. Guardar archivo físico
+  // 1. Guardar archivo físico con UUID
   const buffer = Buffer.from(preview.bufferBase64, 'base64');
-  const timestamp = Date.now();
-  const ext = preview.fileName.split('.').pop() || 'pdf';
-  const savedName = `${timestamp}.${ext}`;
-  const savedPath = join(ANALYZER_DIR, savedName);
+  const storagePath = await saveAnalyzerFile(buffer, preview.fileName);
+  savedFilePaths.push(storagePath);
+  console.log(`[saveAportesFile] ✓ Archivo guardado: ${storagePath}`);
 
-  await writeFile(savedPath, buffer);
-  savedFilePaths.push(savedPath);
-  console.log(`[saveAportesFile] ✓ Archivo guardado: ${savedPath}`);
-
-  // 2. Registrar en hash-index
-  const hashIndex = await loadHashIndex();
-  hashIndex[preview.bufferHash] = { fileName: preview.fileName, savedName, savedPath };
-  await saveHashIndex(hashIndex);
-  hashEntries.push(preview.bufferHash);
-
-  // 3. Crear PdfFile en DB
+  // 2. Crear PdfFile en DB con storagePath
   const analysis = preview.analysis as ListadoPDFResult;
 
   const pdfFile = await tx.pdfFile.create({
     data: {
       fileName: preview.fileName,
       bufferHash: preview.bufferHash,
+      storagePath,
       type: preview.conceptType === 'FOPID' ? 'FOPID' : 'SUELDO',
       concept: analysis.concepto || 'Aporte Sindical SIDEPP (1%)',
       peopleCount: preview.peopleCount,
@@ -301,7 +261,7 @@ async function saveAportesFile(
   });
   console.log(`[saveAportesFile] ✓ PdfFile creado: ${pdfFile.id}`);
 
-  // 4. Crear ContributionLines y Members
+  // 3. Crear ContributionLines y Members
   let contributionLineCount = 0;
 
   if (analysis.personas && analysis.personas.length > 0) {
@@ -358,31 +318,20 @@ async function saveTransferenciaFile(
   preview: TransferenciaPreviewResult,
   periodId: string,
   savedFilePaths: string[],
-  hashEntries: string[],
   tx: TransactionClient
 ): Promise<{ pdfFileId: string; bankTransferId: string }> {
-  // 1. Guardar archivo físico
+  // 1. Guardar archivo físico con UUID
   const buffer = Buffer.from(preview.bufferBase64, 'base64');
-  const timestamp = Date.now();
-  const ext = preview.fileName.split('.').pop() || 'pdf';
-  const savedName = `${timestamp}.${ext}`;
-  const savedPath = join(ANALYZER_DIR, savedName);
+  const storagePath = await saveAnalyzerFile(buffer, preview.fileName);
+  savedFilePaths.push(storagePath);
+  console.log(`[saveTransferenciaFile] ✓ Archivo guardado: ${storagePath}`);
 
-  await writeFile(savedPath, buffer);
-  savedFilePaths.push(savedPath);
-  console.log(`[saveTransferenciaFile] ✓ Archivo guardado: ${savedPath}`);
-
-  // 2. Registrar en hash-index
-  const hashIndex = await loadHashIndex();
-  hashIndex[preview.bufferHash] = { fileName: preview.fileName, savedName, savedPath };
-  await saveHashIndex(hashIndex);
-  hashEntries.push(preview.bufferHash);
-
-  // 3. Crear PdfFile en DB
+  // 2. Crear PdfFile en DB con storagePath
   const pdfFile = await tx.pdfFile.create({
     data: {
       fileName: preview.fileName,
       bufferHash: preview.bufferHash,
+      storagePath,
       type: 'COMPROBANTE',
       concept: 'Transferencia Bancaria',
       totalAmount: preview.transferAmount.toString(),
@@ -391,10 +340,9 @@ async function saveTransferenciaFile(
   });
   console.log(`[saveTransferenciaFile] ✓ PdfFile creado: ${pdfFile.id}`);
 
-  // 4. Crear BankTransfer
+  // 3. Crear BankTransfer
   const analysis = preview.analysis;
 
-  // Extraer datos según si es simple o múltiple
   let operacion: any;
   let ordenante: any;
   let nroReferencia: string | null = null;
@@ -403,7 +351,6 @@ async function saveTransferenciaFile(
   let hora: string | null = null;
 
   if (analysis.tipo === 'TRANSFERENCIAS_MULTIPLES') {
-    // Usar datos de la primera transferencia para el registro
     const primera = analysis.transferencias?.[0];
     operacion = primera?.operacion || {};
     ordenante = primera?.ordenante || {};

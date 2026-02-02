@@ -1,29 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { unlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
 import { requireAdmin } from '$lib/server/auth/middleware';
 import { prisma } from '$lib/server/db';
-import { CONFIG } from '$lib/server/config';
-
-const ANALYZER_DIR = join(CONFIG.UPLOAD_DIR, 'analyzer');
-const HASH_INDEX = join(ANALYZER_DIR, 'hash-index.json');
-
-// Cargar índice de hashes
-async function loadHashIndex(): Promise<Record<string, { fileName: string; savedName: string; savedPath: string }>> {
-  try {
-    const buf = await readFile(HASH_INDEX, 'utf8');
-    return JSON.parse(buf) as Record<string, { fileName: string; savedName: string; savedPath: string }>;
-  } catch {
-    return {};
-  }
-}
-
-// Guardar índice de hashes
-async function saveHashIndex(index: Record<string, { fileName: string; savedName: string; savedPath: string }>): Promise<void> {
-  await writeFile(HASH_INDEX, Buffer.from(JSON.stringify(index, null, 2), 'utf8'));
-}
+import { deleteFile } from '$lib/server/storage';
 
 export const DELETE: RequestHandler = async (event) => {
   // Verificar que es ADMIN
@@ -73,28 +51,14 @@ export const DELETE: RequestHandler = async (event) => {
       where: { id: fileId }
     });
 
-    // 3. Eliminar archivo físico del disco
-    if (pdfFile.bufferHash) {
-      const hashIndex = await loadHashIndex();
-      const hashEntry = hashIndex[pdfFile.bufferHash];
-
-      if (hashEntry?.savedPath) {
-        console.log(`[DELETE FILE] Eliminando archivo físico: ${hashEntry.savedPath}`);
-        if (existsSync(hashEntry.savedPath)) {
-          await unlink(hashEntry.savedPath);
-          console.log(`[DELETE FILE] Archivo físico eliminado`);
-        } else {
-          console.log(`[DELETE FILE] Archivo físico no encontrado en disco`);
-        }
-
-        // 4. Limpiar entrada del hash-index.json
-        delete hashIndex[pdfFile.bufferHash];
-        await saveHashIndex(hashIndex);
-        console.log(`[DELETE FILE] Entrada de hash eliminada del índice`);
-      }
+    // 3. Eliminar archivo físico del disco usando storagePath de la DB
+    if (pdfFile.storagePath) {
+      console.log(`[DELETE FILE] Eliminando archivo físico: ${pdfFile.storagePath}`);
+      const deleted = await deleteFile(pdfFile.storagePath);
+      console.log(`[DELETE FILE] ${deleted ? 'Archivo físico eliminado' : 'Archivo físico no encontrado en disco'}`);
     }
 
-    // 5. Si el período queda sin archivos, eliminarlo también (junto con BankTransfer)
+    // 4. Si el período queda sin archivos, eliminarlo también (junto con BankTransfer)
     if (pdfFile.period) {
       const remainingFiles = pdfFile.period.pdfFiles.filter(f => f.id !== fileId);
 
