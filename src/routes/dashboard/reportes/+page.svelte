@@ -18,7 +18,7 @@
   let sortColumn = $state<string>('fullName');
   let sortDirection = $state<'asc' | 'desc'>('asc');
 
-  // Paginaci�n
+  // Paginación
   let currentPage = $state(1);
   let itemsPerPage = $state(50);
 
@@ -28,7 +28,7 @@
 
     let filtered = reporte.afiliados;
 
-    // Filtrar por b�squeda
+    // Filtrar por búsqueda
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -50,7 +50,7 @@
         aValue = a.dni;
         bValue = b.dni;
       } else if (sortColumn.startsWith('mes-')) {
-        // Ordenar por mes espec�fico
+        // Ordenar por mes específico
         const mes = sortColumn.replace('mes-', '');
         aValue = a.meses[mes]?.montoConcepto || 0;
         bValue = b.meses[mes]?.montoConcepto || 0;
@@ -75,13 +75,13 @@
     return filteredData.slice(start, end);
   });
 
-  // Computed: n�mero total de p�ginas
+  // Computed: número total de páginas
   let totalPages = $derived(Math.ceil(filteredData.length / itemsPerPage));
 
-  // Funci�n para cargar reporte
+  // Función para cargar reporte
   async function loadReporte() {
     if (!startMonth || !endMonth) {
-      error = 'Debe seleccionar un per�odo v�lido';
+      error = 'Debe seleccionar un período válido';
       return;
     }
 
@@ -115,10 +115,10 @@
     }
   }
 
-  // Funci�n para exportar PDF
+  // Función para exportar PDF
   async function exportPdf() {
     if (!startMonth || !endMonth) {
-      alert('Debe seleccionar un per�odo v�lido');
+      alert('Debe seleccionar un período válido');
       return;
     }
 
@@ -160,7 +160,7 @@
     }
   }
 
-  // Funci�n para ordenar
+  // Función para ordenar
   function handleSort(column: string) {
     if (sortColumn === column) {
       sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -170,7 +170,7 @@
     }
   }
 
-  // Funci�n para cambiar p�gina
+  // Función para cambiar página
   function goToPage(page: number) {
     if (page >= 1 && page <= totalPages) {
       currentPage = page;
@@ -190,7 +190,7 @@
 
 <div class="max-w-[95%] mx-auto px-4 sm:px-6 lg:px-8">
   <PageHeader
-    title="Reportes de Aportes por Per�odo"
+    title="Reportes de Aportes por Período"
     description="Visualice y exporte reportes de aportes mensuales de afiliados"
   />
 
@@ -199,10 +199,10 @@
     <h3 class="text-lg font-semibold text-gray-900 mb-4">Filtros de Reporte</h3>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <!-- Selector de instituci�n -->
+      <!-- Selector de institución -->
       <div>
         <label for="institution" class="block text-sm font-medium text-gray-700 mb-2">
-          Instituci�n
+          Institución
         </label>
         <select
           id="institution"
@@ -242,7 +242,7 @@
         />
       </div>
 
-      <!-- Bot�n generar -->
+      <!-- Botón generar -->
       <div class="flex items-end">
         <button
           onclick={loadReporte}
@@ -264,7 +264,7 @@
   <!-- Resultados -->
   {#if reporte}
     <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-      <!-- Header con b�squeda y exportar -->
+      <!-- Header con búsqueda y exportar -->
       <div class="p-6 border-b border-gray-200">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -277,7 +277,7 @@
           </div>
 
           <div class="flex gap-3 w-full md:w-auto">
-            <!-- B�squeda -->
+            <!-- Búsqueda -->
             <input
               type="text"
               bind:value={searchTerm}
@@ -285,7 +285,7 @@
               class="flex-1 md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
 
-            <!-- Bot�n exportar PDF -->
+            <!-- Botón exportar PDF -->
             <button
               onclick={exportPdf}
               class="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
@@ -399,7 +399,7 @@
         </table>
       </div>
 
-      <!-- Paginaci�n -->
+      <!-- Paginación -->
       {#if totalPages > 1}
         <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
           <div class="text-sm text-gray-600">
