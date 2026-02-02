@@ -1,20 +1,18 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { writeFile } from 'node:fs/promises';
-import { mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { CONFIG } from '$lib/server/config';
 import { requireAuth } from '$lib/server/auth/middleware';
 import { extractLineData } from '$lib/server/pdf/parse-listado';
 import { prisma } from '$lib/server/db';
 import { createHash } from 'node:crypto';
-import { readFile as fsReadFile } from 'node:fs/promises';
 // Importar analyzer de PDFs con IA (Claude)
 import { analyzeAportesIA } from '$lib/utils/analyzer-pdf-ia/index.js';
 // Importar utilidades de CUIT (formatCuit ya existe localmente en este archivo)
 import { normalizeCuit as normalizeCuitUtil } from '$lib/utils/cuit-utils.js';
 // Librería para manejo preciso de montos monetarios
 import currency from 'currency.js';
+// Storage centralizado
+import { saveAnalyzerFile, deleteFile, ANALYZER_DIR } from '$lib/server/storage';
 
 // ============================================================================
 // ROLLBACK DE SESIÓN: Interface y tipos para tracking de datos creados
@@ -25,7 +23,6 @@ interface SessionCleanupData {
   pdfFileIds: string[];              // PdfFiles creados
   contributionLineIds: string[];     // ContributionLines creadas
   memberIdsCreated: string[];        // Members NUEVOS (no los encontrados)
-  hashEntries: string[];             // Hashes agregados al índice
   savedFilePaths: string[];          // Rutas de archivos físicos guardados
 }
 
@@ -55,26 +52,7 @@ function sumMoneyARS(amounts: number[]): number {
 	return amounts.reduce((acc, val) => currency(acc).add(val).value, 0);
 }
 
-const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
-const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
-const HASH_INDEX = join(ANALYZER_DIR, 'hash-index.json');
-
-if (!existsSync(ANALYZER_DIR)) {
-	mkdirSync(ANALYZER_DIR, { recursive: true, mode: 0o755 });
-}
-// Cargar/crear índice de hashes
-async function loadHashIndex(): Promise<Record<string, { fileName: string; savedName: string; savedPath: string }>> {
-  try {
-    const buf = await fsReadFile(HASH_INDEX, 'utf8');
-    return JSON.parse(buf) as Record<string, { fileName: string; savedName: string; savedPath: string }>;
-  } catch {
-    return {};
-  }
-}
-
-async function saveHashIndex(index: Record<string, { fileName: string; savedName: string; savedPath: string }>): Promise<void> {
-  await writeFile(HASH_INDEX, Buffer.from(JSON.stringify(index, null, 2), 'utf8'));
-}
+const { MAX_FILE_SIZE } = CONFIG;
 
 async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 	try {
@@ -560,7 +538,6 @@ async function findMemberByName(
 /**
  * Función de limpieza/rollback de SESIÓN que elimina SOLO los datos creados en esta sesión:
  * - Archivos físicos específicos de esta sesión
- * - Entradas del hash-index.json de esta sesión
  * - Registros de la DB creados en esta sesión (ContributionLine, Member, PdfFile, PayrollPeriod)
  *
  * Esta función implementa "borrón y cuenta nueva" - si falla cualquier archivo,
@@ -571,7 +548,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 	membersDeleted: number;
 	pdfFilesDeleted: number;
 	periodDeleted: boolean;
-	hashesRemoved: number;
 	filesDeleted: number;
 	errors: string[];
 }> {
@@ -580,7 +556,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		membersDeleted: 0,
 		pdfFilesDeleted: 0,
 		periodDeleted: false,
-		hashesRemoved: 0,
 		filesDeleted: 0,
 		errors: [] as string[]
 	};
@@ -592,7 +567,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		pdfFileIds: data.pdfFileIds.length,
 		contributionLineIds: data.contributionLineIds.length,
 		memberIdsCreated: data.memberIdsCreated.length,
-		hashEntries: data.hashEntries.length,
 		savedFilePaths: data.savedFilePaths.length
 	});
 
@@ -670,42 +644,16 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		}
 	}
 
-	// 5. Limpiar entradas del hash-index.json de esta sesión
-	if (data.hashEntries.length > 0) {
-		console.log('[SESSION_CLEANUP][5] Limpiando hash-index.json...');
-		try {
-			const hashIndex = await loadHashIndex();
-			for (const hash of data.hashEntries) {
-				if (hashIndex[hash]) {
-					delete hashIndex[hash];
-					results.hashesRemoved++;
-				}
-			}
-			await saveHashIndex(hashIndex);
-			console.log(`[SESSION_CLEANUP][5] ✓ ${results.hashesRemoved} entradas de hash eliminadas`);
-		} catch (e) {
-			const msg = `Hash index: ${e instanceof Error ? e.message : e}`;
-			results.errors.push(msg);
-			console.error('[SESSION_CLEANUP][5] ❌', msg);
-		}
-	}
-
-	// 6. Eliminar archivos físicos de esta sesión
+	// 5. Eliminar archivos físicos de esta sesión
 	if (data.savedFilePaths.length > 0) {
-		console.log('[SESSION_CLEANUP][6] Eliminando archivos físicos...');
-		const { unlink } = await import('node:fs/promises');
+		console.log('[SESSION_CLEANUP][5] Eliminando archivos físicos...');
 		for (const filePath of data.savedFilePaths) {
-			try {
-				await unlink(filePath);
+			const deleted = await deleteFile(filePath);
+			if (deleted) {
 				results.filesDeleted++;
-			} catch (e) {
-				// Ignorar si el archivo no existe
-				if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-					results.errors.push(`Archivo ${filePath}: ${e}`);
-				}
 			}
 		}
-		console.log(`[SESSION_CLEANUP][6] ✓ ${results.filesDeleted} archivos físicos eliminados`);
+		console.log(`[SESSION_CLEANUP][5] ✓ ${results.filesDeleted} archivos físicos eliminados`);
 	}
 
 	console.log('[SESSION_CLEANUP] ✓ Limpieza de sesión completada:', results);
@@ -728,7 +676,6 @@ export const POST: RequestHandler = async (event) => {
 		pdfFileIds: [],
 		contributionLineIds: [],
 		memberIdsCreated: [],
-		hashEntries: [],
 		savedFilePaths: []
 	};
 
@@ -777,21 +724,8 @@ export const POST: RequestHandler = async (event) => {
 		const bufferHash = createHash('sha256').update(buffer).digest('hex');
 		console.log('[APORTES][4] Hash SHA-256:', bufferHash);
 		
-		console.log('[APORTES][5] Verificando duplicados en índice de hashes...');
-		const hashIndex = await loadHashIndex();
-		if (hashIndex[bufferHash]) {
-			console.warn('[APORTES][5] ⚠️ Duplicado detectado en índice:', hashIndex[bufferHash]);
-			return json({
-				status: 'duplicate',
-				message: 'El archivo ya fue cargado anteriormente',
-				bufferHash,
-				previous: hashIndex[bufferHash]
-			}, { status: 409 });
-		}
-		console.log('[APORTES][5] ✓ No es duplicado en índice');
-		
-		// Deduplicación en DB por hash
-		console.log('[APORTES][6] Verificando duplicados en base de datos...');
+		// Deduplicación en DB por hash (fuente de verdad)
+		console.log('[APORTES][5] Verificando duplicados en base de datos...');
 		try {
 			const existingPdf = await prisma.pdfFile.findUnique({
 				where: { bufferHash },
@@ -856,25 +790,11 @@ export const POST: RequestHandler = async (event) => {
 		}
 		console.log('[APORTES][7] ✓ Archivo PDF válido');
 
-		const timestamp = Date.now();
-		const ext = file.name.split('.').pop() || 'pdf';
-		const savedName = `${timestamp}.${ext}`;
-		const savedPath = join(ANALYZER_DIR, savedName);
-
-		console.log('[APORTES][8] Guardando archivo...');
-		console.log('[APORTES][8] Ruta:', savedPath);
-		await writeFile(savedPath, buffer);
-		console.log('[APORTES][8] ✓ Archivo guardado exitosamente');
+		console.log('[APORTES][8] Guardando archivo con UUID...');
+		const savedPath = await saveAnalyzerFile(buffer, file.name);
+		console.log('[APORTES][8] ✓ Archivo guardado:', savedPath);
 		// ROLLBACK: Registrar archivo físico guardado
 		sessionData.savedFilePaths.push(savedPath);
-
-		// Registrar en índice de hashes
-		console.log('[APORTES][9] Registrando en índice de hashes...');
-		hashIndex[bufferHash] = { fileName: file.name, savedName, savedPath };
-		await saveHashIndex(hashIndex);
-		console.log('[APORTES][9] ✓ Registrado en índice');
-		// ROLLBACK: Registrar hash agregado
-		sessionData.hashEntries.push(bufferHash);
 
 		// NOTE: El PdfFile se creará más adelante una vez detectemos el tipo (FOPID/SUELDO)
 		let pdfFileId: string | null = null;
@@ -1179,6 +1099,7 @@ export const POST: RequestHandler = async (event) => {
 				data: {
 					fileName: file.name,
 					bufferHash,
+					storagePath: savedPath,
 					type: pdfType,
 					concept: conceptForPdf,
 					peopleCount: peopleCountForPdf || null,
@@ -1549,7 +1470,7 @@ export const POST: RequestHandler = async (event) => {
 				}
 
 				// Fallback para transferId requerido
-				const fallbackTransferId = bufferHash || savedName;
+				const fallbackTransferId = bufferHash || `aportes-${Date.now()}`;
 
 				// Buscar o crear PayrollPeriod usando la restricción única
 				let createdPeriodId: string | null = null;
@@ -1650,8 +1571,7 @@ export const POST: RequestHandler = async (event) => {
 
 		const responseData = {
 			fileName: file.name,
-			savedName,
-			savedPath,
+			storagePath: savedPath,
 			size: file.size,
 			mimeType: detectedFileType.mime,
 			status: 'saved',
@@ -1710,7 +1630,7 @@ export const POST: RequestHandler = async (event) => {
 
 /**
  * DELETE /api/analyzer-pdf-aportes
- * Limpia TODOS los datos de análisis: archivos físicos, hash-index y registros de DB
+ * Limpia TODOS los datos de análisis: archivos físicos y registros de DB
  * ADVERTENCIA: Esta es una limpieza completa, no por sesión
  * Útil para reintentar después de un error grave - solo para ADMIN
  */
@@ -1732,7 +1652,6 @@ export const DELETE: RequestHandler = async (event) => {
 	console.log('========================================\n');
 
 	const results = {
-		hashIndexCleared: false,
 		filesDeleted: 0,
 		pdfFilesDeleted: 0,
 		contributionLinesDeleted: 0,
@@ -1742,57 +1661,44 @@ export const DELETE: RequestHandler = async (event) => {
 	};
 
 	try {
-		// 1. Limpiar hash-index.json
-		console.log('[CLEANUP][1] Limpiando hash-index.json...');
+		// 1. Eliminar archivos físicos de la carpeta analyzer
+		console.log('[CLEANUP][1] Eliminando archivos de', ANALYZER_DIR);
 		try {
-			await writeFile(HASH_INDEX, Buffer.from('{}', 'utf8'));
-			results.hashIndexCleared = true;
-			console.log('[CLEANUP][1] ✓ hash-index.json limpiado');
-		} catch (e) {
-			results.errors.push(`Hash index: ${e}`);
-		}
-
-		// 2. Eliminar archivos físicos de la carpeta analyzer
-		console.log('[CLEANUP][2] Eliminando archivos de', ANALYZER_DIR);
-		try {
-			const { readdir, unlink } = await import('node:fs/promises');
+			const { readdir } = await import('node:fs/promises');
+			const { join } = await import('node:path');
 			const files = await readdir(ANALYZER_DIR);
 			for (const file of files) {
-				if (file === 'hash-index.json') continue;
-				try {
-					await unlink(join(ANALYZER_DIR, file));
-					results.filesDeleted++;
-				} catch (unlinkErr) {
-					results.errors.push(`Archivo ${file}: ${unlinkErr}`);
-				}
+				const filePath = join(ANALYZER_DIR, file);
+				const deleted = await deleteFile(filePath);
+				if (deleted) results.filesDeleted++;
 			}
-			console.log('[CLEANUP][2] ✓', results.filesDeleted, 'archivos eliminados');
+			console.log('[CLEANUP][1] ✓', results.filesDeleted, 'archivos eliminados');
 		} catch (e) {
 			results.errors.push(`Directorio: ${e}`);
 		}
 
-		// 3. Eliminar ContributionLines de la DB
-		console.log('[CLEANUP][3] Eliminando ContributionLines de DB...');
+		// 2. Eliminar ContributionLines de la DB
+		console.log('[CLEANUP][2] Eliminando ContributionLines de DB...');
 		try {
 			const deleteResult = await prisma.contributionLine.deleteMany({});
 			results.contributionLinesDeleted = deleteResult.count;
-			console.log('[CLEANUP][3] ✓', results.contributionLinesDeleted, 'contribution lines eliminadas');
+			console.log('[CLEANUP][2] ✓', results.contributionLinesDeleted, 'contribution lines eliminadas');
 		} catch (e) {
 			results.errors.push(`ContributionLines: ${e}`);
 		}
 
-		// 4. Eliminar PdfFiles de la DB
-		console.log('[CLEANUP][4] Eliminando PdfFiles de DB...');
+		// 3. Eliminar PdfFiles de la DB
+		console.log('[CLEANUP][3] Eliminando PdfFiles de DB...');
 		try {
 			const deleteResult = await prisma.pdfFile.deleteMany({});
 			results.pdfFilesDeleted = deleteResult.count;
-			console.log('[CLEANUP][4] ✓', results.pdfFilesDeleted, 'pdf files eliminados');
+			console.log('[CLEANUP][3] ✓', results.pdfFilesDeleted, 'pdf files eliminados');
 		} catch (e) {
 			results.errors.push(`PdfFiles: ${e}`);
 		}
 
-		// 5. Eliminar PayrollPeriods huérfanos de la DB
-		console.log('[CLEANUP][5] Eliminando PayrollPeriods huérfanos de DB...');
+		// 4. Eliminar PayrollPeriods huérfanos de la DB
+		console.log('[CLEANUP][4] Eliminando PayrollPeriods huérfanos de DB...');
 		try {
 			const deleteResult = await prisma.payrollPeriod.deleteMany({
 				where: {
@@ -1802,7 +1708,7 @@ export const DELETE: RequestHandler = async (event) => {
 				}
 			});
 			results.payrollPeriodsDeleted = deleteResult.count;
-			console.log('[CLEANUP][5] ✓', results.payrollPeriodsDeleted, 'payroll periods eliminados');
+			console.log('[CLEANUP][4] ✓', results.payrollPeriodsDeleted, 'payroll periods eliminados');
 		} catch (e) {
 			results.errors.push(`PayrollPeriods: ${e}`);
 		}

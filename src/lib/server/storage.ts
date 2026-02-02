@@ -1,50 +1,70 @@
-import { writeFile } from 'node:fs/promises';
+import { writeFile, unlink } from 'node:fs/promises';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
 
-// Importar configuración centralizada
 import { CONFIG } from './config';
 
-// Usar el directorio de subidas de la configuración
 const UPLOAD_DIR = CONFIG.UPLOAD_DIR;
+export const ANALYZER_DIR = join(UPLOAD_DIR, 'analyzer');
 
-// Asegurarse de que el directorio de subidas exista
+// Asegurar que los directorios existen al cargar el modulo
 if (!existsSync(UPLOAD_DIR)) {
   mkdirSync(UPLOAD_DIR, { recursive: true, mode: 0o755 });
-  console.log(`✅ Directorio de subidas creado en: ${UPLOAD_DIR}`);
+}
+if (!existsSync(ANALYZER_DIR)) {
+  mkdirSync(ANALYZER_DIR, { recursive: true, mode: 0o755 });
 }
 
-export function safeName(original: string) {
-  return original
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+/**
+ * Genera un nombre de archivo unico usando UUID para evitar colisiones.
+ */
+export function generateFileName(originalName: string): string {
+  const ext = originalName.split('.').pop() || 'pdf';
+  return `${crypto.randomUUID()}.${ext}`;
 }
 
-export async function saveUploadedFile(file: File) {
+/**
+ * Construye el path absoluto para un archivo en el directorio analyzer.
+ */
+export function getAnalyzerFilePath(fileName: string): string {
+  return join(ANALYZER_DIR, fileName);
+}
+
+/**
+ * Guarda un buffer en el directorio analyzer.
+ * Retorna el storagePath absoluto del archivo guardado.
+ */
+export async function saveAnalyzerFile(buffer: Buffer, originalName: string): Promise<string> {
+  const fileName = generateFileName(originalName);
+  const storagePath = getAnalyzerFilePath(fileName);
+  await writeFile(storagePath, buffer);
+  return storagePath;
+}
+
+/**
+ * Elimina un archivo por su storagePath.
+ * Retorna true si se elimino, false si no existia.
+ * No lanza error si el archivo no existe.
+ */
+export async function deleteFile(storagePath: string): Promise<boolean> {
   try {
-    // Verificar que el directorio existe
-    if (!existsSync(UPLOAD_DIR)) {
-      throw new Error(`El directorio de subidas no existe: ${UPLOAD_DIR}`);
+    if (existsSync(storagePath)) {
+      await unlink(storagePath);
+      return true;
     }
-    
-    const buf = Buffer.from(await file.arrayBuffer());
-    const ts = new Date().toISOString().replace(/[:.]/g, '');
-    const name = safeName(file.name || 'archivo.pdf');
-    const fileName = `${ts}-${crypto.randomUUID()}-${name}`;
-    const storagePath = join(UPLOAD_DIR, fileName);
-    
-    await writeFile(storagePath, buf);
-    console.log(`✅ Archivo guardado en: ${storagePath}`);
-    
-    return { 
-      fileName,
-      storagePath,
-      url: `/uploads/${fileName}` // URL relativa para acceder al archivo
-    };
-  } catch (error) {
-    console.error('❌ Error al guardar el archivo:', error);
-    throw new Error(`No se pudo guardar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    return false;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.error(`Error eliminando archivo: ${storagePath}`, err);
+    }
+    return false;
   }
+}
+
+/**
+ * Verifica si un archivo existe en disco.
+ */
+export function fileExists(storagePath: string): boolean {
+  return existsSync(storagePath);
 }

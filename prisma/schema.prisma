@@ -119,6 +119,7 @@ model BankTransfer {
 model PdfFile {
   id               String             @id @default(cuid())
   fileName         String
+  storagePath      String?
   periodId         String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
