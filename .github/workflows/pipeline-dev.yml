@@ -1,0 +1,81 @@
+name: Build and Notify
+
+on:
+  push:
+    branches: ["develop"]
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: build/
+
+  notify:
+    name: Notify Discord
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=format:'%s')
+          COMMIT_MSG_ESCAPED=$(echo "$COMMIT_MSG" | sed 's/"/\\"/g' | sed "s/'/\\'/g")
+
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            COLOR=3066993
+            STATUS="✅ SIDEPP-Digital - Build Exitoso"
+            DESCRIPTION="El build del entorno de **desarrollo** finalizó correctamente.\n\n📦 Dependencias instaladas y compilación completada sin errores."
+          else
+            COLOR=15158332
+            STATUS="❌ SIDEPP-Digital - Build Fallido"
+            DESCRIPTION="El build del entorno de **desarrollo** ha fallado.\n\n⚠️ Revisar los logs del workflow para identificar el error."
+          fi
+
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"$STATUS\",
+                \"description\": \"$DESCRIPTION\",
+                \"color\": $COLOR,
+                \"fields\": [
+                  {\"name\": \"📝 Cambios\", \"value\": \"$COMMIT_MSG_ESCAPED\", \"inline\": false},
+                  {\"name\": \"🌿 Branch\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                  {\"name\": \"🔗 Commit\", \"value\": \"[\`${GITHUB_SHA::7}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})\", \"inline\": true},
+                  {\"name\": \"👤 Autor\", \"value\": \"${{ github.actor }}\", \"inline\": true}
+                ],
+                \"footer\": {\"text\": \"SIDEPP-Digital • GitHub Actions\"},
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }" \
+            $DISCORD_WEBHOOK

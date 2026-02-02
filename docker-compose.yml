@@ -1,45 +1,19 @@
-# ===========================================
-# Docker Compose para SIDEPP-Digital
-# Versión: Producción (servidor VPS)
-# ===========================================
-#
-# Uso:
-#   docker compose up -d --build
-#
-# La base de datos PostgreSQL debe estar corriendo
-# externamente (no incluida en este compose).
-#
-# IMPORTANTE: Los archivos se guardan en el SERVIDOR en:
-# /root/apps/sidepp-digital/data/
-# docker system prune -a -f NO borra esta carpeta.
-# ===========================================
-
-name: sidepp-digital
-
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: prod
-    container_name: sidepp_app
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      HOST: 0.0.0.0
-      ORIGIN: ${ORIGIN:-http://vps-5478319-x.dattaweb.com:3000}
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      FILE_STORAGE_DIR: /data
-      UPLOAD_DIR: /data/uploads
-      EXTRACTION_DIR: /data/extractions
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://vps-5478319-x.dattaweb.com:3000}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  sidepp_digital:
+    image: ghcr.io/gustavo180591/sidepp-digital:latest
+    container_name: sidepp_digital_prod
+    restart: always
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     volumes:
-      # Bind mount: carpeta del SERVIDOR -> carpeta del contenedor
-      # docker system prune -a -f NO toca esta carpeta
       - /root/apps/sidepp-digital/data:/data
-    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sidepp
+
+networks:
+  sidepp:
+    external: true
