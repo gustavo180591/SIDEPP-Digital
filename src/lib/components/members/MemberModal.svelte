@@ -93,6 +93,8 @@
       type: 'text',
       placeholder: 'Nombre completo del miembro',
       required: true,
+      minLength: 2,
+      maxLength: 200,
       value: formData.fullName
     },
     {
@@ -100,13 +102,15 @@
       label: 'Email',
       type: 'email',
       placeholder: 'email@ejemplo.com',
+      pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
       value: formData.email
     },
     {
       name: 'phone',
       label: 'Teléfono',
-      type: 'text',
+      type: 'tel',
       placeholder: 'Número de teléfono',
+      pattern: '^[\\d\\s\\-+()]{7,20}$',
       value: formData.phone
     },
     {
@@ -115,22 +119,27 @@
       type: 'text',
       placeholder: 'Número de documento',
       required: true,
+      maxLength: 20,
       value: formData.documentoIdentidad
     },
     {
       name: 'numeroOrden',
       label: 'Número de Orden',
       type: 'text',
-      placeholder: 'Número de orden',
+      placeholder: 'Solo números',
       required: true,
+      pattern: '^\\d+$',
+      maxLength: 20,
       value: formData.numeroOrden
     },
     {
       name: 'numeroMatricula',
       label: 'Número de Matrícula',
       type: 'text',
-      placeholder: 'Número de matrícula',
+      placeholder: 'Solo números',
       required: true,
+      pattern: '^\\d+$',
+      maxLength: 20,
       value: formData.numeroMatricula
     },
     {
@@ -139,6 +148,7 @@
       type: 'date',
       placeholder: 'Fecha de ingreso',
       required: true,
+      max: new Date().toISOString().split('T')[0],
       value: formData.membershipStartDate
     },
     {

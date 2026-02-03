@@ -3,6 +3,40 @@ import { InstitutionService } from '$lib/db/services/institutionService';
 import { MemberService } from '$lib/db/services/memberService';
 import type { PageServerLoad, Actions } from './$types';
 
+// Funciones de validación
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[\d\s\-+()]{7,20}$/;
+
+function validateEmail(email: string): string | null {
+  if (!email?.trim()) return null; // Email es opcional
+  if (!EMAIL_REGEX.test(email.trim())) return 'El formato del email no es válido';
+  return null;
+}
+
+function validatePhone(phone: string): string | null {
+  if (!phone?.trim()) return null; // Teléfono es opcional
+  if (!PHONE_REGEX.test(phone.trim())) return 'El formato del teléfono no es válido';
+  return null;
+}
+
+function validateNumero(value: string, fieldName: string): string | null {
+  if (!value?.trim()) return `${fieldName} es requerido`;
+  if (!/^\d+$/.test(value.trim())) return `${fieldName} debe contener solo números`;
+  if (value.trim().length > 20) return `${fieldName} es demasiado largo`;
+  return null;
+}
+
+function validateDate(dateStr: string, fieldName: string): string | null {
+  if (!dateStr?.trim()) return `${fieldName} es requerida`;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return `${fieldName} no es una fecha válida`;
+  // Validar que no sea una fecha futura
+  if (date > new Date()) return `${fieldName} no puede ser una fecha futura`;
+  // Validar que no sea antes de 1900
+  if (date.getFullYear() < 1900) return `${fieldName} no puede ser antes de 1900`;
+  return null;
+}
+
 // Helper para verificar acceso a institución
 function hasAccessToInstitution(user: App.Locals['user'], institutionId: string): boolean {
   if (!user) return false;
@@ -93,39 +127,71 @@ export const actions: Actions = {
 
     try {
       const formData = await request.formData();
-      
-      const memberData = {
-        fullName: formData.get('fullName') as string,
-        email: formData.get('email') as string,
-        phone: (formData.get('phone') as string) || undefined,
-        numeroOrden: formData.get('numeroOrden') as string,
-        numeroMatricula: formData.get('numeroMatricula') as string,
-        documentoIdentidad: formData.get('documentoIdentidad') as string,
-        membershipStartDate: new Date(formData.get('membershipStartDate') as string),
-        status: (formData.get('status') as 'active' | 'inactive') || 'active',
-        institucionId: institutionId
-      };
 
-      // Validar campos requeridos
-      if (!memberData.fullName || !memberData.documentoIdentidad ||
-          !memberData.numeroOrden || !memberData.numeroMatricula) {
-        return { success: false, message: 'Todos los campos obligatorios deben ser completados' };
+      const fullName = formData.get('fullName') as string;
+      const email = formData.get('email') as string;
+      const phone = formData.get('phone') as string;
+      const numeroOrden = formData.get('numeroOrden') as string;
+      const numeroMatricula = formData.get('numeroMatricula') as string;
+      const documentoIdentidad = formData.get('documentoIdentidad') as string;
+      const membershipStartDateStr = formData.get('membershipStartDate') as string;
+      const status = (formData.get('status') as 'active' | 'inactive') || 'active';
+
+      // Validaciones
+      if (!fullName?.trim()) {
+        return { success: false, message: 'El nombre completo es requerido' };
+      }
+      if (fullName.trim().length < 2) {
+        return { success: false, message: 'El nombre debe tener al menos 2 caracteres' };
       }
 
+      if (!documentoIdentidad?.trim()) {
+        return { success: false, message: 'El documento de identidad es requerido' };
+      }
+
+      // Validar email si se proporciona
+      const emailError = validateEmail(email);
+      if (emailError) return { success: false, message: emailError };
+
+      // Validar teléfono si se proporciona
+      const phoneError = validatePhone(phone);
+      if (phoneError) return { success: false, message: phoneError };
+
+      // Validar números de orden y matrícula
+      const ordenError = validateNumero(numeroOrden, 'Número de orden');
+      if (ordenError) return { success: false, message: ordenError };
+
+      const matriculaError = validateNumero(numeroMatricula, 'Número de matrícula');
+      if (matriculaError) return { success: false, message: matriculaError };
+
+      // Validar fecha de inicio de membresía
+      const dateError = validateDate(membershipStartDateStr, 'Fecha de inicio de membresía');
+      if (dateError) return { success: false, message: dateError };
+
       // Verificar que el número de orden no esté duplicado
-      const ordenExists = await MemberService.existsByNumeroOrden(memberData.numeroOrden, institutionId);
+      const ordenExists = await MemberService.existsByNumeroOrden(numeroOrden.trim(), institutionId);
       if (ordenExists) {
         return { success: false, message: 'El número de orden ya existe en esta institución' };
       }
 
       // Verificar que el número de matrícula no esté duplicado
-      const matriculaExists = await MemberService.existsByNumeroMatricula(memberData.numeroMatricula, institutionId);
+      const matriculaExists = await MemberService.existsByNumeroMatricula(numeroMatricula.trim(), institutionId);
       if (matriculaExists) {
         return { success: false, message: 'El número de matrícula ya existe en esta institución' };
       }
 
-      await MemberService.create(memberData);
-      
+      await MemberService.create({
+        fullName: fullName.trim(),
+        email: email?.trim() || undefined,
+        phone: phone?.trim() || undefined,
+        numeroOrden: numeroOrden.trim(),
+        numeroMatricula: numeroMatricula.trim(),
+        documentoIdentidad: documentoIdentidad.trim(),
+        membershipStartDate: new Date(membershipStartDateStr),
+        status,
+        institucionId: institutionId
+      });
+
       return { success: true, message: 'Miembro creado exitosamente' };
     } catch (err) {
       console.error('Error al crear miembro:', err);
@@ -161,37 +227,69 @@ export const actions: Actions = {
         return { success: false, message: 'ID de miembro requerido' };
       }
 
-      const memberData = {
-        fullName: formData.get('fullName') as string,
-        email: formData.get('email') as string,
-        phone: (formData.get('phone') as string) || undefined,
-        numeroOrden: formData.get('numeroOrden') as string,
-        numeroMatricula: formData.get('numeroMatricula') as string,
-        documentoIdentidad: formData.get('documentoIdentidad') as string,
-        membershipStartDate: new Date(formData.get('membershipStartDate') as string),
-        status: (formData.get('status') as 'active' | 'inactive') || 'active'
-      };
+      const fullName = formData.get('fullName') as string;
+      const email = formData.get('email') as string;
+      const phone = formData.get('phone') as string;
+      const numeroOrden = formData.get('numeroOrden') as string;
+      const numeroMatricula = formData.get('numeroMatricula') as string;
+      const documentoIdentidad = formData.get('documentoIdentidad') as string;
+      const membershipStartDateStr = formData.get('membershipStartDate') as string;
+      const status = (formData.get('status') as 'active' | 'inactive') || 'active';
 
-      // Validar campos requeridos
-      if (!memberData.fullName || !memberData.documentoIdentidad ||
-          !memberData.numeroOrden || !memberData.numeroMatricula) {
-        return { success: false, message: 'Todos los campos obligatorios deben ser completados' };
+      // Validaciones
+      if (!fullName?.trim()) {
+        return { success: false, message: 'El nombre completo es requerido' };
+      }
+      if (fullName.trim().length < 2) {
+        return { success: false, message: 'El nombre debe tener al menos 2 caracteres' };
       }
 
+      if (!documentoIdentidad?.trim()) {
+        return { success: false, message: 'El documento de identidad es requerido' };
+      }
+
+      // Validar email si se proporciona
+      const emailError = validateEmail(email);
+      if (emailError) return { success: false, message: emailError };
+
+      // Validar teléfono si se proporciona
+      const phoneError = validatePhone(phone);
+      if (phoneError) return { success: false, message: phoneError };
+
+      // Validar números de orden y matrícula
+      const ordenError = validateNumero(numeroOrden, 'Número de orden');
+      if (ordenError) return { success: false, message: ordenError };
+
+      const matriculaError = validateNumero(numeroMatricula, 'Número de matrícula');
+      if (matriculaError) return { success: false, message: matriculaError };
+
+      // Validar fecha de inicio de membresía
+      const dateError = validateDate(membershipStartDateStr, 'Fecha de inicio de membresía');
+      if (dateError) return { success: false, message: dateError };
+
       // Verificar que el número de orden no esté duplicado (excluyendo el miembro actual)
-      const ordenExists = await MemberService.existsByNumeroOrden(memberData.numeroOrden, institutionId, memberId);
+      const ordenExists = await MemberService.existsByNumeroOrden(numeroOrden.trim(), institutionId, memberId);
       if (ordenExists) {
         return { success: false, message: 'El número de orden ya existe en esta institución' };
       }
 
       // Verificar que el número de matrícula no esté duplicado (excluyendo el miembro actual)
-      const matriculaExists = await MemberService.existsByNumeroMatricula(memberData.numeroMatricula, institutionId, memberId);
+      const matriculaExists = await MemberService.existsByNumeroMatricula(numeroMatricula.trim(), institutionId, memberId);
       if (matriculaExists) {
         return { success: false, message: 'El número de matrícula ya existe en esta institución' };
       }
 
-      await MemberService.update(memberId, memberData);
-      
+      await MemberService.update(memberId, {
+        fullName: fullName.trim(),
+        email: email?.trim() || undefined,
+        phone: phone?.trim() || undefined,
+        numeroOrden: numeroOrden.trim(),
+        numeroMatricula: numeroMatricula.trim(),
+        documentoIdentidad: documentoIdentidad.trim(),
+        membershipStartDate: new Date(membershipStartDateStr),
+        status
+      });
+
       return { success: true, message: 'Miembro actualizado exitosamente' };
     } catch (err) {
       console.error('Error al actualizar miembro:', err);
@@ -284,8 +382,12 @@ export const actions: Actions = {
 
     try {
       await InstitutionService.delete(institutionId);
-      throw redirect(302, '/instituciones');
+      throw redirect(302, '/dashboard/instituciones');
     } catch (err) {
+      // Si es un redirect, re-lanzarlo
+      if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 302) {
+        throw err;
+      }
       console.error('Error al eliminar institución:', err);
       return { success: false, message: 'Error al eliminar institución' };
     }

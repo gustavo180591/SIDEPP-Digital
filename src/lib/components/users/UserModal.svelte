@@ -72,6 +72,9 @@
       label: 'Nombre',
       type: 'text',
       placeholder: 'Nombre del usuario',
+      required: true,
+      minLength: 2,
+      maxLength: 100,
       value: formData.name
     },
     {
@@ -80,14 +83,16 @@
       type: 'email',
       placeholder: 'usuario@ejemplo.com',
       required: true,
+      pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
       value: formData.email
     },
     {
       name: 'password',
       label: modalType === 'edit' ? 'Nueva Contraseña (opcional)' : 'Contraseña',
       type: 'password',
-      placeholder: 'Contraseña',
+      placeholder: modalType === 'create' ? 'Mín. 8 caracteres, mayúscula, minúscula, número' : 'Dejar vacío para mantener actual',
       required: modalType === 'create',
+      minLength: modalType === 'create' ? 8 : undefined,
       value: formData.password
     },
     ...(modalType === 'create' ? [{
@@ -96,6 +101,7 @@
       type: 'password',
       placeholder: 'Confirmar contraseña',
       required: true,
+      minLength: 8,
       value: formData.confirmPassword
     }] : []),
     {

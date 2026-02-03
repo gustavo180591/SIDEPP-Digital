@@ -3,6 +3,48 @@ import type { InstitutionFilters, PaginationParams } from '$lib/db/models';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 
+// Funciones de validación
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[\d\s\-+()]{7,20}$/;
+
+function validateCUIT(cuit: string): string | null {
+  if (!cuit?.trim()) return null; // CUIT es opcional
+  const cleanCuit = cuit.replace(/[-\s]/g, '');
+  if (!/^\d{11}$/.test(cleanCuit)) {
+    return 'El CUIT debe tener 11 dígitos';
+  }
+  // Validar prefijo (20, 23, 24, 27, 30, 33, 34)
+  const prefix = cleanCuit.substring(0, 2);
+  const validPrefixes = ['20', '23', '24', '27', '30', '33', '34'];
+  if (!validPrefixes.includes(prefix)) {
+    return 'El prefijo del CUIT no es válido';
+  }
+  // Validar dígito verificador
+  const multipliers = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(cleanCuit[i]) * multipliers[i];
+  }
+  const remainder = sum % 11;
+  const verifier = remainder === 0 ? 0 : remainder === 1 ? 9 : 11 - remainder;
+  if (parseInt(cleanCuit[10]) !== verifier) {
+    return 'El dígito verificador del CUIT no es válido';
+  }
+  return null;
+}
+
+function validateEmail(email: string, isRequired: boolean = false): string | null {
+  if (!email?.trim()) return isRequired ? 'El email es requerido' : null;
+  if (!EMAIL_REGEX.test(email.trim())) return 'El formato del email no es válido';
+  return null;
+}
+
+function validatePhone(phone: string): string | null {
+  if (!phone?.trim()) return null; // Teléfono es opcional
+  if (!PHONE_REGEX.test(phone.trim())) return 'El formato del teléfono no es válido';
+  return null;
+}
+
 export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any }) => {
   // Validar que el usuario esté autenticado
   if (!locals.user) {
@@ -100,7 +142,7 @@ export const actions: Actions = {
 
     try {
       const formData = await request.formData();
-      
+
       const name = formData.get('name') as string;
       const cuit = formData.get('cuit') as string;
       const address = formData.get('address') as string;
@@ -111,14 +153,29 @@ export const actions: Actions = {
       const responsibleEmail = formData.get('responsibleEmail') as string;
       const responsablePhone = formData.get('responsablePhone') as string;
 
-      // Validaciones básicas
+      // Validaciones
       if (!name?.trim()) {
         return fail(400, { error: 'El nombre es requerido' });
       }
+      if (name.trim().length < 2) {
+        return fail(400, { error: 'El nombre debe tener al menos 2 caracteres' });
+      }
+
+      // Validar CUIT
+      const cuitError = validateCUIT(cuit);
+      if (cuitError) return fail(400, { error: cuitError });
+
+      // Validar email del responsable
+      const emailError = validateEmail(responsibleEmail);
+      if (emailError) return fail(400, { error: emailError });
+
+      // Validar teléfono del responsable
+      const phoneError = validatePhone(responsablePhone);
+      if (phoneError) return fail(400, { error: phoneError });
 
       // Verificar si el CUIT ya existe
-      if (cuit) {
-        const cuitExists = await InstitutionService.existsByCuit(cuit);
+      if (cuit?.trim()) {
+        const cuitExists = await InstitutionService.existsByCuit(cuit.trim());
         if (cuitExists) {
           return fail(400, { error: 'Ya existe una institución con este CUIT' });
         }
@@ -168,13 +225,29 @@ export const actions: Actions = {
         return fail(400, { error: 'ID de institución requerido' });
       }
 
+      // Validaciones
       if (!name?.trim()) {
         return fail(400, { error: 'El nombre es requerido' });
       }
+      if (name.trim().length < 2) {
+        return fail(400, { error: 'El nombre debe tener al menos 2 caracteres' });
+      }
+
+      // Validar CUIT
+      const cuitError = validateCUIT(cuit);
+      if (cuitError) return fail(400, { error: cuitError });
+
+      // Validar email del responsable
+      const emailError = validateEmail(responsibleEmail);
+      if (emailError) return fail(400, { error: emailError });
+
+      // Validar teléfono del responsable
+      const phoneError = validatePhone(responsablePhone);
+      if (phoneError) return fail(400, { error: phoneError });
 
       // Verificar si el CUIT ya existe (excluyendo la institución actual)
-      if (cuit) {
-        const cuitExists = await InstitutionService.existsByCuit(cuit, id);
+      if (cuit?.trim()) {
+        const cuitExists = await InstitutionService.existsByCuit(cuit.trim(), id);
         if (cuitExists) {
           return fail(400, { error: 'Ya existe otra institución con este CUIT' });
         }
