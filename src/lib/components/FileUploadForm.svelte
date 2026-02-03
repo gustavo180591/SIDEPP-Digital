@@ -125,6 +125,66 @@
   let errorMessage: string | null = null;
   let personCountWarning: string | null = null;
 
+  // ============================================================================
+  // PROGRESO SIMULADO
+  // ============================================================================
+
+  type ProgressStep = { label: string; shortLabel: string };
+
+  const analyzeSteps: ProgressStep[] = [
+    { label: 'Preparando archivos', shortLabel: 'Preparar' },
+    { label: 'Extrayendo texto de PDFs', shortLabel: 'Extraer' },
+    { label: 'Analizando archivos', shortLabel: 'Analizar' },
+    { label: 'Validando resultados', shortLabel: 'Validar' }
+  ];
+
+  const confirmSteps: ProgressStep[] = [
+    { label: 'Validando datos', shortLabel: 'Validar' },
+    { label: 'Guardando en base de datos', shortLabel: 'Guardar' },
+    { label: 'Finalizando', shortLabel: 'Finalizar' }
+  ];
+
+  let progress = 0;
+  let currentStepIndex = 0;
+  let progressInterval: ReturnType<typeof setInterval> | null = null;
+
+  $: activeSteps = state === 'analyzing' ? analyzeSteps : state === 'confirming' ? confirmSteps : [];
+
+  function startProgress(totalSteps: number) {
+    progress = 0;
+    currentStepIndex = 0;
+    if (progressInterval) clearInterval(progressInterval);
+
+    const maxProgress = 90;
+    const stepSize = maxProgress / totalSteps;
+
+    progressInterval = setInterval(() => {
+      if (progress < maxProgress) {
+        // Avance rápido al inicio, se frena gradualmente
+        const remaining = maxProgress - progress;
+        const increment = Math.max(0.3, remaining * 0.04);
+        progress = Math.min(progress + increment, maxProgress);
+        currentStepIndex = Math.min(
+          Math.floor(progress / stepSize),
+          totalSteps - 1
+        );
+      }
+    }, 150);
+  }
+
+  function completeProgress() {
+    if (progressInterval) clearInterval(progressInterval);
+    progress = 100;
+    currentStepIndex = activeSteps.length - 1;
+  }
+
+  function resetProgress() {
+    if (progressInterval) clearInterval(progressInterval);
+    progress = 0;
+    currentStepIndex = 0;
+    progressInterval = null;
+  }
+
   // Detectar diferencias en cantidad de personas entre archivos
   $: {
     personCountWarning = null;
@@ -200,6 +260,7 @@
 
     state = 'analyzing';
     stageMessage = 'Preparando archivos para análisis...';
+    startProgress(analyzeSteps.length);
 
     try {
       const formData = new FormData();
@@ -225,8 +286,12 @@
         throw new Error(data.error || data.message || 'Error al analizar los archivos');
       }
 
+      completeProgress();
+      await new Promise(r => setTimeout(r, 400));
+
       previewResult = data;
       state = 'preview';
+      resetProgress();
 
       console.log('=== PREVIEW RESULT ===');
       console.log('Session ID:', previewResult?.sessionId);
@@ -234,6 +299,7 @@
       console.log('=====================');
 
     } catch (err) {
+      resetProgress();
       state = 'error';
       errorMessage = err instanceof Error ? err.message : 'Error desconocido';
     }
@@ -247,6 +313,7 @@
 
     state = 'confirming';
     stageMessage = 'Guardando archivos...';
+    startProgress(confirmSteps.length);
 
     try {
       // Obtener la institución detectada de los previews
@@ -281,8 +348,12 @@
         throw new Error(data.error || data.message || 'Error al guardar los archivos');
       }
 
+      completeProgress();
+      await new Promise(r => setTimeout(r, 400));
+
       saveResult = data;
       state = 'success';
+      resetProgress();
 
       console.log('=== SAVE RESULT ===');
       console.log('Period ID:', saveResult?.periodId);
@@ -290,6 +361,7 @@
       console.log('==================');
 
     } catch (err) {
+      resetProgress();
       state = 'error';
       errorMessage = err instanceof Error ? err.message : 'Error desconocido';
     }
@@ -314,6 +386,7 @@
     saveResult = null;
     errorMessage = null;
     personCountWarning = null;
+    resetProgress();
 
     if (fileInputSueldos) fileInputSueldos.value = '';
     if (fileInputFopid) fileInputFopid.value = '';
@@ -479,6 +552,70 @@
             Analizar Archivos
           {/if}
         </button>
+      </div>
+    {/if}
+
+    <!-- ========== BARRA DE PROGRESO: ANALYZING ========== -->
+    {#if state === 'analyzing'}
+      <div class="my-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg p-5 sm:p-6">
+        <!-- Header -->
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+            <svg class="w-5 h-5 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-base sm:text-lg font-bold text-gray-900">Procesando archivos</h3>
+            <p class="text-xs sm:text-sm text-gray-500">
+              {activeSteps[currentStepIndex]?.label || 'Preparando...'}
+            </p>
+          </div>
+          <span class="text-sm font-bold text-blue-600">{Math.round(progress)}%</span>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div class="w-full bg-gray-200 rounded-full h-3 mb-5 overflow-hidden">
+          <div
+            class="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 transition-all duration-300 ease-out relative"
+            style="width: {progress}%"
+          >
+            <div class="absolute inset-0 rounded-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
+          </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {#each analyzeSteps as step, i}
+            <div class="flex flex-col items-center text-center gap-1.5">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500
+                {i < currentStepIndex
+                  ? 'bg-green-500 text-white shadow-md shadow-green-200'
+                  : i === currentStepIndex
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200 animate-pulse'
+                    : 'bg-gray-200 text-gray-400'
+                }"
+              >
+                {#if i < currentStepIndex}
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                {:else}
+                  {i + 1}
+                {/if}
+              </div>
+              <span class="text-[10px] sm:text-xs font-medium leading-tight
+                {i <= currentStepIndex ? 'text-gray-900' : 'text-gray-400'}"
+              >
+                <span class="hidden sm:inline">{step.label}</span>
+                <span class="sm:hidden">{step.shortLabel}</span>
+              </span>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Mensaje -->
+        <p class="text-center text-xs text-gray-400 mt-4">Esto puede tomar unos segundos, no cierres la ventana</p>
       </div>
     {/if}
 
@@ -805,13 +942,65 @@
 
     <!-- ========== ESTADO: CONFIRMING - Guardando ========== -->
     {#if state === 'confirming'}
-      <div class="my-8 flex flex-col items-center justify-center">
-        <svg class="animate-spin h-12 w-12 text-blue-600 mb-4" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="text-lg font-medium text-gray-700">{stageMessage}</p>
-        <p class="text-sm text-gray-500 mt-2">Por favor espere...</p>
+      <div class="my-6 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50 shadow-lg p-5 sm:p-6">
+        <!-- Header -->
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
+            <svg class="w-5 h-5 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-base sm:text-lg font-bold text-gray-900">Guardando datos</h3>
+            <p class="text-xs sm:text-sm text-gray-500">
+              {activeSteps[currentStepIndex]?.label || 'Procesando...'}
+            </p>
+          </div>
+          <span class="text-sm font-bold text-emerald-600">{Math.round(progress)}%</span>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div class="w-full bg-gray-200 rounded-full h-3 mb-5 overflow-hidden">
+          <div
+            class="h-full rounded-full bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 transition-all duration-300 ease-out relative"
+            style="width: {progress}%"
+          >
+            <div class="absolute inset-0 rounded-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
+          </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="grid grid-cols-3 gap-2 sm:gap-3">
+          {#each confirmSteps as step, i}
+            <div class="flex flex-col items-center text-center gap-1.5">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500
+                {i < currentStepIndex
+                  ? 'bg-green-500 text-white shadow-md shadow-green-200'
+                  : i === currentStepIndex
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 animate-pulse'
+                    : 'bg-gray-200 text-gray-400'
+                }"
+              >
+                {#if i < currentStepIndex}
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                {:else}
+                  {i + 1}
+                {/if}
+              </div>
+              <span class="text-[10px] sm:text-xs font-medium leading-tight
+                {i <= currentStepIndex ? 'text-gray-900' : 'text-gray-400'}"
+              >
+                <span class="hidden sm:inline">{step.label}</span>
+                <span class="sm:hidden">{step.shortLabel}</span>
+              </span>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Mensaje -->
+        <p class="text-center text-xs text-gray-400 mt-4">Por favor no cierres la ventana</p>
       </div>
     {/if}
 
