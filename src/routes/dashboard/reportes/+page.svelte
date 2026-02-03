@@ -207,7 +207,7 @@
         <select
           id="institution"
           bind:value={selectedInstitution}
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
         >
           <option value="">Todas las instituciones</option>
           {#each data.institutions as institution}
@@ -225,7 +225,7 @@
           id="startMonth"
           type="month"
           bind:value={startMonth}
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
         />
       </div>
 
@@ -238,7 +238,7 @@
           id="endMonth"
           type="month"
           bind:value={endMonth}
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
         />
       </div>
 
@@ -247,7 +247,7 @@
         <button
           onclick={loadReporte}
           disabled={loading}
-          class="w-full px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+          class="w-full px-6 py-2 bg-gradient-to-r from-red-700 to-red-600 text-white font-medium rounded-lg hover:from-red-800 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
         >
           {loading ? 'Cargando...' : 'Generar Reporte'}
         </button>
@@ -282,7 +282,7 @@
               type="text"
               bind:value={searchTerm}
               placeholder="Buscar por nombre o DNI..."
-              class="flex-1 md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="flex-1 md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
             />
 
             <!-- Botón exportar PDF -->
@@ -357,7 +357,7 @@
                 <th class="px-1 py-2 text-center text-xs font-medium text-gray-600 bg-green-50 border-l border-gray-300">
                   Tot. Rem.
                 </th>
-                <th class="px-1 py-2 text-center text-xs font-medium text-gray-600 bg-blue-50">
+                <th class="px-1 py-2 text-center text-xs font-medium text-gray-600 bg-red-50">
                   Concepto
                 </th>
               {/each}
@@ -421,7 +421,7 @@
             }).filter(Boolean) as page}
               <button
                 onclick={() => goToPage(page)}
-                class="px-3 py-1 text-sm border rounded-md {currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}"
+                class="px-3 py-1 text-sm border rounded-md {currentPage === page ? 'bg-red-700 text-white border-red-700' : 'border-gray-300 hover:bg-gray-50'}"
               >
                 {page}
               </button>
@@ -452,7 +452,7 @@
 
   {#if loading}
     <div class="bg-white rounded-xl shadow-md p-12 text-center border border-gray-200">
-      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-red-700 mb-4"></div>
       <p class="text-sm text-gray-600">Cargando reporte...</p>
     </div>
   {/if}

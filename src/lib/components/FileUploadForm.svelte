@@ -412,7 +412,7 @@
   <div class="p-6 space-y-4">
     <!-- Header -->
     <div class="flex items-center gap-3 mb-4">
-      <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+      <div class="w-10 h-10 bg-gradient-to-br from-red-700 to-red-600 rounded-xl flex items-center justify-center shadow-md">
         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
         </svg>
@@ -485,7 +485,7 @@
             bind:this={fileInputSueldos}
             type="file"
             accept="application/pdf"
-            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
           />
@@ -497,7 +497,7 @@
             bind:this={fileInputFopid}
             type="file"
             accept="application/pdf"
-            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
           />
@@ -513,7 +513,7 @@
               bind:this={fileInputAguinaldo}
               type="file"
               accept="application/pdf"
-              class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+              class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
               disabled={state === 'analyzing'}
               required
             />
@@ -526,7 +526,7 @@
             bind:this={fileInputTransfer}
             type="file"
             accept="application/pdf"
-            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+            class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
           />
@@ -536,7 +536,7 @@
       <div class="flex justify-end pt-4 border-t border-gray-200">
         <button
           type="submit"
-          class="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          class="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-red-700 to-red-600 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           disabled={state === 'analyzing'}
         >
           {#if state === 'analyzing'}
@@ -557,10 +557,10 @@
 
     <!-- ========== BARRA DE PROGRESO: ANALYZING ========== -->
     {#if state === 'analyzing'}
-      <div class="my-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg p-5 sm:p-6">
+      <div class="my-6 rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-red-100 shadow-lg p-5 sm:p-6">
         <!-- Header -->
         <div class="flex items-center gap-3 mb-5">
-          <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+          <div class="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center shadow-md">
             <svg class="w-5 h-5 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
             </svg>
@@ -571,13 +571,13 @@
               {activeSteps[currentStepIndex]?.label || 'Preparando...'}
             </p>
           </div>
-          <span class="text-sm font-bold text-blue-600">{Math.round(progress)}%</span>
+          <span class="text-sm font-bold text-red-700">{Math.round(progress)}%</span>
         </div>
 
         <!-- Barra de progreso -->
         <div class="w-full bg-gray-200 rounded-full h-3 mb-5 overflow-hidden">
           <div
-            class="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 transition-all duration-300 ease-out relative"
+            class="h-full rounded-full bg-gradient-to-r from-red-600 via-red-500 to-red-400 transition-all duration-300 ease-out relative"
             style="width: {progress}%"
           >
             <div class="absolute inset-0 rounded-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
@@ -592,7 +592,7 @@
                 {i < currentStepIndex
                   ? 'bg-green-500 text-white shadow-md shadow-green-200'
                   : i === currentStepIndex
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200 animate-pulse'
+                    ? 'bg-red-700 text-white shadow-md shadow-red-200 animate-pulse'
                     : 'bg-gray-200 text-gray-400'
                 }"
               >
@@ -1051,7 +1051,7 @@
               </span>
             {/if}
             {#if saveResult.savedFiles.transferencia}
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-900">
                 Transferencia
               </span>
             {/if}

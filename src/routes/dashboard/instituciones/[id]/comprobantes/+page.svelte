@@ -126,11 +126,11 @@
 
     <!-- Estadísticas -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <div class="bg-white overflow-hidden shadow-lg hover:shadow-xl rounded-xl transition-all duration-300 hover:scale-105 border border-blue-100">
+      <div class="bg-white overflow-hidden shadow-lg hover:shadow-xl rounded-xl transition-all duration-300 hover:scale-105 border border-red-100">
         <div class="p-6">
           <div class="flex items-center">
             <div class="flex-shrink-0">
-              <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+              <div class="w-14 h-14 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center shadow-md">
                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
@@ -209,7 +209,7 @@
             bind:value={searchTerm}
             on:input={handleSearch}
             placeholder="Buscar por nombre o concepto..."
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all shadow-sm"
           />
         </div>
 

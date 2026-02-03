@@ -23,7 +23,7 @@
       render: (institution: InstitutionListItem) => `
         <a 
           href="/dashboard/instituciones/${institution.id}" 
-          class="font-medium text-blue-600 hover:text-blue-800 transition-colors duration-200"
+          class="font-medium text-red-700 hover:text-red-900 transition-colors duration-200"
         >
           ${institution.name}
         </a>
@@ -56,7 +56,7 @@
       render: (institution: InstitutionListItem) => {
         if (institution.responsibleEmail) {
           return `
-            <a href="mailto:${institution.responsibleEmail}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
+            <a href="mailto:${institution.responsibleEmail}" class="text-sm text-red-700 hover:text-red-900 transition-colors duration-200">
               ${institution.responsibleEmail}
             </a>
           `;

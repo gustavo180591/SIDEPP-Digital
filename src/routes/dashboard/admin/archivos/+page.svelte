@@ -134,7 +134,7 @@
 
   function getFileTypeColor(type: string | null): string {
     switch (type) {
-      case 'SUELDO': return 'bg-blue-100 text-blue-800';
+      case 'SUELDO': return 'bg-red-100 text-red-900';
       case 'FOPID': return 'bg-green-100 text-green-800';
       case 'AGUINALDO': return 'bg-yellow-100 text-yellow-800';
       case 'COMPROBANTE': return 'bg-purple-100 text-purple-800';
@@ -240,7 +240,7 @@
         <select
           id="institution"
           bind:value={selectedInstitution}
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
         >
           <option value="">Todas</option>
           {#each data.institutions as inst}
@@ -254,7 +254,7 @@
         <select
           id="year"
           bind:value={selectedYear}
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
         >
           <option value="">Todos</option>
           {#each data.years as year}
@@ -268,7 +268,7 @@
         <select
           id="month"
           bind:value={selectedMonth}
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
         >
           <option value="">Todos</option>
           {#each data.months as month}
@@ -280,7 +280,7 @@
       <div class="flex items-end gap-2">
         <button
           on:click={applyFilters}
-          class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          class="flex-1 px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors"
         >
           Filtrar
         </button>
@@ -316,8 +316,8 @@
             tabindex="0"
           >
             <div class="flex items-center gap-4">
-              <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                 </svg>
               </div>

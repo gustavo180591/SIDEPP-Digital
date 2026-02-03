@@ -41,7 +41,7 @@
         <a
           href="/dashboard"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Dashboard
         </a>
@@ -52,7 +52,7 @@
         <a
           href="/dashboard/usuarios"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/usuarios') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/usuarios') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Usuarios
         </a>
@@ -63,7 +63,7 @@
         <a
           href="/dashboard/instituciones"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/instituciones') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/instituciones') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           {user?.role === 'LIQUIDADOR' ? 'Mis Instituciones' : 'Instituciones'}
         </a>
@@ -74,7 +74,7 @@
         <a
           href="/dashboard/afiliados"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/afiliados') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/afiliados') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Afiliados
         </a>
@@ -82,7 +82,7 @@
         <a
           href="/dashboard/reportes"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/reportes') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/reportes') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Reportes
         </a>
@@ -93,7 +93,7 @@
         <a
           href="/dashboard/upload"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/upload') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/upload') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Subir Aportes
         </a>
@@ -104,7 +104,7 @@
         <a
           href="/dashboard/admin/archivos"
           on:click={closeMenu}
-          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/admin/archivos') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+          class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {isActive('/dashboard/admin/archivos') ? 'text-red-700 bg-red-50' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
         >
           Gestión de Archivos
         </a>
@@ -128,7 +128,7 @@
               {user?.role}
             </div>
             {#if user?.institutionName}
-              <div class="text-sm font-medium text-blue-600">
+              <div class="text-sm font-medium text-red-700">
                 {user.institutionName}
               </div>
             {/if}

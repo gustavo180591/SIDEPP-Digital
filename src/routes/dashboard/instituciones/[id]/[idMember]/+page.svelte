@@ -88,7 +88,7 @@
   <nav class="mb-6" aria-label="Breadcrumb">
     <ol class="flex items-center space-x-2 text-sm text-gray-600">
       <li>
-        <a href="/dashboard/instituciones" class="hover:text-blue-600 transition-colors">Instituciones</a>
+        <a href="/dashboard/instituciones" class="hover:text-red-700 transition-colors">Instituciones</a>
       </li>
       <li>
         <svg class="w-4 h-4 mx-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,7 +96,7 @@
         </svg>
       </li>
       <li>
-        <a href="/dashboard/instituciones/{data.institution.id}" class="hover:text-blue-600 transition-colors">{data.institution.name}</a>
+        <a href="/dashboard/instituciones/{data.institution.id}" class="hover:text-red-700 transition-colors">{data.institution.name}</a>
       </li>
       <li>
         <svg class="w-4 h-4 mx-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,10 +108,10 @@
   </nav>
 
   <!-- Header del miembro -->
-  <div class="bg-gradient-to-r from-white to-blue-50/50 rounded-xl p-6 mb-6 shadow-lg border border-blue-100">
+  <div class="bg-gradient-to-r from-white to-red-50/50 rounded-xl p-6 mb-6 shadow-lg border border-red-100">
     <div class="flex items-start gap-4">
       <div class="flex-shrink-0">
-        <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+        <div class="w-12 h-12 bg-gradient-to-br from-red-700 to-red-600 rounded-xl flex items-center justify-center shadow-md">
           <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
           </svg>
@@ -129,7 +129,7 @@
     <!-- Información Personal -->
     <div class="bg-white shadow-xl rounded-xl border border-gray-100 p-6">
       <div class="flex items-center gap-3 mb-6">
-        <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+        <div class="w-10 h-10 bg-gradient-to-br from-red-700 to-red-600 rounded-xl flex items-center justify-center shadow-md">
           <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
           </svg>
@@ -192,7 +192,7 @@
         <div>
           <label class="text-sm font-medium text-gray-500">Email</label>
           {#if data.member.email}
-            <a href="mailto:{data.member.email}" class="text-blue-600 hover:text-blue-800 transition-colors">
+            <a href="mailto:{data.member.email}" class="text-red-700 hover:text-red-900 transition-colors">
               {data.member.email}
             </a>
           {:else}
@@ -247,7 +247,7 @@
       <div class="overflow-x-auto">
         <table class="w-full">
           <thead>
-            <tr class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <tr class="bg-gradient-to-r from-red-700 to-red-600 text-white">
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Nombre</th>
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Cantidad</th>
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Monto Concepto</th>
@@ -258,7 +258,7 @@
           </thead>
           <tbody class="divide-y divide-gray-200">
             {#each data.member.contributions as contribution, index}
-              <tr class="hover:bg-blue-50 transition-all duration-200 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
+              <tr class="hover:bg-red-50 transition-all duration-200 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
                 <td class="px-4 py-3">
                   <div class="font-medium text-gray-900">
                     {contribution.name || '-'}
@@ -294,7 +294,7 @@
       </div>
 
       <!-- Resumen de contribuciones -->
-      <div class="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+      <div class="mt-6 p-6 bg-gradient-to-r from-red-50 to-red-100 rounded-xl border border-red-100">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p class="text-sm font-semibold text-gray-600 mb-1">Total de Contribuciones</p>
@@ -302,7 +302,7 @@
           </div>
           <div>
             <p class="text-sm font-semibold text-gray-600 mb-1">Monto Total Conceptos</p>
-            <p class="text-3xl font-bold text-blue-600">
+            <p class="text-3xl font-bold text-red-700">
               {formatCurrency(
                 data.member.contributions.reduce((sum, c) => sum + Number(c.conceptAmount || 0), 0)
               )}
@@ -321,8 +321,8 @@
     {:else}
       <!-- Estado vacío -->
       <div class="text-center py-12">
-        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-          <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center">
+          <svg class="w-8 h-8 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
         </div>

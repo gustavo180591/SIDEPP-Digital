@@ -108,7 +108,7 @@
         if (member.institucion) {
           return `
             <a href="/dashboard/instituciones/${member.institucionId}"
-               class="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200">
+               class="text-red-700 hover:text-red-900 font-medium transition-colors duration-200">
               ${member.institucion.name || '-'}
             </a>
           `;
@@ -136,7 +136,7 @@
       render: (member: MemberWithInstitution) => {
         if (member.phone) {
           return `
-            <a href="tel:${member.phone}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
+            <a href="tel:${member.phone}" class="text-sm text-red-700 hover:text-red-900 transition-colors duration-200">
               ${member.phone}
             </a>
           `;
@@ -228,8 +228,8 @@
               <p class="text-sm text-gray-600">Total de Afiliados</p>
               <p class="text-3xl font-bold text-gray-900">{data.pagination.totalItems}</p>
             </div>
-            <div class="p-3 bg-blue-100 rounded-full">
-              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="p-3 bg-red-100 rounded-full">
+              <svg class="w-8 h-8 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
               </svg>
             </div>
@@ -260,12 +260,12 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-gray-600">Página Actual</p>
-              <p class="text-3xl font-bold text-indigo-600">
+              <p class="text-3xl font-bold text-red-700">
                 {data.pagination.currentPage} / {data.pagination.totalPages}
               </p>
             </div>
-            <div class="p-3 bg-indigo-100 rounded-full">
-              <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="p-3 bg-red-100 rounded-full">
+              <svg class="w-8 h-8 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
             </div>
@@ -281,7 +281,7 @@
           <h2 class="text-xl font-bold text-gray-900">Listado de Afiliados</h2>
           {#if canEdit}
             <button
-              class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg transition-all"
+              class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-700 to-red-600 rounded-lg shadow-md hover:shadow-lg transition-all"
               on:click={openCreateModal}
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

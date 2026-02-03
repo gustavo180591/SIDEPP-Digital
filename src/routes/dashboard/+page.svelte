@@ -19,7 +19,7 @@
     <div class="bg-white shadow-xl rounded-xl border border-gray-100">
       <div class="px-6 py-6 sm:p-8">
         <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <div class="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
@@ -29,16 +29,16 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <!-- Usuarios: Solo ADMIN -->
           {#if data.user?.role === 'ADMIN'}
-            <a href="/dashboard/usuarios" class="relative group bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <a href="/dashboard/usuarios" class="relative group bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-xl border-2 border-red-200 hover:border-red-400 hover:shadow-lg transition-all duration-300 hover:scale-105">
               <div>
-                <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md">
+                <span class="rounded-xl inline-flex p-3 bg-gradient-to-br from-red-600 to-red-700 text-white shadow-md">
                   <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
                   </svg>
                 </span>
               </div>
               <div class="mt-4">
-                <h3 class="text-lg font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                <h3 class="text-lg font-bold text-gray-900 group-hover:text-red-800 transition-colors">
                   <span class="absolute inset-0" aria-hidden="true"></span>
                   Gestionar Usuarios
                 </h3>

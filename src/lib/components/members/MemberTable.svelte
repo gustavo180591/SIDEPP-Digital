@@ -36,7 +36,7 @@
       render: (member: Member) => {
         if (member.email) {
           return `
-            <a href="mailto:${member.email}" class="text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200">
+            <a href="mailto:${member.email}" class="text-sm text-red-700 hover:text-red-900 transition-colors duration-200">
               ${member.email}
             </a>
           `;

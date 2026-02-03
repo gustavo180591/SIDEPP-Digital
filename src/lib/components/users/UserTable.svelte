@@ -41,7 +41,7 @@
           return `
             <div class="text-sm text-gray-900">
               ${names[0]}
-              <span class="text-xs text-blue-600 ml-1">+${names.length - 1} más</span>
+              <span class="text-xs text-red-700 ml-1">+${names.length - 1} más</span>
             </div>
           `;
         }
