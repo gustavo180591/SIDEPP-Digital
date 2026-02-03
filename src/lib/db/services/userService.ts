@@ -345,4 +345,100 @@ export class UserService {
       handlePrismaError(error, 'obtener las estadísticas');
     }
   }
+
+  /**
+   * Generar token de reset de contraseña
+   */
+  static async generateResetToken(email: string): Promise<{ token: string; user: UserWithRelations } | null> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email, deletedAt: null, isActive: true },
+        include: {
+          userInstitutions: {
+            include: { institution: true }
+          }
+        }
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      // Generar token único (32 bytes en hex = 64 caracteres)
+      const crypto = await import('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+
+      // Expiración en 1 hora
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetToken: token,
+          resetExpires
+        }
+      });
+
+      return { token, user };
+    } catch (error) {
+      console.error('Error al generar token de reset:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Buscar usuario por token de reset
+   */
+  static async findByResetToken(token: string): Promise<UserWithRelations | null> {
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          resetToken: token,
+          resetExpires: { gt: new Date() }, // Token no expirado
+          deletedAt: null,
+          isActive: true
+        },
+        include: {
+          userInstitutions: {
+            include: { institution: true }
+          }
+        }
+      });
+
+      return user;
+    } catch (error) {
+      console.error('Error al buscar por token de reset:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Restablecer contraseña usando token
+   */
+  static async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    try {
+      const user = await this.findByResetToken(token);
+
+      if (!user) {
+        return false;
+      }
+
+      // Hash de la nueva contraseña
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          resetToken: null,
+          resetExpires: null
+        }
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error al restablecer contraseña:', error);
+      return false;
+    }
+  }
 }
