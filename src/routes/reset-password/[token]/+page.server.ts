@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { UserService } from '$lib/db/services/userService';
 
@@ -77,7 +77,8 @@ export const actions: Actions = {
       // Redirigir al login con mensaje de éxito
       throw redirect(303, '/login?reset=success');
     } catch (error) {
-      if (error instanceof Response) throw error; // Re-throw redirects
+      // Re-throw redirects (SvelteKit 2.x)
+      if (isRedirect(error)) throw error;
 
       console.error('Error en reset-password:', error);
       return fail(500, {
