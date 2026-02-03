@@ -24,6 +24,8 @@ model Institution {
   members          Member[]
   payrollPeriods   PayrollPeriod[]
   userInstitutions UserInstitution[]
+  pdfFiles         PdfFile[]
+  bankTransfers    BankTransfer[]
 
   @@map("institutions")
 }
@@ -62,6 +64,7 @@ model PayrollPeriod {
   month         Int?
   year          Int?
   transferId    String?
+  label         String?
   createdAt     DateTime?     @default(now())
   updatedAt     DateTime?     @updatedAt
   transfer      BankTransfer?
@@ -104,14 +107,16 @@ model BankTransfer {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   bufferHash         String?
-  // Nuevos campos del analyzer
   banco              String?
   tipoOperacion      String?
   importeATransferir Decimal?      @db.Decimal(18, 2)
   importeTotal       Decimal?      @db.Decimal(18, 2)
   ordenanteNombre    String?
   ordenanteDomicilio String?
+  institutionId      String?
   period             PayrollPeriod @relation(fields: [periodId], references: [id])
+  institution        Institution?  @relation(fields: [institutionId], references: [id])
+  pdfFiles           PdfFile[]
 
   @@map("bank_transfers")
 }
@@ -128,10 +133,19 @@ model PdfFile {
   peopleCount      Int?
   totalAmount      Decimal?           @db.Decimal(18, 2)
   type             PdfFileType?
-  // Metadata del PDF (creator, creationDate, totalPaginas, etc.)
   metadata         Json?
+  kind             PdfKind?
+  size             Int?
+  mimeType         String?
+  parsed           Boolean?           @default(false)
+  parseErrors      String?
+  institutionId    String?
+  uploadedBy       String?
+  transferId       String?
   contributionLine ContributionLine[]
   period           PayrollPeriod?     @relation(fields: [periodId], references: [id])
+  institution      Institution?       @relation(fields: [institutionId], references: [id])
+  bankTransfer     BankTransfer?      @relation(fields: [transferId], references: [id])
 
   @@map("pdf_files")
 }
@@ -173,6 +187,11 @@ enum PdfFileType {
   FOPID
   AGUINALDO
   COMPROBANTE
+}
+
+enum PdfKind {
+  LISTADO
+  TRANSFER
 }
 
 enum ContributionStatus {
