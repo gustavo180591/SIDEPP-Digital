@@ -53,8 +53,8 @@
       </div>
     {:else if data.length === 0}
       <div class="text-center py-12">
-        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-          <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center">
+          <svg class="w-8 h-8 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={emptyState.icon}></path>
           </svg>
         </div>
@@ -72,7 +72,7 @@
     {:else}
       <div class="overflow-x-auto">
         <table class="table w-full">
-          <thead class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+          <thead class="bg-gradient-to-r from-red-700 to-red-600 text-white">
             <tr>
               {#each columns as column}
                 <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3">
@@ -86,7 +86,7 @@
           </thead>
           <tbody class="divide-y divide-gray-200">
             {#each data as item, index}
-              <tr class="hover:bg-blue-50 transition-all duration-200 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
+              <tr class="hover:bg-red-50 transition-all duration-200 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
                 {#each columns as column}
                   <td class="px-4 py-3">
                     {#if column.render}
@@ -136,7 +136,7 @@
 
 <!-- Paginación -->
 {#if pagination && pagination.totalPages > 1}
-  <div class="flex justify-center items-center gap-3 p-5 bg-gradient-to-r from-gray-50 to-blue-50/30 rounded-b-xl border-t border-gray-200">
+  <div class="flex justify-center items-center gap-3 p-5 bg-gradient-to-r from-gray-50 to-red-50/30 rounded-b-xl border-t border-gray-200">
     <button
       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
       disabled={pagination.currentPage === 1}
@@ -157,7 +157,7 @@
         return pageNum;
       }) as pageNum}
         <button
-          class="w-10 h-10 text-sm font-medium rounded-lg transition-all {pageNum === pagination.currentPage ? 'text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md' : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'}"
+          class="w-10 h-10 text-sm font-medium rounded-lg transition-all {pageNum === pagination.currentPage ? 'text-white bg-gradient-to-r from-red-700 to-red-600 shadow-md' : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'}"
           on:click={() => {
             const url = buildUrl({ page: String(pageNum) });
             goto(url);

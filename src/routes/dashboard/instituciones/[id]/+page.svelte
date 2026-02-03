@@ -149,7 +149,7 @@
     <!-- Acciones -->
     <div class="flex flex-wrap gap-3 mb-6">
       {#if canEdit}
-        <button class="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105" on:click={openEditModal}>
+        <button class="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-red-700 to-red-600 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105" on:click={openEditModal}>
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
           </svg>
@@ -215,7 +215,7 @@
             <div>
               <label class="text-sm font-medium text-gray-500">Email</label>
               {#if data.institution.responsibleEmail}
-                <a href="mailto:{data.institution.responsibleEmail}" class="text-blue-600 hover:text-blue-800">
+                <a href="mailto:{data.institution.responsibleEmail}" class="text-red-700 hover:text-red-900">
                   {data.institution.responsibleEmail}
                 </a>
               {:else}
@@ -235,7 +235,7 @@
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-bold text-gray-900">Miembros de la Institución</h2>
         {#if canEdit}
-          <button class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md hover:shadow-lg transition-all" on:click={openMemberModal}>
+          <button class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-700 to-red-600 rounded-lg shadow-md hover:shadow-lg transition-all" on:click={openMemberModal}>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>

@@ -123,7 +123,7 @@
     {placeholder}
     {disabled}
     autocomplete="off"
-    class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+    class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-10 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
   />
 
   <!-- Icono de flecha -->
@@ -153,8 +153,8 @@
             aria-selected={option.value === value}
             tabindex="-1"
             class="cursor-pointer px-3 py-2 text-sm transition-colors
-              {option.value === value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-900'}
-              {highlightedIndex === index ? 'bg-blue-100' : 'hover:bg-gray-100'}"
+              {option.value === value ? 'bg-red-50 text-red-800 font-medium' : 'text-gray-900'}
+              {highlightedIndex === index ? 'bg-red-100' : 'hover:bg-gray-100'}"
             on:click={() => handleOptionClick(option)}
             on:mouseenter={() => handleOptionMouseEnter(index)}
             on:keydown={(e) => e.key === 'Enter' && handleOptionClick(option)}
