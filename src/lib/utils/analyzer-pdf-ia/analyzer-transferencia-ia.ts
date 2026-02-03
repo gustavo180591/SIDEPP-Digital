@@ -14,7 +14,7 @@ import {
 	type ValidationResult
 } from './validator.js';
 
-// Schema de validacion con Zod
+// Schema de validacion con Zod - más flexible para variaciones de OpenAI
 const OrdenanteSchema = z.object({
   cuit: z.string().nullable(),
   nombre: z.string().nullable(),
@@ -33,8 +33,23 @@ const OperacionSchema = z.object({
   importeTotal: z.number().nullable(),
 });
 
+// Normalizar el tipo a mayúsculas y aceptar variaciones comunes
+const tipoTransferenciaSchema = z.preprocess(
+  (val) => {
+    if (typeof val === 'string') {
+      const normalized = val.toUpperCase().replace(/[_\s-]+/g, '_');
+      // Aceptar variaciones comunes
+      if (normalized.includes('TRANSFER')) {
+        return 'TRANSFERENCIA';
+      }
+    }
+    return val;
+  },
+  z.literal('TRANSFERENCIA')
+);
+
 const TransferenciaSchema = z.object({
-  tipo: z.literal('TRANSFERENCIA'),
+  tipo: tipoTransferenciaSchema,
   titulo: z.string(),
   nroReferencia: z.string().nullable(),
   nroOperacion: z.string().nullable(),
@@ -223,8 +238,17 @@ export async function analyzeTransferenciaWithAI(
     return result;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      console.error(`[analyzeTransferenciaWithAI] Errores de validacion para ${filename}:`, err.issues);
-      throw new Error(`Validacion fallida: ${JSON.stringify(err.issues)}`);
+      console.error(`[analyzeTransferenciaWithAI] Errores de validacion Zod para ${filename}:`, err.issues);
+      // Crear mensaje de error más descriptivo
+      const errorDetails = err.issues.map(issue => {
+        const path = issue.path.join('.');
+        return `Campo "${path || 'raíz'}": ${issue.message}`;
+      }).join('; ');
+      throw new Error(`Error de formato en respuesta de IA (transferencia): ${errorDetails}`);
+    }
+    if (err instanceof SyntaxError) {
+      console.error(`[analyzeTransferenciaWithAI] Error de JSON para ${filename}:`, err.message);
+      throw new Error(`La IA no retornó JSON válido: ${err.message}`);
     }
     throw err;
   }
@@ -291,8 +315,17 @@ export async function analyzeTransferenciaWithVision(
     return result;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      console.error(`[analyzeTransferenciaWithVision] Errores de validacion para ${filename}:`, err.issues);
-      throw new Error(`Validacion Vision fallida: ${JSON.stringify(err.issues)}`);
+      console.error(`[analyzeTransferenciaWithVision] Errores de validacion Zod para ${filename}:`, err.issues);
+      // Crear mensaje de error más descriptivo
+      const errorDetails = err.issues.map(issue => {
+        const path = issue.path.join('.');
+        return `Campo "${path || 'raíz'}": ${issue.message}`;
+      }).join('; ');
+      throw new Error(`Error de formato en respuesta de IA Vision: ${errorDetails}`);
+    }
+    if (err instanceof SyntaxError) {
+      console.error(`[analyzeTransferenciaWithVision] Error de JSON para ${filename}:`, err.message);
+      throw new Error(`La IA Vision no retornó JSON válido: ${err.message}`);
     }
     throw err;
   }

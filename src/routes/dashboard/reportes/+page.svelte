@@ -160,6 +160,51 @@
     }
   }
 
+  // Función para exportar Excel
+  async function exportExcel() {
+    if (!startMonth || !endMonth) {
+      alert('Debe seleccionar un período válido');
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        startMonth,
+        endMonth
+      });
+
+      if (selectedInstitution) {
+        params.append('institutionId', selectedInstitution);
+      }
+
+      const response = await fetch(`/api/reports/aportes-por-periodo/export-excel?${params}`);
+
+      if (!response.ok) {
+        throw new Error('Error al exportar el Excel');
+      }
+
+      // Descargar el archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Obtener nombre de archivo del header Content-Disposition
+      const disposition = response.headers.get('Content-Disposition');
+      const filenameMatch = disposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch ? filenameMatch[1] : 'reporte-aportes.xlsx';
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert('Error al exportar Excel: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+      console.error('Error al exportar Excel:', err);
+    }
+  }
+
   // Función para ordenar
   function handleSort(column: string) {
     if (sortColumn === column) {
@@ -285,15 +330,26 @@
               class="flex-1 md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
             />
 
+            <!-- Botón exportar Excel -->
+            <button
+              onclick={exportExcel}
+              class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium rounded-lg hover:from-emerald-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Excel
+            </button>
+
             <!-- Botón exportar PDF -->
             <button
               onclick={exportPdf}
-              class="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
+              class="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white font-medium rounded-lg hover:from-red-700 hover:to-rose-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Exportar PDF
+              PDF
             </button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { extractPDFContent, extractTextWithPdfJs, detectDocumentType } from './pdf-extractor.js';
-import { analyzeAportesWithAI } from './analyzer-aportes-ia.js';
+import { analyzeAportesWithAI, analyzeAportesWithVision, analyzeMultipleAportesWithVision } from './analyzer-aportes-ia.js';
 import { analyzeTransferenciaWithAI, analyzeTransferenciaWithVision, analyzeMultipleTransferenciasWithVision } from './analyzer-transferencia-ia.js';
 import type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult, PDFResult } from './types/index.js';
 
@@ -9,6 +9,7 @@ export type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFRes
 /**
  * Analiza un PDF de listado de aportes usando IA
  * Esta es la función principal que usa el API endpoint
+ * Soporta tanto PDFs con texto como PDFs escaneados (imágenes)
  *
  * @param buffer - Buffer del archivo PDF
  * @param filename - Nombre del archivo original
@@ -20,22 +21,20 @@ export async function analyzeAportesIA(
 ): Promise<ListadoPDFResult> {
   console.log(`[analyzeAportesIA] Procesando: ${filename}`);
 
-  // Extraer texto del PDF
+  // Extraer contenido del PDF
   const content = await extractPDFContent(buffer);
 
   if (!content.hasText) {
-    // Si no hay texto, intentar con pdfjs-dist
-    console.log(`[analyzeAportesIA] Intentando extracción alternativa con pdfjs-dist...`);
-    const pdfJsText = await extractTextWithPdfJs(buffer);
+    // PDF sin texto - usar Vision API para analizar las imágenes
+    console.log(`[analyzeAportesIA] PDF sin texto, usando Vision API para ${content.imagesBase64.length} página(s)...`);
 
-    if (pdfJsText && pdfJsText.length > 50) {
-      console.log(`[analyzeAportesIA] Texto extraído con pdfjs-dist: ${pdfJsText.length} caracteres`);
-      return analyzeAportesWithAI(pdfJsText, filename);
+    if (content.imagesBase64.length === 1) {
+      // Una sola página
+      return analyzeAportesWithVision(content.imagesBase64[0], filename);
+    } else {
+      // Múltiples páginas - combinar resultados
+      return analyzeMultipleAportesWithVision(content.imagesBase64, filename);
     }
-
-    // Si aún no hay texto, el PDF probablemente es solo imágenes
-    // Para listados de aportes, esto es raro pero podría pasar
-    throw new Error('No se pudo extraer texto del PDF. El documento puede ser solo imágenes.');
   }
 
   console.log(`[analyzeAportesIA] Texto extraído: ${content.text.length} caracteres`);
@@ -125,5 +124,5 @@ export async function analyzePDF(
 
 // Exportar funciones auxiliares por si se necesitan
 export { extractPDFContent, extractTextWithPdfJs, detectDocumentType, cleanTextForAI } from './pdf-extractor.js';
-export { analyzeAportesWithAI } from './analyzer-aportes-ia.js';
+export { analyzeAportesWithAI, analyzeAportesWithVision, analyzeMultipleAportesWithVision } from './analyzer-aportes-ia.js';
 export { analyzeTransferenciaWithAI, analyzeTransferenciaWithVision, analyzeMultipleTransferenciasWithVision } from './analyzer-transferencia-ia.js';
