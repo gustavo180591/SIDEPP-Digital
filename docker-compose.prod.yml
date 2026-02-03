@@ -20,6 +20,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       # Secretos
       JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       # Directorios (volúmenes persistentes)
       FILE_STORAGE_DIR: ${FILE_STORAGE_DIR:-/app/uploads}
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
