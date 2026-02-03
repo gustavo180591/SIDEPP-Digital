@@ -34,7 +34,7 @@
 
 <!-- Menú móvil -->
 {#if isOpen}
-  <div class="md:hidden">
+  <div class="lg:hidden">
     <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-b border-gray-200">
       <!-- Dashboard: Solo ADMIN y FINANZAS -->
       {#if user?.role === 'ADMIN' || user?.role === 'FINANZAS'}
@@ -114,8 +114,8 @@
       <div class="pt-4 pb-3 border-t border-gray-200">
         <div class="flex items-center px-3">
           <div class="flex-shrink-0">
-            <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-              <span class="text-sm font-medium text-gray-700">
+            <div class="h-8 w-8 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
+              <span class="text-sm font-medium text-white">
                 {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
               </span>
             </div>
@@ -133,6 +133,15 @@
               </div>
             {/if}
           </div>
+        </div>
+        <div class="mt-3 px-3">
+          <a
+            href="/logout"
+            on:click={closeMenu}
+            class="block w-full px-3 py-2 rounded-md text-base font-medium text-red-700 hover:text-red-900 hover:bg-red-50 transition-colors duration-200"
+          >
+            Cerrar Sesión
+          </a>
         </div>
       </div>
     </div>
