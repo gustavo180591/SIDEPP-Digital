@@ -3,7 +3,7 @@ import { sequence } from '@sveltejs/kit/hooks';
 import { verifyToken, validateUser } from '$lib/server/auth/utils';
 
 // Rutas públicas que no requieren autenticación
-const publicRoutes = ['/login', '/unauthorized', '/logout'];
+const publicRoutes = ['/login', '/unauthorized', '/logout', '/forgot-password', '/reset-password'];
 
 const auth: Handle = async ({ event, resolve }) => {
   const token = event.cookies.get('auth_token');

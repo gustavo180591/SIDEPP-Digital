@@ -10,6 +10,9 @@
 
   // Obtener URL de redirección si existe
   $: redirectTo = $page.url.searchParams.get('redirect') || '/dashboard';
+
+  // Verificar si viene de un reset exitoso
+  $: resetSuccess = $page.url.searchParams.get('reset') === 'success';
 </script>
 
 <svelte:head>
@@ -51,6 +54,18 @@
         }}
         class="space-y-5"
       >
+        <!-- Alert de éxito (reset password) -->
+        {#if resetSuccess}
+          <div class="bg-green-50 border-l-4 border-green-500 px-4 py-3 rounded-md flex items-start gap-3 animate-fade-in">
+            <svg class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-green-800">Tu contraseña ha sido restablecida correctamente. Ya puedes iniciar sesión.</p>
+            </div>
+          </div>
+        {/if}
+
         <!-- Alert de error -->
         {#if form?.error}
           <div class="bg-red-50 border-l-4 border-red-500 px-4 py-3 rounded-md flex items-start gap-3 animate-fade-in">
@@ -138,17 +153,17 @@
         </div>
       </form>
 
-      <!-- Ayuda -->
-      <div class="mt-6 pt-6 border-t border-gray-200">
-        <div class="flex items-center justify-center gap-2 text-sm text-gray-600">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+      <!-- Recuperar contraseña -->
+      <div class="mt-6 pt-6 border-t border-gray-200 text-center">
+        <a
+          href="/forgot-password"
+          class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-red-700 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
-          <span>¿Problemas para acceder?</span>
-        </div>
-        <p class="mt-2 text-center text-xs text-gray-500">
-          Contacta al administrador del sistema
-        </p>
+          ¿Olvidaste tu contraseña?
+        </a>
       </div>
     </div>
 
