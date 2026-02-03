@@ -189,6 +189,9 @@ jobs:
             cd ~/apps/sidepp-digital/deploy
             docker compose pull
             docker compose up -d
+            # Aplicar cambios de schema a la base de datos
+            sleep 5
+            docker compose exec -T app npx prisma db push --accept-data-loss --skip-generate
             echo "Deploy completed!"
 
   notify-deploy:
