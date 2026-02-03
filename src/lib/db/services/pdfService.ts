@@ -50,7 +50,9 @@ export class PdfService {
   ): Promise<PaginatedResult<PdfFileWithPeriod>> {
     try {
       const { search = '', year, month } = filters;
-      const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+      const { page: rawPage = 1, limit: rawLimit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+      const page = Math.max(1, Math.floor(rawPage));
+      const limit = Math.min(100, Math.max(1, Math.floor(rawLimit)));
       
       // Construir condiciones WHERE
       const where: any = {

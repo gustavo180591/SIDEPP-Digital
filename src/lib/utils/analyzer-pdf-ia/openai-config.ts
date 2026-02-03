@@ -1,6 +1,10 @@
 import OpenAI from 'openai';
 import { env } from '$env/dynamic/private';
 
+if (!env.OPENAI_API_KEY) {
+  console.error('[openai-config] OPENAI_API_KEY no esta configurada. El analizador de PDF no funcionara.');
+}
+
 export const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 });

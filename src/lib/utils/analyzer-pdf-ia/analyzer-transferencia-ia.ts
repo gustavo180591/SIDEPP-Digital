@@ -241,9 +241,9 @@ export async function analyzeTransferenciaWithVision(
   // Usar retry logic para llamadas a OpenAI
   const response = await withRetry(
     () => openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      max_tokens: 2000,
+      model: MODEL_CONFIG.model,
+      temperature: MODEL_CONFIG.temperature,
+      max_tokens: MODEL_CONFIG.max_tokens,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {

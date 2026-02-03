@@ -152,7 +152,12 @@
               <span class="badge badge-outline">{data.member.numeroOrden || '-'}</span>
             </p>
           </div>
-          
+          <div>
+            <label class="text-sm font-medium text-gray-500">N° Matricula</label>
+            <p class="text-gray-900">
+              <span class="badge badge-outline">{data.member.numeroMatricula || '-'}</span>
+            </p>
+          </div>
         </div>
         <div>
           <label class="text-sm font-medium text-gray-500">Nacionalidad</label>

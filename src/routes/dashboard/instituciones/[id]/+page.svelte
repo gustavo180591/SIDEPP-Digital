@@ -101,7 +101,7 @@
       });
       
       if (response.ok) {
-        goto('/instituciones');
+        goto('/dashboard/instituciones');
       } else {
         console.error('Error al eliminar institución');
       }

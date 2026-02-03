@@ -55,7 +55,7 @@ export const GET: RequestHandler = async (event) => {
         orderBy: { createdAt: 'desc' },
         include: {
           institution: { select: { id: true, name: true, cuit: true } },
-          period: { select: { id: true, label: true } }
+          period: { select: { id: true, month: true, year: true } }
         }
       });
       console.log(`✅ Se encontraron ${files.length} archivos`);
