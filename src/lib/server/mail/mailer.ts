@@ -1,10 +1,10 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
-// Configuración SMTP desde variables de entorno
-const SMTP_HOST = process.env.SMTP_HOST || 'mail.sidepp2.com.ar';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true'; // true para 465, false para otros puertos
+// Configuración SMTP desde variables de entorno (Ferozo/DonWeb hosting)
+const SMTP_HOST = process.env.SMTP_HOST || 'a0031348.ferozo.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
+const SMTP_SECURE = process.env.SMTP_SECURE !== 'false'; // true por defecto para puerto 465 con SSL
 const SMTP_USER = process.env.SMTP_USER || 'sa@sidepp2.com.ar';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_FROM = process.env.SMTP_FROM || 'SIDEPP Digital <sa@sidepp2.com.ar>';
