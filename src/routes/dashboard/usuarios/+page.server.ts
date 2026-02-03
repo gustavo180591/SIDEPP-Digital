@@ -77,6 +77,34 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
   }
 };
 
+// Funciones de validación
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_ROLES = ['ADMIN', 'FINANZAS', 'LIQUIDADOR'];
+
+function validateEmail(email: string): string | null {
+  if (!email?.trim()) return 'El email es requerido';
+  if (!EMAIL_REGEX.test(email.trim())) return 'El formato del email no es válido';
+  return null;
+}
+
+function validatePassword(password: string, isRequired: boolean = true): string | null {
+  if (!password?.trim()) {
+    return isRequired ? 'La contraseña es requerida' : null;
+  }
+  if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+  if (!/[A-Z]/.test(password)) return 'La contraseña debe contener al menos una mayúscula';
+  if (!/[a-z]/.test(password)) return 'La contraseña debe contener al menos una minúscula';
+  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número';
+  return null;
+}
+
+function validateName(name: string): string | null {
+  if (!name?.trim()) return 'El nombre es requerido';
+  if (name.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
+  if (name.trim().length > 100) return 'El nombre no puede exceder 100 caracteres';
+  return null;
+}
+
 export const actions: Actions = {
   create: async ({ request }: { request: Request }) => {
     try {
@@ -86,22 +114,27 @@ export const actions: Actions = {
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
       const confirmPassword = formData.get('confirmPassword') as string;
-      // Obtener múltiples instituciones del form (multiselect envía múltiples values)
       const institutionIds = formData.getAll('institutionIds') as string[];
-      const role = formData.get('role') as any;
+      const role = formData.get('role') as string;
       const isActive = formData.get('isActive') === 'true';
 
-      // Validaciones básicas
-      if (!email?.trim()) {
-        return fail(400, { error: 'El email es requerido' });
-      }
+      // Validaciones
+      const nameError = validateName(name);
+      if (nameError) return fail(400, { error: nameError });
 
-      if (!password?.trim()) {
-        return fail(400, { error: 'La contraseña es requerida' });
-      }
+      const emailError = validateEmail(email);
+      if (emailError) return fail(400, { error: emailError });
+
+      const passwordError = validatePassword(password);
+      if (passwordError) return fail(400, { error: passwordError });
 
       if (password !== confirmPassword) {
         return fail(400, { error: 'Las contraseñas no coinciden' });
+      }
+
+      // Validar rol
+      if (role && !VALID_ROLES.includes(role)) {
+        return fail(400, { error: 'Rol no válido' });
       }
 
       // Verificar si el email ya existe
@@ -112,11 +145,11 @@ export const actions: Actions = {
 
       // Crear el usuario con múltiples instituciones
       const user = await UserService.create({
-        name: name?.trim() || undefined,
+        name: name.trim(),
         email: email.trim(),
         password: password,
         institutionIds: institutionIds.filter(id => id.trim()),
-        role: role || 'LIQUIDADOR',
+        role: (role as 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR') || 'LIQUIDADOR',
         isActive
       });
 
@@ -135,17 +168,30 @@ export const actions: Actions = {
       const name = formData.get('name') as string;
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
-      // Obtener múltiples instituciones del form (multiselect envía múltiples values)
       const institutionIds = formData.getAll('institutionIds') as string[];
-      const role = formData.get('role') as any;
+      const role = formData.get('role') as string;
       const isActive = formData.get('isActive') === 'true';
 
       if (!id) {
         return fail(400, { error: 'ID de usuario requerido' });
       }
 
-      if (!email?.trim()) {
-        return fail(400, { error: 'El email es requerido' });
+      // Validaciones
+      const nameError = validateName(name);
+      if (nameError) return fail(400, { error: nameError });
+
+      const emailError = validateEmail(email);
+      if (emailError) return fail(400, { error: emailError });
+
+      // Validar password solo si se proporciona (no es required en update)
+      if (password?.trim()) {
+        const passwordError = validatePassword(password, false);
+        if (passwordError) return fail(400, { error: passwordError });
+      }
+
+      // Validar rol
+      if (role && !VALID_ROLES.includes(role)) {
+        return fail(400, { error: 'Rol no válido' });
       }
 
       // Verificar si el email ya existe (excluyendo el usuario actual)
@@ -155,11 +201,18 @@ export const actions: Actions = {
       }
 
       // Preparar datos de actualización con múltiples instituciones
-      const updateData: any = {
-        name: name?.trim() || null,
+      const updateData: {
+        name: string;
+        email: string;
+        institutionIds: string[];
+        role: 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR';
+        isActive: boolean;
+        password?: string;
+      } = {
+        name: name.trim(),
         email: email.trim(),
         institutionIds: institutionIds.filter(id => id.trim()),
-        role: role || 'LIQUIDADOR',
+        role: (role as 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR') || 'LIQUIDADOR',
         isActive
       };
 

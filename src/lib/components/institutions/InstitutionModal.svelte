@@ -77,6 +77,8 @@
         type: 'text',
         placeholder: 'Nombre de la institución',
         required: true,
+        minLength: 2,
+        maxLength: 200,
         span: 2,
         value: formData.name
       },
@@ -85,7 +87,7 @@
         label: 'CUIT',
         type: 'text',
         placeholder: '20-12345678-9',
-        required: true,
+        pattern: '^\\d{2}-?\\d{8}-?\\d$',
         value: formData.cuit
       },
       {
@@ -100,6 +102,7 @@
         label: 'Dirección',
         type: 'text',
         placeholder: 'Dirección completa',
+        maxLength: 300,
         span: 2,
         value: formData.address
       },
@@ -108,6 +111,7 @@
         label: 'Ciudad',
         type: 'text',
         placeholder: 'Ciudad',
+        maxLength: 100,
         value: formData.city
       },
       {
@@ -115,6 +119,7 @@
         label: 'Provincia',
         type: 'text',
         placeholder: 'Provincia',
+        maxLength: 100,
         value: formData.state
       },
       {
@@ -122,6 +127,7 @@
         label: 'Nombre del Responsable',
         type: 'text',
         placeholder: 'Nombre del responsable',
+        maxLength: 100,
         value: formData.responsibleName
       },
       {
@@ -129,6 +135,7 @@
         label: 'Email del Responsable',
         type: 'email',
         placeholder: 'email@ejemplo.com',
+        pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
         value: formData.responsibleEmail
       },
       {
@@ -136,6 +143,7 @@
         label: 'Teléfono del Responsable',
         type: 'tel',
         placeholder: '+54 11 1234-5678',
+        pattern: '^[\\d\\s\\-+()]{7,20}$',
         value: formData.responsablePhone
       }
     ];
