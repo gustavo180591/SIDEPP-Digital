@@ -1,5 +1,27 @@
 import { prisma } from '../index';
+import { Prisma } from '@prisma/client';
 import type { Member } from '@prisma/client';
+
+// Helper para manejar errores de Prisma
+function handlePrismaError(error: unknown, context: string): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case 'P2002':
+        // Violación de constraint único
+        const target = (error.meta?.target as string[])?.join(', ') || 'campo';
+        throw new Error(`Ya existe un miembro con el mismo ${target}`);
+      case 'P2025':
+        throw new Error('Miembro no encontrado');
+      case 'P2003':
+        throw new Error('La institución especificada no existe');
+      default:
+        console.error(`Error Prisma [${error.code}] en ${context}:`, error.message);
+        throw new Error(`Error de base de datos: ${error.message}`);
+    }
+  }
+  console.error(`Error en ${context}:`, error);
+  throw new Error(`No se pudo ${context}`);
+}
 
 export type CreateMemberData = {
   fullName: string;
@@ -45,8 +67,7 @@ export class MemberService {
       });
       return member;
     } catch (error) {
-      console.error('Error al crear miembro:', error);
-      throw new Error('No se pudo crear el miembro');
+      handlePrismaError(error, 'crear el miembro');
     }
   }
 
@@ -62,8 +83,7 @@ export class MemberService {
 
       return member;
     } catch (error) {
-      console.error('Error al obtener miembro:', error);
-      throw new Error('No se pudo obtener el miembro');
+      handlePrismaError(error, 'obtener el miembro');
     }
   }
 
@@ -91,8 +111,7 @@ export class MemberService {
 
       return member;
     } catch (error) {
-      console.error('Error al actualizar miembro:', error);
-      throw new Error('No se pudo actualizar el miembro');
+      handlePrismaError(error, 'actualizar el miembro');
     }
   }
 
@@ -102,8 +121,7 @@ export class MemberService {
         where: { id }
       });
     } catch (error) {
-      console.error('Error al eliminar miembro:', error);
-      throw new Error('No se pudo eliminar el miembro');
+      handlePrismaError(error, 'eliminar el miembro');
     }
   }
 
@@ -113,21 +131,20 @@ export class MemberService {
         where: { institucionId: institutionId },
         orderBy: { createdAt: 'desc' }
       });
-      
+
       return members;
     } catch (error) {
-      console.error('Error al obtener miembros:', error);
-      throw new Error('No se pudieron obtener los miembros');
+      handlePrismaError(error, 'obtener los miembros de la institución');
     }
   }
 
   static async existsByNumeroOrden(numeroOrden: string, institutionId: string, excludeId?: string): Promise<boolean> {
     try {
-      const where: any = { 
+      const where: any = {
         numeroOrden,
         institucionId: institutionId
       };
-      
+
       if (excludeId) {
         where.id = { not: excludeId };
       }
@@ -135,8 +152,7 @@ export class MemberService {
       const count = await prisma.member.count({ where });
       return count > 0;
     } catch (error) {
-      console.error('Error al verificar número de orden:', error);
-      throw new Error('No se pudo verificar el número de orden');
+      handlePrismaError(error, 'verificar el número de orden');
     }
   }
 
@@ -154,8 +170,7 @@ export class MemberService {
       const count = await prisma.member.count({ where });
       return count > 0;
     } catch (error) {
-      console.error('Error al verificar número de matrícula:', error);
-      throw new Error('No se pudo verificar el número de matrícula');
+      handlePrismaError(error, 'verificar el número de matrícula');
     }
   }
 
@@ -216,8 +231,7 @@ export class MemberService {
         }
       };
     } catch (error) {
-      console.error('Error al obtener miembros:', error);
-      throw new Error('No se pudieron obtener los miembros');
+      handlePrismaError(error, 'obtener los miembros');
     }
   }
 }

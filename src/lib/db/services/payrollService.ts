@@ -67,7 +67,8 @@ export class PayrollService {
       }
     });
 
-    return { ...result, data, meta: { ...result.meta, total: data.length } } as PaginatedResult<any>;
+    // Mantener el total original para paginación correcta (no recalcular con data.length expandido)
+    return { ...result, data } as PaginatedResult<any>;
   }
 
   static async getById(id: string) {
