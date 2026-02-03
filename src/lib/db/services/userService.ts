@@ -1,4 +1,5 @@
 import { prisma } from '../index';
+import { Prisma } from '@prisma/client';
 import { paginator, type PaginatedResult } from '../paginator';
 import type {
   CreateUserData,
@@ -9,6 +10,29 @@ import type {
   PaginationParams
 } from '../models';
 import bcrypt from 'bcryptjs';
+
+// Helper para manejar errores de Prisma
+function handlePrismaError(error: unknown, context: string): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case 'P2002':
+        const target = (error.meta?.target as string[])?.join(', ') || 'campo';
+        if (target.includes('email')) {
+          throw new Error('Ya existe un usuario con este email');
+        }
+        throw new Error(`Ya existe un usuario con el mismo ${target}`);
+      case 'P2025':
+        throw new Error('Usuario no encontrado');
+      case 'P2003':
+        throw new Error('La institución especificada no existe');
+      default:
+        console.error(`Error Prisma [${error.code}] en ${context}:`, error.message);
+        throw new Error(`Error de base de datos: ${error.message}`);
+    }
+  }
+  console.error(`Error en ${context}:`, error);
+  throw new Error(`No se pudo ${context}`);
+}
 
 // Crear instancia del paginador con opciones por defecto
 const paginate = paginator({ page: 1, perPage: 10 });
@@ -49,8 +73,7 @@ export class UserService {
 
       return user;
     } catch (error) {
-      console.error('Error al crear usuario:', error);
-      throw new Error('No se pudo crear el usuario');
+      handlePrismaError(error, 'crear el usuario');
     }
   }
 
@@ -72,8 +95,7 @@ export class UserService {
 
       return user;
     } catch (error) {
-      console.error('Error al obtener usuario:', error);
-      throw new Error('No se pudo obtener el usuario');
+      handlePrismaError(error, 'obtener el usuario');
     }
   }
 
@@ -95,8 +117,7 @@ export class UserService {
 
       return user;
     } catch (error) {
-      console.error('Error al obtener usuario por email:', error);
-      throw new Error('No se pudo obtener el usuario');
+      handlePrismaError(error, 'obtener el usuario por email');
     }
   }
 
@@ -170,8 +191,7 @@ export class UserService {
 
       return result;
     } catch (error) {
-      console.error('Error al obtener usuarios:', error);
-      throw new Error('No se pudieron obtener los usuarios');
+      handlePrismaError(error, 'obtener los usuarios');
     }
   }
 
@@ -248,8 +268,7 @@ export class UserService {
         }
       });
     } catch (error) {
-      console.error('Error al eliminar usuario:', error);
-      throw new Error('No se pudo eliminar el usuario');
+      handlePrismaError(error, 'eliminar el usuario');
     }
   }
 
@@ -266,8 +285,7 @@ export class UserService {
       const count = await prisma.user.count({ where });
       return count > 0;
     } catch (error) {
-      console.error('Error al verificar email:', error);
-      throw new Error('No se pudo verificar el email');
+      handlePrismaError(error, 'verificar el email');
     }
   }
 
@@ -300,8 +318,7 @@ export class UserService {
 
       return updated;
     } catch (error) {
-      console.error('Error al cambiar estado del usuario:', error);
-      throw new Error('No se pudo cambiar el estado del usuario');
+      handlePrismaError(error, 'cambiar el estado del usuario');
     }
   }
 
@@ -325,8 +342,7 @@ export class UserService {
         inactiveUsers: totalUsers - activeUsers
       };
     } catch (error) {
-      console.error('Error al obtener estadísticas de usuarios:', error);
-      throw new Error('No se pudieron obtener las estadísticas');
+      handlePrismaError(error, 'obtener las estadísticas');
     }
   }
 }

@@ -51,7 +51,7 @@ model Member {
   updatedAt           DateTime?          @updatedAt
   deletedAt           DateTime?
   contributions       ContributionLine[]
-  institucion         Institution?       @relation(fields: [institucionId], references: [id])
+  institucion         Institution?       @relation(fields: [institucionId], references: [id], onDelete: Cascade)
 
   @@unique([documentoIdentidad, institucionId], name: "unique_documento_institution")
   @@unique([fullName, institucionId], name: "unique_fullname_institution")
@@ -86,8 +86,8 @@ model ContributionLine {
   pdfFileId     String?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
-  member        Member?            @relation(fields: [memberId], references: [id])
-  pdfFile       PdfFile?           @relation(fields: [pdfFileId], references: [id])
+  member        Member?            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  pdfFile       PdfFile?           @relation(fields: [pdfFileId], references: [id], onDelete: SetNull)
 
   @@map("contribution_lines")
 }
@@ -114,8 +114,8 @@ model BankTransfer {
   ordenanteNombre    String?
   ordenanteDomicilio String?
   institutionId      String?
-  period             PayrollPeriod @relation(fields: [periodId], references: [id])
-  institution        Institution?  @relation(fields: [institutionId], references: [id])
+  period             PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  institution        Institution?  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   pdfFiles           PdfFile[]
 
   @@map("bank_transfers")
@@ -143,9 +143,9 @@ model PdfFile {
   uploadedBy       String?
   transferId       String?
   contributionLine ContributionLine[]
-  period           PayrollPeriod?     @relation(fields: [periodId], references: [id])
-  institution      Institution?       @relation(fields: [institutionId], references: [id])
-  bankTransfer     BankTransfer?      @relation(fields: [transferId], references: [id])
+  period           PayrollPeriod?     @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  institution      Institution?       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  bankTransfer     BankTransfer?      @relation(fields: [transferId], references: [id], onDelete: SetNull)
 
   @@map("pdf_files")
 }
