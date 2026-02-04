@@ -134,9 +134,12 @@ export async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
   try {
     // Usamos la build legacy para Node y deshabilitamos worker
     const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const { createRequire } = await import('module');
+    const require = createRequire(import.meta.url);
+    const standardFontDataUrl = require.resolve('pdfjs-dist/package.json').replace('package.json', 'standard_fonts/');
 
     const uint8 = new Uint8Array(buffer);
-    const loadingTask = pdfjs.getDocument({ data: uint8, useWorker: false });
+    const loadingTask = pdfjs.getDocument({ data: uint8, useWorker: false, standardFontDataUrl });
     const pdf = await loadingTask.promise;
     const numPages = pdf.numPages ?? 1;
 
