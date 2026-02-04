@@ -14,9 +14,7 @@ async function loadPdfJs() {
 
 async function rasterizeFirstPage(buffer: Buffer): Promise<{ imageData: ImageData }> {
 	const pdfjs = await loadPdfJs();
-	const { createRequire } = await import('module');
-	const require = createRequire(import.meta.url);
-	const standardFontDataUrl = require.resolve('pdfjs-dist/package.json').replace('package.json', 'standard_fonts/');
+	const standardFontDataUrl = `${process.cwd()}/node_modules/pdfjs-dist/standard_fonts/`;
 
 	const uint8 = new Uint8Array(buffer);
 	const loadingTask = pdfjs.getDocument({ data: uint8, standardFontDataUrl });

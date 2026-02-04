@@ -58,9 +58,7 @@ async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 	try {
 		// Usamos la build legacy para Node y deshabilitamos worker
 		const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
-		const { createRequire } = await import('module');
-		const require = createRequire(import.meta.url);
-		const standardFontDataUrl = require.resolve('pdfjs-dist/package.json').replace('package.json', 'standard_fonts/');
+		const standardFontDataUrl = `${process.cwd()}/node_modules/pdfjs-dist/standard_fonts/`;
 
 		// En entornos Node no es necesario establecer workerSrc; usamos useWorker:false
 		const uint8 = new Uint8Array(buffer);
