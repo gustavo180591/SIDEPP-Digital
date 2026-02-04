@@ -396,11 +396,38 @@
                         </div>
                       </div>
 
-                      <div class="flex items-center gap-3">
+                      <div class="flex items-center gap-2">
                         <span class="px-2 py-1 text-xs font-medium rounded-full {getFileTypeColor(file.type)}">
                           {getFileTypeLabel(file.type)}
                         </span>
 
+                        <!-- Botón Ver PDF -->
+                        <a
+                          href="/api/files/{file.id}/download?view=true"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          title="Ver PDF"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                          </svg>
+                        </a>
+
+                        <!-- Botón Descargar PDF -->
+                        <a
+                          href="/api/files/{file.id}/download"
+                          download
+                          class="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
+                          title="Descargar PDF"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                          </svg>
+                        </a>
+
+                        <!-- Botón Eliminar -->
                         <button
                           on:click={() => confirmDelete = { type: 'file', id: file.id, name: file.fileName }}
                           disabled={deletingFile === file.id}
