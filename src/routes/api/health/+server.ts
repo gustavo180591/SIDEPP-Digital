@@ -7,6 +7,7 @@ export const GET = async () => {
     return json({ ok: true });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'db error';
+    console.error('[health] Error de conexión a base de datos:', errorMessage);
     return json({ ok: false, error: errorMessage }, { status: 500 });
   }
 };

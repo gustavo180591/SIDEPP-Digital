@@ -239,18 +239,23 @@ export async function analyzeTransferenciaWithAI(
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
       console.error(`[analyzeTransferenciaWithAI] Errores de validacion Zod para ${filename}:`, err.issues);
+      console.error(`[analyzeTransferenciaWithAI] JSON parseado:`, JSON.stringify(parsed).substring(0, 500));
       // Crear mensaje de error más descriptivo
       const errorDetails = err.issues.map(issue => {
         const path = issue.path.join('.');
-        return `Campo "${path || 'raíz'}": ${issue.message}`;
+        return `Campo "${path || 'raíz'}": ${issue.message} (código: ${issue.code})`;
       }).join('; ');
-      throw new Error(`Error de formato en respuesta de IA (transferencia): ${errorDetails}`);
+      throw new Error(`Error de validación Zod (AI texto): ${errorDetails}`);
     }
     if (err instanceof SyntaxError) {
       console.error(`[analyzeTransferenciaWithAI] Error de JSON para ${filename}:`, err.message);
+      console.error(`[analyzeTransferenciaWithAI] Contenido recibido:`, content?.substring(0, 500));
       throw new Error(`La IA no retornó JSON válido: ${err.message}`);
     }
-    throw err;
+    // Capturar cualquier otro error con más detalle
+    console.error(`[analyzeTransferenciaWithAI] Error no manejado para ${filename}:`, err);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Error en análisis AI de transferencia: ${errorMsg}`);
   }
 }
 
@@ -316,18 +321,23 @@ export async function analyzeTransferenciaWithVision(
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
       console.error(`[analyzeTransferenciaWithVision] Errores de validacion Zod para ${filename}:`, err.issues);
+      console.error(`[analyzeTransferenciaWithVision] JSON parseado:`, JSON.stringify(parsed).substring(0, 500));
       // Crear mensaje de error más descriptivo
       const errorDetails = err.issues.map(issue => {
         const path = issue.path.join('.');
-        return `Campo "${path || 'raíz'}": ${issue.message}`;
+        return `Campo "${path || 'raíz'}": ${issue.message} (código: ${issue.code})`;
       }).join('; ');
-      throw new Error(`Error de formato en respuesta de IA Vision: ${errorDetails}`);
+      throw new Error(`Error de validación Zod (Vision): ${errorDetails}`);
     }
     if (err instanceof SyntaxError) {
       console.error(`[analyzeTransferenciaWithVision] Error de JSON para ${filename}:`, err.message);
+      console.error(`[analyzeTransferenciaWithVision] Contenido recibido:`, content?.substring(0, 500));
       throw new Error(`La IA Vision no retornó JSON válido: ${err.message}`);
     }
-    throw err;
+    // Capturar cualquier otro error con más detalle
+    console.error(`[analyzeTransferenciaWithVision] Error no manejado para ${filename}:`, err);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Error en análisis Vision de transferencia: ${errorMsg}`);
   }
 }
 
@@ -421,9 +431,18 @@ export async function analyzeMultipleTransferenciasWithVision(
       console.log(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: ✓ Transferencia de $${validated.operacion.importe}`);
     } catch (err) {
       paginasConError++;
-      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
+      let errorMsg = 'Error desconocido';
+      if (err instanceof z.ZodError) {
+        errorMsg = err.issues.map(issue => `${issue.path.join('.')}: ${issue.message} (${issue.code})`).join('; ');
+        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Error Zod - ${errorMsg}`);
+      } else if (err instanceof SyntaxError) {
+        errorMsg = `JSON inválido: ${err.message}`;
+        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: ${errorMsg}`);
+      } else if (err instanceof Error) {
+        errorMsg = err.message;
+        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Error - ${errorMsg}`);
+      }
       erroresPorPagina.push(`Página ${i + 1}: ${errorMsg}`);
-      console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Error - ${errorMsg}`);
       // Continuar con las demás páginas
     }
   }

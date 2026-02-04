@@ -856,7 +856,7 @@ export const POST: RequestHandler = async (event) => {
 				
 				
 			} catch (e) {
-				
+				console.error('[analyzer-pdf-bank] Error extrayendo texto del PDF:', e instanceof Error ? e.message : e);
 			}
 		} else {
 			

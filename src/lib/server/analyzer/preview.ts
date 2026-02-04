@@ -253,11 +253,14 @@ export async function analyzeAportesPreview(
     };
 
   } catch (error) {
-    console.error(`[analyzeAportesPreview] Error:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error(`[analyzeAportesPreview] Error para ${fileName}:`, errorMessage);
+    console.error(`[analyzeAportesPreview] Stack:`, errorStack);
     return {
       success: false,
       error: 'Error al analizar el PDF de aportes',
-      details: error instanceof Error ? error.message : 'Error desconocido',
+      details: errorMessage,
       fileName
     };
   }
@@ -341,11 +344,14 @@ export async function analyzeTransferenciaPreview(
     };
 
   } catch (error) {
-    console.error(`[analyzeTransferenciaPreview] Error:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error(`[analyzeTransferenciaPreview] Error para ${fileName}:`, errorMessage);
+    console.error(`[analyzeTransferenciaPreview] Stack:`, errorStack);
     return {
       success: false,
       error: 'Error al analizar el PDF de transferencia',
-      details: error instanceof Error ? error.message : 'Error desconocido',
+      details: errorMessage,
       fileName
     };
   }

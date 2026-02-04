@@ -42,6 +42,7 @@ export async function ocrPdfFirstPage(buffer: Buffer): Promise<OcrResult | null>
 		await worker.terminate();
 		return { text: data.text || '', language: data?.language || 'spa+eng', engine: 'tesseract' };
 	} catch (e) {
+		console.error('[ocr] Error en OCR de primera página del PDF:', e instanceof Error ? e.message : e);
 		return null;
 	}
 }
