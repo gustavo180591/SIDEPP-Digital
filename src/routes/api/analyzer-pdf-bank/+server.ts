@@ -692,6 +692,36 @@ export const POST: RequestHandler = async (event) => {
 		// TRACKING: Registrar archivo físico guardado para posible rollback
 		sessionData.savedFilePaths.push(savedPath);
 
+		// ============================================================================
+		// VALIDACIÓN TEMPRANA: Detectar tipo de documento ANTES del análisis IA
+		// Esto evita procesar documentos incorrectos y da feedback inmediato al usuario
+		// ============================================================================
+		let quickText = '';
+		try {
+			quickText = await extractTextWithPdfJs(buffer);
+		} catch {
+			// Si falla la extracción rápida, continuar con el análisis normal
+		}
+
+		if (quickText && quickText.length > 50) {
+			const textLower = quickText.toLowerCase();
+			// Detectar si es un listado de aportes (documento incorrecto para este endpoint)
+			const looksLikeAportes = /(totales?\s+por\s+concepto|listado|detalle\s+de\s+aportes|cantidad\s+de\s+personas|monto\s+del\s+concepto|aporte\s+sindical)/i.test(textLower);
+			const looksLikeTransfer = /(comprobante|transferencia\s+a\s+terceros|cbu\s+destino|operaci[oó]n\s+n[º°]?|importe\s+total|banco\s+macro)/i.test(textLower);
+
+			if (looksLikeAportes && !looksLikeTransfer) {
+				// Limpiar archivo guardado antes de retornar error
+				await deleteFile(savedPath);
+				return json({
+					status: 'error',
+					message: 'Este archivo parece ser un listado de aportes, no un comprobante de transferencia.',
+					hint: 'Por favor, suba este archivo en la sección de "Aportes" y suba el comprobante de transferencia correspondiente aquí.',
+					documentType: 'LISTADO_APORTES'
+				}, { status: 400 });
+			}
+		}
+		// ============================================================================
+
 		// Crear PdfFile en DB temprano (sin periodId aún)
 		let pdfFileId: string | null = null;
 		try {
