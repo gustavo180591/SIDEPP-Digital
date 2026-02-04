@@ -189,11 +189,8 @@ function validateAportesResult(
 		);
 	}
 
-	// Loguear warnings
-	const warnings = getWarnings(validations);
-	if (warnings.length > 0) {
-		console.warn(`[analyzeAportesWithAI] Warnings para ${filename}:\n${formatValidationResults(warnings)}`);
-	}
+	// Si hay advertencias, ignorarlas en producción (solo retornarlas)
+	getWarnings(validations);
 
 	// Si hay errores críticos, lanzar excepción
 	const errors = getErrors(validations);
@@ -334,8 +331,6 @@ export async function analyzeAportesWithVision(
   imageBase64: string,
   filename: string
 ): Promise<ListadoPDFResult> {
-  console.log(`[analyzeAportesWithVision] Analizando imagen de ${filename}...`);
-
   // Usar retry logic para llamadas a OpenAI
   const response = await withRetry(
     () => openai.chat.completions.create({
@@ -386,7 +381,6 @@ export async function analyzeAportesWithVision(
     // Validar el resultado antes de retornarlo
     validateAportesResult(result, filename);
 
-    console.log(`[analyzeAportesWithVision] ✓ Análisis completado: ${result.personas.length} personas, $${result.totales.montoTotal}`);
     return result;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
@@ -413,7 +407,6 @@ export async function analyzeMultipleAportesWithVision(
   imagesBase64: string[],
   filename: string
 ): Promise<ListadoPDFResult> {
-  console.log(`[analyzeMultipleAportesWithVision] Analizando ${imagesBase64.length} página(s)...`);
 
   // Para listados de aportes, generalmente todas las páginas son parte del mismo listado
   // Analizamos cada página y combinamos los resultados
@@ -427,7 +420,6 @@ export async function analyzeMultipleAportesWithVision(
 
   for (let i = 0; i < imagesBase64.length; i++) {
     const imageBase64 = imagesBase64[i];
-    console.log(`[analyzeMultipleAportesWithVision] Procesando página ${i + 1}/${imagesBase64.length}...`);
 
     try {
       const response = await withRetry(
@@ -466,7 +458,6 @@ export async function analyzeMultipleAportesWithVision(
       const content = response.choices[0]?.message?.content;
       if (!content) {
         paginasConError++;
-        console.warn(`[analyzeMultipleAportesWithVision] Página ${i + 1}: Sin contenido de OpenAI`);
         continue;
       }
 
@@ -489,12 +480,8 @@ export async function analyzeMultipleAportesWithVision(
 
       // Agregar personas de esta página
       todasLasPersonas.push(...validated.personas);
-
-      console.log(`[analyzeMultipleAportesWithVision] Página ${i + 1}: ✓ ${validated.personas.length} personas`);
-    } catch (err) {
+    } catch {
       paginasConError++;
-      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-      console.warn(`[analyzeMultipleAportesWithVision] Página ${i + 1}: Error - ${errorMsg}`);
     }
   }
 
@@ -521,12 +508,6 @@ export async function analyzeMultipleAportesWithVision(
 
   // Validar resultado combinado
   validateAportesResult(result, filename);
-
-  console.log(`[analyzeMultipleAportesWithVision] ✓ Total: ${todasLasPersonas.length} personas de ${imagesBase64.length} páginas, $${montoTotal.toFixed(2)}`);
-
-  if (paginasConError > 0) {
-    console.warn(`[analyzeMultipleAportesWithVision] ⚠️ ADVERTENCIA: ${paginasConError} de ${imagesBase64.length} páginas fallaron`);
-  }
 
   return result;
 }

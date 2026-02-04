@@ -27,7 +27,6 @@ const auth: Handle = async ({ event, resolve }) => {
     const user = await validateUser(decoded.userId);
 
     if (user) {
-      console.log('✅ Usuario autenticado:', user.email, 'Rol:', user.role, 'Instituciones:', user.institutions.length);
       event.locals.user = {
         id: user.id,
         email: user.email,
@@ -40,7 +39,6 @@ const auth: Handle = async ({ event, resolve }) => {
       };
     } else {
       // Usuario no existe o está inactivo
-      console.log('❌ Usuario no válido en base de datos');
       event.cookies.delete('auth_token', { path: '/' });
       if (!isPublic) {
         throw redirect(303, '/login');
@@ -48,7 +46,6 @@ const auth: Handle = async ({ event, resolve }) => {
     }
   } else {
     // Token inválido o expirado
-    console.log('❌ Token JWT inválido o expirado');
     event.cookies.delete('auth_token', { path: '/' });
     if (!isPublic && event.url.pathname !== '/') {
       throw redirect(303, '/login');
@@ -57,7 +54,6 @@ const auth: Handle = async ({ event, resolve }) => {
 
   // Si es la ruta raíz y hay usuario autenticado, redirigir al dashboard
   if (event.url.pathname === '/' && event.locals.user) {
-    console.log('🔄 Redirigiendo desde ruta raíz a dashboard');
     throw redirect(303, '/dashboard');
   }
 
@@ -65,8 +61,6 @@ const auth: Handle = async ({ event, resolve }) => {
   if (event.locals.user) {
     const userRole = event.locals.user.role;
     const path = event.url.pathname;
-
-    console.log('🔐 Verificando autorización - Ruta:', path, 'Rol:', userRole);
 
     // Rutas exclusivas para ADMIN
     const adminOnlyRoutes = ['/dashboard/usuarios', '/dashboard/admin'];
@@ -85,39 +79,30 @@ const auth: Handle = async ({ event, resolve }) => {
     // Verificar si es ruta de detalle de institución (/dashboard/instituciones/{id})
     const isInstitutionDetailRoute = path.startsWith('/dashboard/instituciones/') && path !== '/dashboard/instituciones/';
 
-    console.log('🔐 Ruta solo-admin:', needsAdminOnly, '| Ruta upload:', isUploadRoute, '| Lista instituciones:', isInstitutionsListRoute, '| Detalle institución:', isInstitutionDetailRoute);
-
     // Bloquear rutas solo-admin para no-admins
     if (needsAdminOnly && userRole !== 'ADMIN') {
-      console.log('❌ Sin permisos de admin, redirigiendo a unauthorized');
       throw redirect(303, '/unauthorized');
     }
 
     // Lista de instituciones: ADMIN, FINANZAS y LIQUIDADOR
     if (isInstitutionsListRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS' && userRole !== 'LIQUIDADOR') {
-      console.log('❌ Sin permisos para ver lista de instituciones');
       throw redirect(303, '/unauthorized');
     }
 
     // Afiliados: solo ADMIN y FINANZAS
     if (isAfiliadosRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS') {
-      console.log('❌ Sin permisos para ver afiliados');
       throw redirect(303, '/unauthorized');
     }
 
     // Detalle de institución: solo ADMIN y FINANZAS pueden acceder
     if (isInstitutionDetailRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS') {
-      console.log('❌ Sin permisos para ver detalle de institución');
       throw redirect(303, '/unauthorized');
     }
 
     // Rutas de upload: solo ADMIN y LIQUIDADOR
     if (isUploadRoute && userRole !== 'ADMIN' && userRole !== 'LIQUIDADOR') {
-      console.log('❌ Sin permisos para subir, redirigiendo a unauthorized');
       throw redirect(303, '/unauthorized');
     }
-
-    console.log('✅ Permisos OK, continuando');
   }
 
   return resolve(event);

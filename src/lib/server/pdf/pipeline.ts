@@ -15,13 +15,13 @@ interface LogMeta {
 }
 
 const logger = {
-  info: (message: string, meta?: LogMeta) => console.log(`[INFO] ${message}`, meta || ''),
+  info: (_message: string, _meta?: LogMeta) => {},
   error: (message: string, error?: unknown) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[ERROR] ${message}`, errorMessage);
   },
-  debug: (message: string, meta?: LogMeta) => console.debug(`[DEBUG] ${message}`, meta || ''),
-  warn: (message: string, meta?: LogMeta) => console.warn(`[WARN] ${message}`, meta || ''),
+  debug: (_message: string, _meta?: LogMeta) => {},
+  warn: (_message: string, _meta?: LogMeta) => {},
 };
 
 // Importar configuración centralizada

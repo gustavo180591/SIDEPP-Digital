@@ -103,7 +103,6 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
 
     // Obtener instituciones
     const result = await InstitutionService.findMany(filters, pagination);
-    console.log(result);
     return {
       institutions: result.data,
       pagination: {

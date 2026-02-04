@@ -63,7 +63,6 @@ async function convertPdfToImages(buffer: Buffer): Promise<string[]> {
         const imgBuffer = await readFile(imgPath);
         imagesBase64.push(imgBuffer.toString('base64'));
         generatedFiles.push(imgPath);
-        console.log(`[convertPdfToImages] ✓ Página ${pageNum} convertida (${imgBuffer.length} bytes)`);
         pageNum++;
       } catch {
         // No hay más páginas
@@ -81,7 +80,6 @@ async function convertPdfToImages(buffer: Buffer): Promise<string[]> {
       throw new Error('No se pudo convertir ninguna página del PDF');
     }
 
-    console.log(`[convertPdfToImages] ✓ Total: ${imagesBase64.length} páginas convertidas`);
     return imagesBase64;
 
   } catch (error) {
@@ -91,7 +89,7 @@ async function convertPdfToImages(buffer: Buffer): Promise<string[]> {
       await unlink(file).catch(() => {});
     }
     console.error('[convertPdfToImages] Error:', error);
-    throw new Error(`No se pudo convertir el PDF a imágenes: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    throw error;
   }
 }
 
@@ -115,7 +113,6 @@ export async function extractPDFContent(buffer: Buffer): Promise<PDFExtractionRe
     }
 
     // PDF sin texto suficiente - convertir TODAS las páginas a imágenes para Vision API
-    console.log(`      -> PDF con imágenes detectado, convirtiendo todas las páginas a PNG para Vision API...`);
     const imagesBase64 = await convertPdfToImages(buffer);
 
     return {
@@ -169,7 +166,7 @@ export async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 
     return allText;
   } catch (e) {
-    console.error('[extractTextWithPdfJs] ERROR durante la extracción:', e);
+    console.error('[extractTextWithPdfJs] Error durante la extracción:', e);
     return '';
   }
 }

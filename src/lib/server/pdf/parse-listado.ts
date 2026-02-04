@@ -25,10 +25,10 @@ export interface ParseResult {
 
 /* ===== Util simple de log ===== */
 const log = {
-  info: (...a: unknown[]) => console.log('[parse-listado]', ...a),
-  warn: (...a: unknown[]) => console.warn('[parse-listado]', ...a),
+  info: (..._a: unknown[]) => {},
+  warn: (..._a: unknown[]) => {},
   error: (...a: unknown[]) => console.error('[parse-listado]', ...a),
-  debug: (...a: unknown[]) => console.debug('[parse-listado]', ...a)
+  debug: (..._a: unknown[]) => {}
 };
 
 /* ===== Patrones ===== */

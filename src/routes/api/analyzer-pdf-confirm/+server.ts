@@ -42,10 +42,6 @@ export const POST: RequestHandler = async (event) => {
   }
 
   try {
-    console.log('\n========================================');
-    console.log('💾 [CONFIRM] INICIO DE GUARDADO');
-    console.log('========================================\n');
-
     const contentType = event.request.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       return json({ error: 'Se esperaba application/json' }, { status: 400 });
@@ -70,12 +66,6 @@ export const POST: RequestHandler = async (event) => {
       return json({ error: 'No hay archivos para guardar' }, { status: 400 });
     }
 
-    console.log('[CONFIRM] Session ID:', body.sessionId);
-    console.log('[CONFIRM] Período:', body.selectedPeriod);
-    console.log('[CONFIRM] Institución:', body.institutionId);
-    console.log('[CONFIRM] Archivos:', Object.keys(body.previews));
-    console.log('[CONFIRM] Force Confirm:', body.forceConfirm);
-
     // Validar que al menos un archivo tenga success: true
     const validPreviews = Object.values(body.previews).filter(p => p && p.success);
     if (validPreviews.length === 0) {
@@ -90,14 +80,12 @@ export const POST: RequestHandler = async (event) => {
       const userInstitutionIds = auth.user.institutions?.map((i: { id: string }) => i.id) || [];
 
       if (userInstitutionIds.length === 0) {
-        console.error('[CONFIRM] ❌ Usuario LIQUIDADOR sin instituciones asignadas');
         return json({
           error: 'Usuario sin institución asignada'
         }, { status: 403 });
       }
 
       if (!userInstitutionIds.includes(body.institutionId)) {
-        console.error('[CONFIRM] ❌ Usuario intenta guardar para institución no autorizada');
         return json({
           error: 'No tiene permiso para guardar archivos para esta institución'
         }, { status: 403 });
@@ -133,25 +121,16 @@ export const POST: RequestHandler = async (event) => {
     };
 
     // Ejecutar guardado atómico
-    console.log('[CONFIRM] Ejecutando guardado atómico...');
     const result = await saveBatchAtomic(saveInput);
 
     if (!result.success) {
-      console.error('[CONFIRM] ❌ Error en guardado:', result.error);
+      console.error('[CONFIRM] Error en guardado:', result.error);
       return json({
         success: false,
         error: result.error,
         details: result.details
       }, { status: 500 });
     }
-
-    console.log('[CONFIRM] ✓ Guardado completado');
-    console.log('[CONFIRM] Period ID:', result.periodId);
-    console.log('[CONFIRM] Archivos guardados:', Object.keys(result.savedFiles));
-
-    console.log('\n========================================');
-    console.log('✓ [CONFIRM] GUARDADO COMPLETADO');
-    console.log('========================================\n');
 
     return json({
       success: true,
@@ -161,11 +140,7 @@ export const POST: RequestHandler = async (event) => {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('\n========================================');
-    console.error('❌ [CONFIRM] ERROR EN GUARDADO');
-    console.error('========================================');
-    console.error('[CONFIRM] Error:', error);
-    console.error('========================================\n');
+    console.error('[CONFIRM] Error en guardado:', error);
 
     return json({
       success: false,

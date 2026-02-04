@@ -193,7 +193,6 @@ export async function analyzeAportesPreview(
   fileName: string
 ): Promise<AportesPreviewResult | PreviewError> {
   try {
-    console.log(`[analyzeAportesPreview] Iniciando análisis de: ${fileName}`);
 
     // Validar que es un PDF
     const detected = await fileTypeFromBuffer(buffer);
@@ -207,20 +206,12 @@ export async function analyzeAportesPreview(
 
     // Calcular hash
     const bufferHash = createHash('sha256').update(buffer).digest('hex');
-    console.log(`[analyzeAportesPreview] Hash: ${bufferHash}`);
 
     // Verificar duplicado
     const duplicateCheck = await checkDuplicate(bufferHash);
 
     // Analizar con IA
-    console.log(`[analyzeAportesPreview] Analizando con IA...`);
     const analysis = await analyzeAportesIA(buffer, fileName);
-    console.log(`[analyzeAportesPreview] Análisis completado:`, {
-      tipo: analysis.tipo,
-      escuela: analysis.escuela?.nombre,
-      personas: analysis.personas?.length,
-      montoTotal: analysis.totales?.montoTotal
-    });
 
     // Buscar institución
     const cuit = analysis.escuela?.cuit;
@@ -255,8 +246,7 @@ export async function analyzeAportesPreview(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : '';
-    console.error(`[analyzeAportesPreview] Error para ${fileName}:`, errorMessage);
-    console.error(`[analyzeAportesPreview] Stack:`, errorStack);
+    console.error(`[analyzeAportesPreview] Error para ${fileName}:`, errorMessage, errorStack);
     return {
       success: false,
       error: 'Error al analizar el PDF de aportes',
@@ -274,7 +264,6 @@ export async function analyzeTransferenciaPreview(
   fileName: string
 ): Promise<TransferenciaPreviewResult | PreviewError> {
   try {
-    console.log(`[analyzeTransferenciaPreview] Iniciando análisis de: ${fileName}`);
 
     // Validar que es un PDF
     const detected = await fileTypeFromBuffer(buffer);
@@ -288,17 +277,12 @@ export async function analyzeTransferenciaPreview(
 
     // Calcular hash
     const bufferHash = createHash('sha256').update(buffer).digest('hex');
-    console.log(`[analyzeTransferenciaPreview] Hash: ${bufferHash}`);
 
     // Verificar duplicado
     const duplicateCheck = await checkDuplicate(bufferHash);
 
     // Analizar con IA
-    console.log(`[analyzeTransferenciaPreview] Analizando con IA...`);
     const analysis = await analyzeTransferenciaIA(buffer, fileName);
-    console.log(`[analyzeTransferenciaPreview] Análisis completado:`, {
-      tipo: analysis.tipo
-    });
 
     // Determinar importe y si son múltiples transferencias
     let transferAmount = 0;
@@ -346,8 +330,7 @@ export async function analyzeTransferenciaPreview(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : '';
-    console.error(`[analyzeTransferenciaPreview] Error para ${fileName}:`, errorMessage);
-    console.error(`[analyzeTransferenciaPreview] Stack:`, errorStack);
+    console.error(`[analyzeTransferenciaPreview] Error para ${fileName}:`, errorMessage, errorStack);
     return {
       success: false,
       error: 'Error al analizar el PDF de transferencia',
@@ -370,9 +353,6 @@ export async function analyzeBatchPreview(
     .digest('hex')
     .substring(0, 16);
 
-  console.log(`[analyzeBatchPreview] Sesión: ${sessionId}`);
-  console.log(`[analyzeBatchPreview] Período: ${selectedPeriod}`);
-  console.log(`[analyzeBatchPreview] Archivos: ${files.length}`);
 
   const previews: BatchPreviewResult['previews'] = {};
   const warnings: string[] = [];
@@ -380,7 +360,6 @@ export async function analyzeBatchPreview(
 
   // Procesar cada archivo
   for (const file of files) {
-    console.log(`[analyzeBatchPreview] Procesando: ${file.fileName} (${file.type})`);
 
     let result: PreviewResult;
 

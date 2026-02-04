@@ -176,11 +176,8 @@ function validateTransferenciaResult(
 		)
 	);
 
-	// Loguear warnings
-	const warnings = getWarnings(validations);
-	if (warnings.length > 0) {
-		console.warn(`[analyzeTransferenciaWithAI] Warnings para ${filename}:\n${formatValidationResults(warnings)}`);
-	}
+	// Si hay advertencias, ignorarlas en producción
+	getWarnings(validations);
 
 	// Si hay errores críticos, lanzar excepción
 	const errors = getErrors(validations);
@@ -238,9 +235,6 @@ export async function analyzeTransferenciaWithAI(
     return result;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      console.error(`[analyzeTransferenciaWithAI] Errores de validacion Zod para ${filename}:`, err.issues);
-      console.error(`[analyzeTransferenciaWithAI] JSON parseado:`, JSON.stringify(parsed).substring(0, 500));
-      // Crear mensaje de error más descriptivo
       const errorDetails = err.issues.map(issue => {
         const path = issue.path.join('.');
         return `Campo "${path || 'raíz'}": ${issue.message} (código: ${issue.code})`;
@@ -248,12 +242,8 @@ export async function analyzeTransferenciaWithAI(
       throw new Error(`Error de validación Zod (AI texto): ${errorDetails}`);
     }
     if (err instanceof SyntaxError) {
-      console.error(`[analyzeTransferenciaWithAI] Error de JSON para ${filename}:`, err.message);
-      console.error(`[analyzeTransferenciaWithAI] Contenido recibido:`, content?.substring(0, 500));
       throw new Error(`La IA no retornó JSON válido: ${err.message}`);
     }
-    // Capturar cualquier otro error con más detalle
-    console.error(`[analyzeTransferenciaWithAI] Error no manejado para ${filename}:`, err);
     const errorMsg = err instanceof Error ? err.message : String(err);
     throw new Error(`Error en análisis AI de transferencia: ${errorMsg}`);
   }
@@ -320,9 +310,6 @@ export async function analyzeTransferenciaWithVision(
     return result;
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      console.error(`[analyzeTransferenciaWithVision] Errores de validacion Zod para ${filename}:`, err.issues);
-      console.error(`[analyzeTransferenciaWithVision] JSON parseado:`, JSON.stringify(parsed).substring(0, 500));
-      // Crear mensaje de error más descriptivo
       const errorDetails = err.issues.map(issue => {
         const path = issue.path.join('.');
         return `Campo "${path || 'raíz'}": ${issue.message} (código: ${issue.code})`;
@@ -330,12 +317,8 @@ export async function analyzeTransferenciaWithVision(
       throw new Error(`Error de validación Zod (Vision): ${errorDetails}`);
     }
     if (err instanceof SyntaxError) {
-      console.error(`[analyzeTransferenciaWithVision] Error de JSON para ${filename}:`, err.message);
-      console.error(`[analyzeTransferenciaWithVision] Contenido recibido:`, content?.substring(0, 500));
       throw new Error(`La IA Vision no retornó JSON válido: ${err.message}`);
     }
-    // Capturar cualquier otro error con más detalle
-    console.error(`[analyzeTransferenciaWithVision] Error no manejado para ${filename}:`, err);
     const errorMsg = err instanceof Error ? err.message : String(err);
     throw new Error(`Error en análisis Vision de transferencia: ${errorMsg}`);
   }
@@ -351,8 +334,6 @@ export async function analyzeMultipleTransferenciasWithVision(
   imagesBase64: string[],
   filename: string
 ): Promise<TransferenciaPDFResult | MultiTransferenciaPDFResult> {
-  console.log(`[analyzeMultipleTransferenciasWithVision] Analizando ${imagesBase64.length} página(s)...`);
-
   const transferencias: TransferenciaItem[] = [];
   let paginasConError = 0;
   const erroresPorPagina: string[] = [];
@@ -360,7 +341,6 @@ export async function analyzeMultipleTransferenciasWithVision(
   // Analizar cada página por separado
   for (let i = 0; i < imagesBase64.length; i++) {
     const imageBase64 = imagesBase64[i];
-    console.log(`[analyzeMultipleTransferenciasWithVision] Procesando página ${i + 1}/${imagesBase64.length}...`);
 
     try {
       // Usar retry logic para cada página
@@ -401,7 +381,6 @@ export async function analyzeMultipleTransferenciasWithVision(
       if (!content) {
         paginasConError++;
         erroresPorPagina.push(`Página ${i + 1}: Sin contenido de OpenAI`);
-        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Sin contenido de OpenAI`);
         continue;
       }
 
@@ -413,7 +392,6 @@ export async function analyzeMultipleTransferenciasWithVision(
       if (hasErrors(validaciones)) {
         paginasConError++;
         erroresPorPagina.push(`Página ${i + 1}: ${formatValidationResults(validaciones)}`);
-        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Validación fallida`);
         continue;
       }
 
@@ -427,30 +405,19 @@ export async function analyzeMultipleTransferenciasWithVision(
         ordenante: validated.ordenante,
         operacion: validated.operacion,
       });
-
-      console.log(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: ✓ Transferencia de $${validated.operacion.importe}`);
     } catch (err) {
       paginasConError++;
       let errorMsg = 'Error desconocido';
       if (err instanceof z.ZodError) {
         errorMsg = err.issues.map(issue => `${issue.path.join('.')}: ${issue.message} (${issue.code})`).join('; ');
-        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Error Zod - ${errorMsg}`);
       } else if (err instanceof SyntaxError) {
         errorMsg = `JSON inválido: ${err.message}`;
-        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: ${errorMsg}`);
       } else if (err instanceof Error) {
         errorMsg = err.message;
-        console.warn(`[analyzeMultipleTransferenciasWithVision] Página ${i + 1}: Error - ${errorMsg}`);
       }
       erroresPorPagina.push(`Página ${i + 1}: ${errorMsg}`);
       // Continuar con las demás páginas
     }
-  }
-
-  // Advertir si hubo páginas con error
-  if (paginasConError > 0) {
-    console.warn(`[analyzeMultipleTransferenciasWithVision] ⚠️ ADVERTENCIA: ${paginasConError} de ${imagesBase64.length} páginas fallaron el análisis`);
-    console.warn(`[analyzeMultipleTransferenciasWithVision] Errores:\n${erroresPorPagina.join('\n')}`);
   }
 
   if (transferencias.length === 0) {
@@ -481,8 +448,6 @@ export async function analyzeMultipleTransferenciasWithVision(
   // Múltiples transferencias - calcular total usando currency.js para precisión
   const montos = transferencias.map(t => t.operacion.importe ?? 0);
   const importeTotal = sumarMontos(...montos);
-
-  console.log(`[analyzeMultipleTransferenciasWithVision] ✓ Total: ${transferencias.length} transferencias, $${importeTotal.toFixed(2)}`);
 
   return {
     tipo: 'TRANSFERENCIAS_MULTIPLES',

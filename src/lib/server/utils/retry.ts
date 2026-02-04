@@ -32,11 +32,11 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error;
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`[retry] Error en intento ${attempt + 1}/${maxRetries + 1}:`, errorMsg);
+      console.error(`[retry] Error en intento ${attempt + 1}/${maxRetries + 1}:`, errorMsg);
 
       // Verificar si debemos reintentar
       if (attempt === maxRetries || !shouldRetry(error)) {
-        console.error(`[retry] Operación fallida definitivamente después de ${attempt + 1} intentos:`, errorMsg);
+        console.error(`[retry] Operación fallida después de ${attempt + 1} intentos:`, errorMsg);
         break;
       }
 
@@ -50,7 +50,6 @@ export async function withRetry<T>(
       await new Promise(resolve => setTimeout(resolve, delayMs));
       
       attempt++;
-      console.log(`Reintentando operación (intento ${attempt}/${maxRetries})...`);
     }
   }
 

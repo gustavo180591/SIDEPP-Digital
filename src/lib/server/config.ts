@@ -23,14 +23,4 @@ export const CONFIG = {
 // Asegurarse de que el directorio de subidas exista
 if (!existsSync(CONFIG.UPLOAD_DIR)) {
   mkdirSync(CONFIG.UPLOAD_DIR, { recursive: true, mode: 0o755 });
-  console.log(`✅ Directorio de subidas creado en: ${CONFIG.UPLOAD_DIR}`);
-} else {
-  console.log(`ℹ️ Usando directorio de subidas existente: ${CONFIG.UPLOAD_DIR}`);
 }
-
-// Mostrar configuración cargada
-console.log('📂 Configuración de la aplicación:', {
-  rootDir: ROOT_DIR,
-  uploadDir: CONFIG.UPLOAD_DIR,
-  maxFileSize: CONFIG.MAX_FILE_SIZE / (1024 * 1024) + 'MB'
-});

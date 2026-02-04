@@ -149,10 +149,9 @@ Por favor no respondas a este mensaje.
       html: htmlContent
     });
 
-    console.log(`✅ Email de reset enviado a: ${email}`);
     return true;
   } catch (error) {
-    console.error('❌ Error al enviar email de reset:', error);
+    console.error('Error al enviar email de reset:', error);
     return false;
   }
 }
@@ -162,10 +161,9 @@ export async function verifySmtpConfig(): Promise<boolean> {
   try {
     const transport = getTransporter();
     await transport.verify();
-    console.log('✅ Configuración SMTP verificada correctamente');
     return true;
   } catch (error) {
-    console.error('❌ Error en configuración SMTP:', error);
+    console.error('Error en configuración SMTP:', error);
     return false;
   }
 }

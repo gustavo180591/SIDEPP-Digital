@@ -14,14 +14,11 @@ import { CONFIG } from '$lib/server/config';
 const { UPLOAD_DIR, MAX_FILE_SIZE } = CONFIG;
 
 // El directorio ya debería estar creado por la configuración
-console.log(`📁 Usando directorio de subidas: ${UPLOAD_DIR}`);
 
 /**
  * Obtiene la lista de archivos PDF subidos
  */
 export const GET: RequestHandler = async (event) => {
-  console.log('🔍 [GET] /api/files - Iniciando solicitud');
-
   // Requerir autenticación
   const auth = await requireAuth(event);
   if (auth.error) {
@@ -32,13 +29,9 @@ export const GET: RequestHandler = async (event) => {
     // 1. Verificar conexión a la base de datos
     try {
       await prisma.$connect();
-      console.log('✅ Conexión a la base de datos establecida');
     } catch (dbError) {
       const error = dbError as Error;
-      console.error('❌ Error al conectar a la base de datos:', {
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error('Error al conectar a la base de datos:', error.message);
       return json({ 
         error: 'Database Connection Error',
         message: 'No se pudo conectar a la base de datos',
@@ -49,7 +42,6 @@ export const GET: RequestHandler = async (event) => {
     // 2. Obtener archivos
     let files;
     try {
-      console.log('🔍 Buscando archivos en la base de datos...');
       files = await prisma.pdfFile.findMany({
         take: 50,
         orderBy: { createdAt: 'desc' },
@@ -58,13 +50,9 @@ export const GET: RequestHandler = async (event) => {
           period: { select: { id: true, month: true, year: true } }
         }
       });
-      console.log(`✅ Se encontraron ${files.length} archivos`);
     } catch (queryError) {
       const error = queryError as Error;
-      console.error('❌ Error al consultar archivos:', {
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error('Error al consultar archivos:', error.message);
       return json({
         error: 'Database Query Error',
         message: 'Error al consultar los archivos',
@@ -95,10 +83,7 @@ export const GET: RequestHandler = async (event) => {
       return json(response);
     } catch (mappingError) {
       const error = mappingError as Error;
-      console.error('❌ Error al mapear la respuesta:', {
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error('Error al mapear la respuesta:', error.message);
       return json({
         error: 'Response Mapping Error',
         message: 'Error al formatear la respuesta',
@@ -107,12 +92,8 @@ export const GET: RequestHandler = async (event) => {
     }
   } catch (e) {
     const error = e as Error;
-    console.error('❌ Error inesperado en GET /api/files:', {
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      timestamp: new Date().toISOString()
-    });
-    
+    console.error('Error inesperado en GET /api/files:', error.message);
+
     return json({
       error: 'Internal Server Error',
       message: 'Ocurrió un error inesperado',
@@ -129,8 +110,6 @@ export const GET: RequestHandler = async (event) => {
 };
 
 export const POST: RequestHandler = async (event) => {
-  console.log('📤 [POST] /api/files - Iniciando subida de archivo');
-
   // Requerir autenticación
   const auth = await requireAuth(event);
   if (auth.error) {
@@ -141,7 +120,6 @@ export const POST: RequestHandler = async (event) => {
     // Verificar que la solicitud sea un FormData
     const contentType = event.request.headers.get('content-type');
     if (!contentType || !contentType.includes('multipart/form-data')) {
-      console.error('❌ Content-Type no es multipart/form-data');
       return json(
         { error: 'Formato de solicitud no válido. Se esperaba multipart/form-data' },
         { status: 400 }
@@ -151,13 +129,9 @@ export const POST: RequestHandler = async (event) => {
     // Verificar conexión a la base de datos
     try {
       await prisma.$connect();
-      console.log('✅ Conexión a la base de datos establecida');
     } catch (dbError) {
       const error = dbError as Error;
-      console.error('❌ Error al conectar a la base de datos:', {
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error('Error al conectar a la base de datos:', error.message);
       return json(
         { 
           error: 'Error de conexión a la base de datos',
@@ -170,20 +144,16 @@ export const POST: RequestHandler = async (event) => {
     // Obtener el archivo del formulario
     const formData = await event.request.formData();
     const file = formData.get('file') as File;
-    
+
     if (!file) {
-      console.error('❌ No se proporcionó ningún archivo en el formulario');
       return json(
         { error: 'No se proporcionó ningún archivo' },
         { status: 400 }
       );
     }
-    
-    console.log(`📄 Archivo recibido: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-    
+
     // Validar el tamaño del archivo
     if (file.size > MAX_FILE_SIZE) {
-      console.error(`❌ El archivo excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB`);
       return json(
         { error: `El archivo excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB` },
         { status: 413 }
@@ -192,14 +162,11 @@ export const POST: RequestHandler = async (event) => {
     
     // Leer los primeros bytes para verificar la firma del PDF
     const buffer = await file.arrayBuffer().then(ab => Buffer.from(ab));
-    
+
     // Validar el tipo de archivo
     const fileType = await fileTypeFromBuffer(buffer);
-    
-    console.log('🔍 Tipo de archivo detectado:', fileType);
-    
+
     if (!fileType || fileType.mime !== 'application/pdf') {
-      console.error(`❌ Tipo de archivo no permitido: ${fileType?.mime || 'desconocido'}`);
       return json(
         { error: 'Solo se permiten archivos PDF' },
         { status: 400 }
@@ -208,7 +175,6 @@ export const POST: RequestHandler = async (event) => {
     
     // Verificar la firma del PDF (primeros 4 bytes)
     if (!buffer.slice(0, 4).equals(Buffer.from('%PDF'))) {
-      console.error('❌ El archivo no parece ser un PDF válido');
       return json(
         { error: 'El archivo no parece ser un PDF válido' },
         { status: 400 }
@@ -224,8 +190,7 @@ export const POST: RequestHandler = async (event) => {
     // Guardar el archivo
     try {
       await writeFile(filePath, buffer);
-      console.log(`✅ Archivo guardado en: ${filePath}`);
-      
+
       // Guardar en la base de datos
       const savedFile = await prisma.pdfFile.create({
         data: {
@@ -245,9 +210,9 @@ export const POST: RequestHandler = async (event) => {
       processPdfById(savedFile.id).catch(console.error);
       
       return json(savedFile, { status: 201 });
-      
+
     } catch (saveError) {
-      console.error('❌ Error al guardar el archivo:', saveError);
+      console.error('Error al guardar el archivo:', saveError);
       throw error(500, `Error al guardar el archivo: ${saveError instanceof Error ? saveError.message : 'Error desconocido'}`);
     }
     

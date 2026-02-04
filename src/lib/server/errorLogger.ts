@@ -1,6 +1,7 @@
 /**
  * Logger centralizado de errores
- * Guarda errores en archivo /data/logs/errors.log
+ * Guarda errores en archivo /data/logs/errors-YYYY-MM-DD.log (por día)
+ * Solo guarda errores, no logs informativos
  */
 
 import { existsSync, mkdirSync, appendFileSync } from 'fs';
@@ -8,15 +9,13 @@ import { join } from 'path';
 
 // Directorio para logs (configurable via env)
 const LOGS_DIR = process.env.LOGS_DIR || '/data/logs';
-const ERROR_LOG_FILE = join(LOGS_DIR, 'errors.log');
 
 // Crear directorio de logs si no existe
 function ensureLogsDir() {
   if (!existsSync(LOGS_DIR)) {
     try {
       mkdirSync(LOGS_DIR, { recursive: true, mode: 0o755 });
-      console.log(`📁 Directorio de logs creado: ${LOGS_DIR}`);
-    } catch (e) {
+    } catch {
       // Silenciar - puede no tener permisos en desarrollo
     }
   }
@@ -26,7 +25,15 @@ function ensureLogsDir() {
 ensureLogsDir();
 
 /**
- * Escribe un error al archivo de logs
+ * Obtiene el nombre del archivo de log del día actual
+ */
+function getDailyLogFile(): string {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  return join(LOGS_DIR, `errors-${today}.log`);
+}
+
+/**
+ * Escribe un error al archivo de logs diario
  */
 export function logError(
   source: string,
@@ -34,9 +41,6 @@ export function logError(
   error?: unknown,
   extra?: Record<string, unknown>
 ): void {
-  // Siempre mostrar en consola
-  console.error(`[${source}] ${message}`, error || '');
-
   // Intentar guardar en archivo
   try {
     const timestamp = new Date().toISOString();
@@ -54,27 +58,22 @@ export function logError(
       ...extra
     }) + '\n';
 
-    appendFileSync(ERROR_LOG_FILE, logEntry);
+    appendFileSync(getDailyLogFile(), logEntry);
   } catch {
     // Silenciar errores de escritura
   }
 }
 
 /**
- * Wrapper para capturar errores de async functions
+ * Reemplazo de console.error que también guarda en archivo
  */
-export function withErrorLogging<T extends (...args: unknown[]) => Promise<unknown>>(
-  source: string,
-  fn: T
-): T {
-  return (async (...args: unknown[]) => {
-    try {
-      return await fn(...args);
-    } catch (error) {
-      logError(source, 'Error no manejado', error);
-      throw error;
-    }
-  }) as T;
+export function logErrorToFile(source: string, message: string, ...args: unknown[]): void {
+  const error = args.find(arg => arg instanceof Error);
+  const extra = args
+    .filter(arg => !(arg instanceof Error) && typeof arg === 'object' && arg !== null)
+    .reduce((acc: Record<string, unknown>, arg) => ({ ...acc, ...(arg as Record<string, unknown>) }), {});
+
+  logError(source, message, error, extra);
 }
 
-export default { logError, withErrorLogging };
+export default { logError, logErrorToFile };

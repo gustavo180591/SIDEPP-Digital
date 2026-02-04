@@ -43,8 +43,6 @@ export const actions: Actions = {
           console.error('Error al enviar email de reset a:', email);
           // Aún así mostrar éxito por seguridad
         }
-      } else {
-        console.log('Intento de reset para email no registrado:', email);
       }
 
       return {

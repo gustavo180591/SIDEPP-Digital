@@ -17,10 +17,9 @@ if (process.env.NODE_ENV !== 'production') {
 export async function checkDatabaseConnection() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    console.log('✅ Conexión a la base de datos exitosa');
     return true;
   } catch (error) {
-    console.error('❌ Error al conectar a la base de datos:', error);
+    console.error('Error al conectar a la base de datos:', error);
     return false;
   }
 }

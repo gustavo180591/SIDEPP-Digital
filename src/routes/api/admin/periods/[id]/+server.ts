@@ -35,9 +35,6 @@ export const DELETE: RequestHandler = async (event) => {
       return json({ error: 'Período no encontrado' }, { status: 404 });
     }
 
-    console.log(`[DELETE PERIOD] Iniciando eliminación de período: ${period.month}/${period.year} - ${period.institution?.name || 'Sin institución'}`);
-    console.log(`[DELETE PERIOD] Archivos a eliminar: ${period.pdfFiles.length}`);
-
     // 1. Recopilar paths de archivos físicos desde la DB
     const filesToDelete = period.pdfFiles
       .filter(f => f.storagePath)
@@ -46,7 +43,6 @@ export const DELETE: RequestHandler = async (event) => {
     // 2. Eliminar todas las ContributionLines de todos los PdfFiles
     const contributionLineIds = period.pdfFiles.flatMap(f => f.contributionLine.map(cl => cl.id));
     if (contributionLineIds.length > 0) {
-      console.log(`[DELETE PERIOD] Eliminando ${contributionLineIds.length} contribution lines...`);
       await prisma.contributionLine.deleteMany({
         where: { id: { in: contributionLineIds } }
       });
@@ -54,7 +50,6 @@ export const DELETE: RequestHandler = async (event) => {
 
     // 3. Eliminar todos los PdfFiles del período
     if (period.pdfFiles.length > 0) {
-      console.log(`[DELETE PERIOD] Eliminando ${period.pdfFiles.length} archivos PDF de la BD...`);
       await prisma.pdfFile.deleteMany({
         where: { periodId: periodId }
       });
@@ -62,14 +57,12 @@ export const DELETE: RequestHandler = async (event) => {
 
     // 4. Eliminar BankTransfer si existe
     if (period.transfer) {
-      console.log(`[DELETE PERIOD] Eliminando BankTransfer: ${period.transfer.id}`);
       await prisma.bankTransfer.delete({
         where: { id: period.transfer.id }
       });
     }
 
     // 5. Eliminar el PayrollPeriod
-    console.log(`[DELETE PERIOD] Eliminando PayrollPeriod: ${periodId}`);
     await prisma.payrollPeriod.delete({
       where: { id: periodId }
     });
@@ -80,11 +73,8 @@ export const DELETE: RequestHandler = async (event) => {
       const deleted = await deleteFile(filePath);
       if (deleted) {
         filesDeletedCount++;
-        console.log(`[DELETE PERIOD] Archivo físico eliminado: ${filePath}`);
       }
     }
-
-    console.log(`[DELETE PERIOD] Eliminación completada exitosamente`);
 
     return json({
       success: true,

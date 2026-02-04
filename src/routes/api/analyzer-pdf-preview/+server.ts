@@ -71,10 +71,6 @@ export const POST: RequestHandler = async (event) => {
   }
 
   try {
-    console.log('\n========================================');
-    console.log('🔍 [PREVIEW] INICIO DE ANÁLISIS');
-    console.log('========================================\n');
-
     const contentType = event.request.headers.get('content-type');
     if (!contentType || !contentType.includes('multipart/form-data')) {
       return json({ error: 'Se esperaba multipart/form-data' }, { status: 400 });
@@ -94,7 +90,6 @@ export const POST: RequestHandler = async (event) => {
 
     // Parsear período
     const [year, month] = selectedPeriodRaw.split('-').map(Number);
-    console.log('[PREVIEW] Período seleccionado:', { year, month });
 
     // Obtener todos los archivos
     const files: File[] = [];
@@ -115,9 +110,6 @@ export const POST: RequestHandler = async (event) => {
     if (files.length === 0) {
       return json({ error: 'No se proporcionaron archivos' }, { status: 400 });
     }
-
-    console.log('[PREVIEW] Archivos recibidos:', files.length);
-    files.forEach((f, i) => console.log(`  ${i + 1}. ${f.name} (${f.size} bytes)`));
 
     // Validar tamaño de archivos
     for (const file of files) {
@@ -152,33 +144,19 @@ export const POST: RequestHandler = async (event) => {
         fileName: file.name,
         type: finalType
       });
-
-      console.log(`[PREVIEW] Archivo: ${file.name} -> Tipo: ${finalType}`);
     }
 
     // Analizar todos los archivos
-    console.log('[PREVIEW] Iniciando análisis batch...');
     const batchResult = await analyzeBatchPreview(
       fileInputs,
       selectedPeriodRaw,
       institutionIdRaw || undefined
     );
 
-    console.log('[PREVIEW] ✓ Análisis completado');
-    console.log('[PREVIEW] Validación:', batchResult.validation);
-
-    console.log('\n========================================');
-    console.log('✓ [PREVIEW] ANÁLISIS COMPLETADO');
-    console.log('========================================\n');
-
     return json(batchResult, { status: 200 });
 
   } catch (error) {
-    console.error('\n========================================');
-    console.error('❌ [PREVIEW] ERROR EN ANÁLISIS');
-    console.error('========================================');
-    console.error('[PREVIEW] Error:', error);
-    console.error('========================================\n');
+    console.error('[PREVIEW] Error en análisis:', error);
 
     return json({
       error: 'Error al analizar los archivos',

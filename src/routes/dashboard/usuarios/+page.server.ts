@@ -49,7 +49,6 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
     // Obtener instituciones para el dropdown
     const institutionsResult = await InstitutionService.findMany({}, { page: 1, limit: 100 });
 
-    console.log(result);
     return {
       users: result.data,
       institutions: institutionsResult.data,

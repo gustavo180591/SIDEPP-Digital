@@ -79,8 +79,6 @@ function parseMoneyToNumber(s?: string | null): number | null {
 function extractTransferAmount(text: string): number | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   
-  console.log('[extractTransferAmount] Iniciando extracción de importe de transferencia...');
-  
   // Patrón mejorado para montos: acepta formatos con puntos como separadores de miles y coma como decimal
   const MONEY_RE = /\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/g;
   
@@ -102,7 +100,6 @@ function extractTransferAmount(text: string): number | null {
         const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
         const val = Number.parseFloat(normalized);
         if (Number.isFinite(val) && val > 0) {
-          console.log(`[extractTransferAmount] Encontrado con etiqueta de alta prioridad: ${val} (línea: "${line}")`);
           return val; // Devolver inmediatamente si encontramos con etiqueta de alta prioridad
         }
       }
@@ -130,7 +127,6 @@ function extractTransferAmount(text: string): number | null {
   }
   
   if (labeledCandidate != null) {
-    console.log(`[extractTransferAmount] Encontrado con etiqueta común: ${labeledCandidate} (línea: "${labeledLine}")`);
     return labeledCandidate;
   }
 
@@ -153,9 +149,7 @@ function extractTransferAmount(text: string): number | null {
   }
   
   if (maxVal != null) {
-    console.log(`[extractTransferAmount] Fallback - mayor importe encontrado: ${maxVal} (línea: "${maxLine}")`);
   } else {
-    console.log('[extractTransferAmount] No se pudo extraer ningún importe de transferencia');
   }
   
   return maxVal;
@@ -251,7 +245,6 @@ function extractInstitutionCuit(text: string): string | null {
   }
   const allMatches = Array.from(new Set(candidates));
   if (allMatches.length) {
-    console.log('[analyzer][institution] Candidatos de CUIT encontrados:', allMatches);
   }
   if (allMatches.length > 0) {
     const juridicos = allMatches.find((d) => /^(30|33|34)/.test(d));
@@ -331,8 +324,6 @@ function extractTableData(text: string): {
 } {
 	const result: Record<string, number> = {};
 	
-	
-	
 	// Patrones para datos específicos de tabla - mejorados para el formato del documento
 	const PATTERNS = {
 		// Buscar "Cantidad de Personas: X" en la sección de totales
@@ -384,11 +375,9 @@ function extractTableData(text: string): {
 	const totalesIndex = lines.findIndex(line => /totales?/i.test(line));
 	if (totalesIndex !== -1) {
 		
-		
 		// Buscar "Cantidad de Personas: X" en las líneas siguientes
 		for (let i = totalesIndex; i < Math.min(totalesIndex + 5, lines.length); i++) {
 			const line = lines[i];
-			
 			
 			// Buscar cantidad de personas
 			const personasMatch = line.match(/(?:cantidad de personas|cantidad personas)[\s:]*(\d+)/i);
@@ -446,7 +435,6 @@ function extractTableData(text: string): {
 				totalLegajos += legajos;
 				totalMonto += montoConcepto;
 				
-				
 			}
 		}
 		
@@ -457,10 +445,8 @@ function extractTableData(text: string): {
 			if (!result.cantidadLegajos) result.cantidadLegajos = totalLegajos;
 			if (!result.montoConcepto) result.montoConcepto = totalMonto;
 			
-
 		}
 	}
-	
 	
 	return result;
 }
@@ -478,11 +464,7 @@ function extractPersonas(text: string): Array<{
 		montoConcepto: number;
 	}> = [];
 	
-	
 	const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-	
-	
-	
 	
 	// Buscar líneas que parecen filas de datos de personas
 	// Formato acordado:
@@ -490,7 +472,6 @@ function extractPersonas(text: string): Array<{
 	//  2) "tot_remunerativo" (línea siguiente con solo el número)
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		
 		
 		// Patrón para línea 1: nombre, cantidad de legajos, monto concepto
 		const personaMatch = line.match(/^([a-záéíóúñ\s]+?)\s+(\d+)\s+(\d+(?:[\.,]\d+)?)$/i);
@@ -504,7 +485,6 @@ function extractPersonas(text: string): Array<{
 			let totRemunerativo = 0;
 			if (i + 1 < lines.length) {
 				const nextLine = lines[i + 1];
-				
 				
 				// La siguiente línea debería ser solo un número (total remunerativo)
 				const remMatch = nextLine.match(/^(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:\.\d+)?)$/);
@@ -523,13 +503,10 @@ function extractPersonas(text: string): Array<{
 				montoConcepto: montoConcepto
 			});
 			
-			
 		} else {
 			
 		}
 	}
-	
-	
 	
 	return personas;
 }
@@ -560,14 +537,11 @@ async function findMemberByName(
 		});
 
 		if (m) {
-			console.log(`[findMemberByName] ✓ Miembro encontrado: ${m.id} para nombre "${fullName}"`);
 			return { id: m.id };
 		}
 
-		console.log(`[findMemberByName] ✗ No se encontró miembro para nombre "${fullName}"`);
 		return null;
 	} catch (e) {
-		console.warn('[findMemberByName] Error en búsqueda:', e);
 		return null;
 	}
 }
@@ -595,24 +569,13 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		errors: [] as string[]
 	};
 
-	console.log('[BANK_SESSION_CLEANUP] Iniciando limpieza de sesión...');
-	console.log('[BANK_SESSION_CLEANUP] Datos a limpiar:', {
-		periodId: data.periodId,
-		periodWasCreated: data.periodWasCreated,
-		pdfFileIds: data.pdfFileIds.length,
-		bankTransferId: data.bankTransferId,
-		savedFilePaths: data.savedFilePaths.length
-	});
-
 	// ORDEN: Respetar foreign keys (de más dependiente a menos dependiente)
 
 	// 1. Eliminar BankTransfer de esta sesión
 	if (data.bankTransferId) {
-		console.log('[BANK_SESSION_CLEANUP][1] Eliminando BankTransfer...');
 		try {
 			await prisma.bankTransfer.delete({ where: { id: data.bankTransferId } });
 			results.bankTransferDeleted = true;
-			console.log(`[BANK_SESSION_CLEANUP][1] ✓ BankTransfer eliminado`);
 		} catch (e) {
 			const msg = `BankTransfer: ${e instanceof Error ? e.message : e}`;
 			results.errors.push(msg);
@@ -622,13 +585,11 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 2. Eliminar PdfFiles de esta sesión
 	if (data.pdfFileIds.length > 0) {
-		console.log('[BANK_SESSION_CLEANUP][2] Eliminando PdfFiles...');
 		try {
 			const deleted = await prisma.pdfFile.deleteMany({
 				where: { id: { in: data.pdfFileIds } }
 			});
 			results.pdfFilesDeleted = deleted.count;
-			console.log(`[BANK_SESSION_CLEANUP][2] ✓ ${deleted.count} PdfFiles eliminados`);
 		} catch (e) {
 			const msg = `PdfFiles: ${e instanceof Error ? e.message : e}`;
 			results.errors.push(msg);
@@ -638,7 +599,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 3. Eliminar PayrollPeriod SOLO si fue CREADO en esta sesión (no si ya existía)
 	if (data.periodId && data.periodWasCreated) {
-		console.log('[BANK_SESSION_CLEANUP][3] Eliminando PayrollPeriod creado en esta sesión...');
 		try {
 			// Verificar que no tenga otros PDFs asociados (por si algo quedó)
 			const period = await prisma.payrollPeriod.findUnique({
@@ -649,9 +609,7 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 			if (period && period.pdfFiles.length === 0 && !period.bankTransfer) {
 				await prisma.payrollPeriod.delete({ where: { id: data.periodId } });
 				results.periodDeleted = true;
-				console.log(`[BANK_SESSION_CLEANUP][3] ✓ PayrollPeriod eliminado`);
 			} else if (period) {
-				console.log(`[BANK_SESSION_CLEANUP][3] ⚠️ PayrollPeriod tiene ${period.pdfFiles.length} PDFs y/o BankTransfer, no se elimina`);
 			}
 		} catch (e) {
 			const msg = `PayrollPeriod: ${e instanceof Error ? e.message : e}`;
@@ -662,17 +620,14 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 4. Eliminar archivos físicos de esta sesión
 	if (data.savedFilePaths.length > 0) {
-		console.log('[BANK_SESSION_CLEANUP][4] Eliminando archivos físicos...');
 		for (const filePath of data.savedFilePaths) {
 			const deleted = await deleteFile(filePath);
 			if (deleted) {
 				results.filesDeleted++;
 			}
 		}
-		console.log(`[BANK_SESSION_CLEANUP][4] ✓ ${results.filesDeleted} archivos físicos eliminados`);
 	}
 
-	console.log('[BANK_SESSION_CLEANUP] ✓ Limpieza de sesión completada:', results);
 	return results;
 }
 
@@ -714,16 +669,13 @@ export const POST: RequestHandler = async (event) => {
 		const buffer = Buffer.from(await file.arrayBuffer());
 		// Calcular hash SHA-256 para deduplicación
 		const bufferHash = createHash('sha256').update(buffer).digest('hex');
-		console.log('[analyzer][hash] SHA-256:', bufferHash);
 		// Deduplicación en DB por hash (fuente de verdad)
 		try {
 			const existingPdf = await prisma.pdfFile.findUnique({ where: { bufferHash } });
 			if (existingPdf) {
-				console.warn('[analyzer][hash][db] Duplicado en DB, no se guarda:', { id: existingPdf.id, fileName: existingPdf.fileName });
 				return json({ status: 'duplicate', message: 'El archivo ya fue cargado anteriormente', bufferHash, pdfFileId: existingPdf.id }, { status: 409 });
 			}
 		} catch (dbDupErr) {
-			console.warn('[analyzer][hash][db] Error verificando duplicado:', dbDupErr);
 		}
 
 		const detected = await fileTypeFromBuffer(buffer);
@@ -734,19 +686,11 @@ export const POST: RequestHandler = async (event) => {
 			return json({ error: 'El archivo no parece ser un PDF válido' }, { status: 400 });
 		}
 
-		console.log('\n\n========================================');
-		console.log('🚀 [BANK] INICIO DE PROCESAMIENTO');
-		console.log('========================================\n');
-
-		console.log('[BANK][1] Guardando archivo con UUID...');
-		console.log('[BANK][1] Nombre original:', file.name);
 		const savedPath = await saveAnalyzerFile(buffer, file.name);
 		// TRACKING: Registrar archivo físico guardado para posible rollback
 		sessionData.savedFilePaths.push(savedPath);
-		console.log('[BANK][1] ✓ Archivo guardado:', savedPath);
 
 		// Crear PdfFile en DB temprano (sin periodId aún)
-		console.log('[BANK][3] 💾 Creando registro PdfFile en DB...');
 		let pdfFileId: string | null = null;
 		try {
 			const createdPdf = await prisma.pdfFile.create({
@@ -761,7 +705,6 @@ export const POST: RequestHandler = async (event) => {
 			pdfFileId = createdPdf.id;
 			// TRACKING: Registrar PdfFile creado para posible rollback
 			sessionData.pdfFileIds.push(pdfFileId);
-			console.log('[BANK][3] ✓ PdfFile creado en DB:', { id: pdfFileId, fileName: createdPdf.fileName });
 		} catch (pdfDbErr) {
 			console.error('[BANK][3] ❌ Error al crear PdfFile en DB:', pdfDbErr);
 			throw pdfDbErr; // Relanzar para que se capture en el catch principal
@@ -770,25 +713,18 @@ export const POST: RequestHandler = async (event) => {
 		// ============================================================================
 		// NUEVO: Usar analyzer con IA (Claude API)
 		// ============================================================================
-		console.log('[BANK][10] 🤖 Usando analyzer con IA (Claude API)...');
 		let analyzerResult: any = null;
 		let isMultipleTransfers = false;
 		let totalImporteMultiple = 0;
 		try {
 			analyzerResult = await analyzeTransferenciaIA(buffer, file.name);
-			console.log('[BANK][10] ✓ Analyzer IA ejecutado exitosamente');
-			console.log('[BANK][10] Tipo detectado:', analyzerResult.tipo);
 
 			// Manejar múltiples transferencias
 			if (analyzerResult.tipo === 'TRANSFERENCIAS_MULTIPLES') {
 				isMultipleTransfers = true;
 				totalImporteMultiple = analyzerResult.resumen?.importeTotal ?? 0;
-				console.log('[BANK][10] 📋 MÚLTIPLES TRANSFERENCIAS DETECTADAS:');
-				console.log('[BANK][10]   Cantidad:', analyzerResult.resumen?.cantidadTransferencias);
-				console.log('[BANK][10]   Importe Total:', totalImporteMultiple);
 				for (let i = 0; i < analyzerResult.transferencias.length; i++) {
 					const t = analyzerResult.transferencias[i];
-					console.log(`[BANK][10]   Transferencia ${i + 1}: $${t.operacion?.importe} - Nro. ${t.nroOperacion}`);
 				}
 				// Para compatibilidad con el resto del código, usar la primera transferencia como base
 				// pero guardaremos el importe total
@@ -808,22 +744,13 @@ export const POST: RequestHandler = async (event) => {
 					};
 				}
 			} else {
-				console.log('[BANK][10] CBU Destino:', analyzerResult.operacion?.cbuDestino);
-				console.log('[BANK][10] Importe:', analyzerResult.operacion?.importe);
-				console.log('[BANK][10] Cuenta Origen:', analyzerResult.operacion?.cuentaOrigen);
-				console.log('[BANK][10] Titular:', analyzerResult.operacion?.titular);
-				console.log('[BANK][10] CUIT Ordenante:', analyzerResult.ordenante?.cuit);
-				console.log('[BANK][10] Nro Referencia:', analyzerResult.nroReferencia);
-				console.log('[BANK][10] Nro Operación:', analyzerResult.nroOperacion);
 			}
 		} catch (analyzerErr) {
 			console.error('[BANK][10] ❌ Error en analyzer IA:', analyzerErr);
 			// El analyzer IA es crítico, si falla retornamos error
 			// ROLLBACK: Limpiar archivo, hash y PdfFile creados antes del error
-			console.log('[BANK][10] Ejecutando rollback de sesión por error en analyzer...');
 			try {
 				const cleanupResult = await performSessionCleanup(sessionData);
-				console.log('[BANK][10] Rollback completado:', cleanupResult);
 			} catch (cleanupErr) {
 				console.error('[BANK][10] Error en rollback:', cleanupErr);
 			}
@@ -839,10 +766,6 @@ export const POST: RequestHandler = async (event) => {
 		
 		let extractedText = await extractTextWithPdfJs(buffer);
 		
-		
-		
-		
-
 		// 2) Fallback a pdf-parse si no devolvió texto
 		if (!extractedText || extractedText.trim().length === 0) {
 			
@@ -851,9 +774,6 @@ export const POST: RequestHandler = async (event) => {
 				const pdfParseModule = await import('pdf-parse');
 				const result = await pdfParseModule.default(buffer);
 				extractedText = (result.text || '');
-				
-				
-				
 				
 			} catch (e) {
 				console.error('[analyzer-pdf-bank] Error extrayendo texto del PDF:', e instanceof Error ? e.message : e);
@@ -864,16 +784,11 @@ export const POST: RequestHandler = async (event) => {
 
 		extractedText = extractedText.toLowerCase();
 		
-
 		let kind: 'comprobante' | 'listado' | 'desconocido' = 'desconocido';
 		if (extractedText) {
 			
 			const isComprobante = /(comprobante|transferencia|operaci[oó]n|cbu|importe|referencia)/i.test(extractedText);
 			const isListado = /(listado|detalle de aportes|aportes|cuil|cuit|legajo|n[oº]\.\?\s*orden)/i.test(extractedText);
-			
-			
-			
-			
 			
 			if (isComprobante && !isListado) {
 				kind = 'comprobante';
@@ -893,10 +808,6 @@ export const POST: RequestHandler = async (event) => {
 
 		const fullText = extractedText;
 		
-		
-		
-		
-
 		let preview: unknown = undefined;
 		let checks: unknown = undefined;
 		let institution: { id: string; name: string | null; cuit: string | null; address?: string | null } | undefined = undefined;
@@ -905,32 +816,24 @@ export const POST: RequestHandler = async (event) => {
 		// DEBUG: mostrar primeras líneas del texto para diagnóstico
 		try {
 			const firstLines = fullText.split(/\r?\n/).slice(0, 40);
-			console.log('[analyzer][debug] Primeras líneas del texto:', firstLines);
 		} catch {}
 
-		
 		const rawLines = fullText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-		
-		
 		
 		const rows = rawLines
 			.map((line, idx) => ({ lineNumber: idx + 1, ...extractLineData(line) }))
 			.filter((r) => r.cuit || r.importe || r.nombre);
 
-		
 		// Detectar institución por CUIT del ordenante (prioridad: analyzer, fallback: texto)
-		console.log('[BANK][institution] 🔍 Detectando institución...');
 		try {
 			let instCuitDigits: string | null = null;
 
 			// PRIORIDAD 1: Usar CUIT del analyzer (ordenante)
 			if (analyzerResult && analyzerResult.ordenante && analyzerResult.ordenante.cuit) {
 				instCuitDigits = analyzerResult.ordenante.cuit.replace(/\D/g, ''); // Quitar guiones
-				console.log('[BANK][institution] ✓ CUIT del analyzer (ordenante):', analyzerResult.ordenante.cuit, '→', instCuitDigits);
 			} else {
 				// FALLBACK: Extraer del texto
 				instCuitDigits = extractInstitutionCuit(fullText);
-				console.log('[BANK][institution] CUIT del texto (fallback):', instCuitDigits);
 			}
 
 			if (!instCuitDigits || instCuitDigits.length !== 11) {
@@ -946,17 +849,11 @@ export const POST: RequestHandler = async (event) => {
 
 			// Normalizar CUIT a formato con guiones: XX-XXXXXXXX-X (usando utilidad centralizada)
 			const instCuit = formatCuitUtil(instCuitDigits);
-			console.log('[BANK][institution] CUIT normalizado (con guiones):', instCuit);
 
 			// Buscar institución por CUIT (con guiones)
 			try {
 				const existing = await prisma.institution.findUnique({ where: { cuit: instCuit ?? undefined } });
 				if (existing) {
-					console.log('[BANK][institution] ✓ Institución encontrada:', {
-						id: existing.id,
-						cuit: existing.cuit,
-						name: existing.name
-					});
 					institution = {
 						id: existing.id,
 						name: existing.name ?? null,
@@ -965,15 +862,9 @@ export const POST: RequestHandler = async (event) => {
 					};
 				} else {
 					// Intentar buscar sin guiones como fallback
-					console.log('[BANK][institution] No encontrado con guiones, intentando sin guiones:', instCuitDigits);
 					const existingNoHyphens = await prisma.institution.findUnique({ where: { cuit: instCuitDigits } });
 
 					if (existingNoHyphens) {
-						console.log('[BANK][institution] ✓ Institución encontrada (sin guiones):', {
-							id: existingNoHyphens.id,
-							cuit: existingNoHyphens.cuit,
-							name: existingNoHyphens.name
-						});
 						institution = {
 							id: existingNoHyphens.id,
 							name: existingNoHyphens.name ?? null,
@@ -1008,38 +899,22 @@ export const POST: RequestHandler = async (event) => {
 		// Las ContributionLines solo se crean desde PDFs de aportes
 		// Esta sección ha sido removida para evitar datos incorrectos en la base de datos
 
-		console.log('[BANK][info] ℹ️  Las transferencias bancarias no generan ContributionLines');
-
 		// Datos de tabla y personas solo se usan para el preview en respuesta, no para persistencia
 		const tableData = extractTableData(fullText);
 		const personas = extractPersonas(fullText);
-		console.log('[BANK][info] Datos extraídos solo para preview:', {
-			tableDataKeys: Object.keys(tableData).length,
-			personasCount: personas.length
-		});
-
 
 		if (rows.length > 0) {
-			
-			
 			
 			const sumTotal = rows.reduce((acc, r) => acc + (parseMoneyToNumber(r.importe) ?? 0), 0);
 			const declaredTotal = detectDeclaredTotal(fullText);
 			const totalMatches = declaredTotal != null ? Math.abs(sumTotal - declaredTotal) < 0.5 : false;
 			
-			
-			
-			
-			
-
 			const detectedPeriod = detectPeriod(fullText);
 			const selectedPeriod = parseSelectedPeriod(selectedPeriodRaw);
 			const periodMatches = selectedPeriod && detectedPeriod.year && detectedPeriod.month
 				? (selectedPeriod.year === detectedPeriod.year && selectedPeriod.month === detectedPeriod.month)
 				: null;
 			
-
-
 			preview = { 
 				listado: { 
 					count: rows.length, 
@@ -1056,9 +931,6 @@ export const POST: RequestHandler = async (event) => {
 				
 			}
 		} else {
-			
-			
-			
 			
 			// Aún así, incluir datos de tabla si se encontraron
 			if (Object.keys(tableData).length > 0 || personas.length > 0) {
@@ -1079,16 +951,11 @@ export const POST: RequestHandler = async (event) => {
 		let transferAmount: number | null = null;
 		if (analyzerResult && analyzerResult.operacion && analyzerResult.operacion.importe) {
 			transferAmount = Number(analyzerResult.operacion.importe);
-			console.log('[BANK][transfer] ✓ Importe del analyzer mejorado:', transferAmount);
 		} else {
 			transferAmount = extractTransferAmount(fullText);
-			console.log('[BANK][transfer] Importe del método legacy:', transferAmount);
 		}
 
 		// Crear PayrollPeriod asociado a la institución y al PdfFile (solo si hay institución y pdfFile creado)
-		console.log('[BANK][payroll] 📋 Iniciando creación de PayrollPeriod...');
-		console.log('[BANK][payroll] institution:', institution ? `✓ ${institution.id}` : '❌ null');
-		console.log('[BANK][payroll] pdfFileId:', pdfFileId ? `✓ ${pdfFileId}` : '❌ null');
 
 		try {
 			if (institution && pdfFileId) {
@@ -1116,7 +983,6 @@ export const POST: RequestHandler = async (event) => {
 				if (analyzerResult && analyzerResult.operacion && analyzerResult.operacion.importe) {
 					totalAmountNumber = Number(analyzerResult.operacion.importe) || 0;
 					peopleCount = null; // Los comprobantes no tienen peopleCount
-					console.log('[BANK][total] ✓ Usando importe de transferencia:', totalAmountNumber);
 				} else {
 					// Para listados de aportes (fallback, aunque este endpoint es para comprobantes)
 					const table = extractTableData(fullText);
@@ -1146,9 +1012,7 @@ export const POST: RequestHandler = async (event) => {
 					// TRACKING: Registrar PayrollPeriod creado para posible rollback
 					sessionData.periodId = createdPeriodId;
 					sessionData.periodWasCreated = true;
-					console.log('[BANK][period] ✓ PayrollPeriod creado:', { id: createdPeriodId, month: created.month, year: created.year });
 				} catch (perr: any) {
-					console.warn('[BANK][period] ⚠️ No se pudo crear PayrollPeriod (puede existir):', perr?.message);
 					// Intentar encontrar existente por índice único si aplica
 					try {
 						const existing = await prisma.payrollPeriod.findFirst({
@@ -1163,7 +1027,6 @@ export const POST: RequestHandler = async (event) => {
 							// TRACKING: El período ya existía, NO se marca para rollback
 							sessionData.periodId = createdPeriodId;
 							sessionData.periodWasCreated = false; // No eliminar en rollback
-							console.log('[BANK][period] ✓ PayrollPeriod existente encontrado:', { id: createdPeriodId });
 						}
 					} catch {}
 				}
@@ -1179,7 +1042,6 @@ export const POST: RequestHandler = async (event) => {
 								totalAmount: totalAmount
 							}
 						});
-						console.log('[BANK][period] ✓ PDF asociado al período y actualizado:', { pdfFileId, periodId: createdPeriodId, peopleCount, totalAmount });
 					} catch (updateErr) {
 						console.error('[BANK][period] ❌ Error asociando PDF al período:', updateErr);
 					}
@@ -1225,17 +1087,6 @@ export const POST: RequestHandler = async (event) => {
 								}
 							}
 
-							// Logging de diagnóstico antes de guardar
-							// Nota: El analyzer IA usa operacion.titular y operacion.cuit para el beneficiario
-							console.log('[BANK][DEBUG] Datos a guardar en BankTransfer:', {
-								importe: importeDecimal,
-								importeATransferir: importeATransferirDecimal,
-								importeTotal: importeTotalDecimal,
-								cbuDestino: analyzerResult.operacion?.cbuDestino,
-								cuitBenef: analyzerResult.operacion?.cuit,
-								titular: analyzerResult.operacion?.titular
-							});
-
 							// Crear el BankTransfer con manejo de race conditions
 							try {
 								const bankTransfer = await prisma.bankTransfer.create({
@@ -1264,25 +1115,14 @@ export const POST: RequestHandler = async (event) => {
 
 								// TRACKING: Registrar BankTransfer creado para posible rollback
 								sessionData.bankTransferId = bankTransfer.id;
-
-								console.log('[BANK][transfer] ✓ BankTransfer creado con datos completos del analyzer:', {
-									id: bankTransfer.id,
-									importe: importeDecimal,
-									cbu: bankTransfer.cbuDestino,
-									banco: bankTransfer.banco,
-									ordenante: bankTransfer.ordenanteNombre,
-									periodId: createdPeriodId
-								});
 							} catch (createErr: any) {
 								// Manejar race condition (P2002 = unique constraint violation)
 								if (createErr?.code === 'P2002') {
-									console.warn('[BANK][transfer] ⚠️ Race condition detectada - BankTransfer ya existe (creado concurrentemente)');
 									// Buscar el registro existente
 									const raceTransfer = await prisma.bankTransfer.findUnique({
 										where: { periodId: createdPeriodId }
 									});
 									if (raceTransfer) {
-										console.log('[BANK][transfer] ✓ BankTransfer existente encontrado:', raceTransfer.id);
 									}
 								} else {
 									// Re-lanzar otros errores
@@ -1290,18 +1130,13 @@ export const POST: RequestHandler = async (event) => {
 								}
 							}
 						} else {
-							console.log('[BANK][transfer] ℹ️ BankTransfer ya existe para este período:', existingTransfer.id);
 						}
 					} catch (transferErr) {
 						console.error('[BANK][transfer] ❌ Error creando BankTransfer:', transferErr);
 					}
 				} else {
 					if (!createdPeriodId) {
-						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: falta periodId');
 					} else if (!analyzerResult || !analyzerResult.operacion) {
-						console.warn('[BANK][transfer] ⚠️ No se pudo crear BankTransfer: faltan datos del analyzer (analyzerResult.operacion)');
-						console.log('[BANK][transfer] DEBUG - analyzerResult:', analyzerResult ? 'existe' : 'null');
-						console.log('[BANK][transfer] DEBUG - analyzerResult.operacion:', analyzerResult?.operacion ? 'existe' : 'null');
 					}
 				}
 			}
@@ -1309,10 +1144,6 @@ export const POST: RequestHandler = async (event) => {
 			console.error('[BANK][period] ❌ Error general creando PayrollPeriod y BankTransfer:', ppErr);
 			// NO silenciar el error - continuar pero reportar
 		}
-
-		console.log('\n========================================');
-		console.log('✓ [BANK] PROCESAMIENTO COMPLETADO');
-		console.log('========================================\n');
 
 		return json({
 			fileName: file.name,
@@ -1352,12 +1183,9 @@ export const POST: RequestHandler = async (event) => {
 		// ============================================================================
 		// ROLLBACK DE SESIÓN: Limpiar todo lo creado en esta sesión fallida
 		// ============================================================================
-		console.log('[BANK] Iniciando rollback de sesión...');
 		try {
 			const cleanupResult = await performSessionCleanup(sessionData);
-			console.log('[BANK] Rollback completado:', cleanupResult);
 			if (cleanupResult.errors.length > 0) {
-				console.warn('[BANK] Errores durante rollback:', cleanupResult.errors);
 			}
 		} catch (cleanupErr) {
 			console.error('[BANK] Error crítico durante rollback:', cleanupErr);
@@ -1366,5 +1194,3 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Error al procesar el archivo', details: message }, { status: 500 });
 	}
 };
-
-

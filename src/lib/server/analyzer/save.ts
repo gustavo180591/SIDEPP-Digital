@@ -111,11 +111,7 @@ function isPrismaUniqueConstraintError(error: unknown): boolean {
 export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveResult> {
   const { previews, selectedPeriod, institutionId } = input;
 
-  console.log('[saveBatchAtomic] Iniciando guardado atómico...');
-  console.log('[saveBatchAtomic] Período:', selectedPeriod);
-  console.log('[saveBatchAtomic] Institución:', institutionId);
-  console.log('[saveBatchAtomic] Archivos a guardar:', Object.keys(previews).filter(k => previews[k as keyof typeof previews]));
-
+        
   // Archivos físicos guardados (para cleanup en caso de error)
   const savedFilePaths: string[] = [];
 
@@ -126,8 +122,7 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
       let periodId: string | null = null;
 
       // 1. Buscar o crear PayrollPeriod
-      console.log('[saveBatchAtomic] Paso 1: Buscar/crear PayrollPeriod...');
-      let period = await tx.payrollPeriod.findFirst({
+            let period = await tx.payrollPeriod.findFirst({
         where: {
           institutionId,
           month: selectedPeriod.month,
@@ -145,9 +140,7 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
             transferId: fallbackTransferId
           }
         });
-        console.log('[saveBatchAtomic] ✓ PayrollPeriod creado:', period.id);
       } else {
-        console.log('[saveBatchAtomic] ✓ PayrollPeriod existente:', period.id);
       }
 
       periodId = period.id;
@@ -157,7 +150,6 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
         if (!preview || !preview.success) continue;
 
         if (preview.type === 'APORTES') {
-          console.log(`[saveBatchAtomic] Paso 2: Guardando ${key}...`);
           const aportesResult = await saveAportesFile(
             preview as AportesPreviewResult,
             periodId,
@@ -172,7 +164,6 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
 
       // 3. Guardar transferencia
       if (previews.transferencia?.success && previews.transferencia.type === 'TRANSFERENCIA') {
-        console.log('[saveBatchAtomic] Paso 3: Guardando transferencia...');
         const transferResult = await saveTransferenciaFile(
           previews.transferencia as TransferenciaPreviewResult,
           periodId,
@@ -188,7 +179,6 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
       timeout: 60000
     });
 
-    console.log('[saveBatchAtomic] ✓ Guardado atómico completado exitosamente');
 
     return {
       success: true,
@@ -197,13 +187,12 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
     };
 
   } catch (error) {
-    console.error('[saveBatchAtomic] ❌ Error en transacción, ejecutando cleanup...');
+    console.error('[saveBatchAtomic] Error en transacción, ejecutando cleanup...');
 
     // Limpiar archivos físicos guardados
     for (const filePath of savedFilePaths) {
       const deleted = await deleteFile(filePath);
       if (deleted) {
-        console.log(`[saveBatchAtomic] ✓ Archivo eliminado: ${filePath}`);
       }
     }
 
@@ -242,7 +231,6 @@ async function saveAportesFile(
   const buffer = Buffer.from(preview.bufferBase64, 'base64');
   const storagePath = await saveAnalyzerFile(buffer, preview.fileName);
   savedFilePaths.push(storagePath);
-  console.log(`[saveAportesFile] ✓ Archivo guardado: ${storagePath}`);
 
   // 2. Crear PdfFile en DB con storagePath
   const analysis = preview.analysis as ListadoPDFResult;
@@ -259,7 +247,6 @@ async function saveAportesFile(
       period: { connect: { id: periodId } }
     }
   });
-  console.log(`[saveAportesFile] ✓ PdfFile creado: ${pdfFile.id}`);
 
   // 3. Crear ContributionLines y Members
   let contributionLineCount = 0;
@@ -280,7 +267,6 @@ async function saveAportesFile(
             }
           });
           member = { id: createdMember.id };
-          console.log(`[saveAportesFile] ✓ Miembro creado: ${createdMember.id}`);
         } catch (err: any) {
           // Race condition: buscar nuevamente
           if (err?.code === 'P2002') {
@@ -306,7 +292,6 @@ async function saveAportesFile(
     }
   }
 
-  console.log(`[saveAportesFile] ✓ ${contributionLineCount} ContributionLines creadas`);
 
   return { pdfFileId: pdfFile.id, contributionLineCount };
 }
@@ -324,7 +309,6 @@ async function saveTransferenciaFile(
   const buffer = Buffer.from(preview.bufferBase64, 'base64');
   const storagePath = await saveAnalyzerFile(buffer, preview.fileName);
   savedFilePaths.push(storagePath);
-  console.log(`[saveTransferenciaFile] ✓ Archivo guardado: ${storagePath}`);
 
   // 2. Crear PdfFile en DB con storagePath
   const pdfFile = await tx.pdfFile.create({
@@ -338,7 +322,6 @@ async function saveTransferenciaFile(
       period: { connect: { id: periodId } }
     }
   });
-  console.log(`[saveTransferenciaFile] ✓ PdfFile creado: ${pdfFile.id}`);
 
   // 3. Crear BankTransfer
   const analysis = preview.analysis;
@@ -401,7 +384,6 @@ async function saveTransferenciaFile(
     }
   });
 
-  console.log(`[saveTransferenciaFile] ✓ BankTransfer creado: ${bankTransfer.id}`);
 
   return { pdfFileId: pdfFile.id, bankTransferId: bankTransfer.id };
 }

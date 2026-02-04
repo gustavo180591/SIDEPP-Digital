@@ -56,12 +56,9 @@ const { MAX_FILE_SIZE } = CONFIG;
 
 async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 	try {
-		console.log('[extractTextWithPdfJs] ===== INICIO EXTRACCIÓN PDF.JS =====');
-		console.log('[extractTextWithPdfJs] Tamaño del buffer:', buffer.length, 'bytes');
 		
 		// Usamos la build legacy para Node y deshabilitamos worker
 		const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
-		console.log('[extractTextWithPdfJs] PDF.js importado correctamente');
 		
 		// En entornos Node no es necesario establecer workerSrc; usamos useWorker:false
 		const uint8 = new Uint8Array(buffer);
@@ -69,15 +66,11 @@ async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 		const pdf = await loadingTask.promise;
 		const numPages = pdf.numPages ?? 1;
 		
-		console.log('[extractTextWithPdfJs] PDF cargado. Número de páginas:', numPages);
-		
 		let allText = '';
 		for (let p = 1; p <= numPages; p++) {
-			console.log(`[extractTextWithPdfJs] Procesando página ${p}/${numPages}...`);
 			const page = await pdf.getPage(p);
 			const content = await page.getTextContent();
 			const items = content.items as Array<any>;
-			console.log(`[extractTextWithPdfJs] Página ${p}: ${items.length} elementos de texto encontrados`);
 			
 			const linesMap = new Map<number, Array<{ x: number; str: string }>>();
 			for (const it of items) {
@@ -96,10 +89,6 @@ async function extractTextWithPdfJs(buffer: Buffer): Promise<string> {
 				if (line) allText += line + '\n';
 			}
 		}
-		
-		console.log('[extractTextWithPdfJs] Texto total extraído:', allText.length, 'caracteres');
-		console.log('[extractTextWithPdfJs] Primeras 500 caracteres:', allText.substring(0, 500));
-		console.log('[extractTextWithPdfJs] ===== FIN EXTRACCIÓN PDF.JS =====');
 		
 		return allText;
 	} catch (e) {
@@ -211,7 +200,6 @@ function extractInstitutionCuit(text: string): string | null {
   }
   const allMatches = Array.from(new Set(candidates));
   if (allMatches.length) {
-    console.log('[analyzer][institution] Candidatos de CUIT encontrados:', allMatches);
   }
   if (allMatches.length > 0) {
     const juridicos = allMatches.find((d) => /^(30|33|34)/.test(d));
@@ -293,28 +281,23 @@ function extractTableData(text: string): {
 	
 	const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 	
-	console.log('[extractTableData] Iniciando extracción de tabla...');
-	
 	// PRIORIDAD 1: Buscar línea "Totales:" seguida del número total
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
 		// Buscar "Totales:" con o sin el número en la misma línea
 		if (/^totales?\s*:?\s*/i.test(line)) {
-			console.log('[extractTableData] Línea "Totales:" encontrada:', line);
 
 			// Extraer el número si está en la misma línea
 			const sameLineMatch = line.match(/totales?\s*:?\s*([\d.]+)/i);
 			if (sameLineMatch) {
 				result.montoConcepto = parseFloat(sameLineMatch[1]);
-				console.log('[extractTableData] Monto del Concepto (misma línea):', result.montoConcepto);
 			} else if (i + 1 < lines.length) {
 				// Si no está en la misma línea, buscar en la siguiente
 				const nextLine = lines[i + 1];
 				const nextLineMatch = nextLine.match(/^\s*([\d.]+)\s*$/);
 				if (nextLineMatch) {
 					result.montoConcepto = parseFloat(nextLineMatch[1]);
-					console.log('[extractTableData] Monto del Concepto (línea siguiente):', result.montoConcepto);
 				}
 			}
 		}
@@ -323,13 +306,11 @@ function extractTableData(text: string): {
 		const personasMatch = line.match(/cantidad\s+de\s+personas\s*:?\s*(\d+)/i);
 		if (personasMatch && !result.personas) {
 			result.personas = parseInt(personasMatch[1]);
-			console.log('[extractTableData] Personas encontradas:', result.personas);
 		}
 	}
 	
 	// PRIORIDAD 2: Si no encontramos montoConcepto en TOTALES, calcular sumando personas
 	if (!result.montoConcepto) {
-		console.log('[extractTableData] No se encontró Monto del Concepto en TOTALES, calculando desde personas...');
 		let totalMonto = 0;
 		let totalPersonas = 0;
 		let totalLegajos = 0;
@@ -365,7 +346,6 @@ function extractTableData(text: string): {
 					totalLegajos += legajos;
 					totalRemunerativo += totRemunerativo;
 
-					console.log(`[extractTableData] Persona: ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 				}
 			}
 		}
@@ -376,17 +356,9 @@ function extractTableData(text: string): {
 			if (!result.montoConcepto) result.montoConcepto = totalMonto;
 			if (!result.cantidadLegajos) result.cantidadLegajos = totalLegajos;
 			if (!result.totalRemunerativo) result.totalRemunerativo = totalRemunerativo;
-			
-			console.log('[extractTableData] Totales calculados desde personas:', {
-				personas: totalPersonas,
-				montoConcepto: totalMonto,
-				legajos: totalLegajos,
-				totalRemunerativo: totalRemunerativo
-			});
 		}
 	}
 	
-	console.log('[extractTableData] Resultado final:', result);
 	return result;
 }
 
@@ -404,8 +376,6 @@ function extractPersonas(text: string): Array<{
 	}> = [];
 	
 	const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-	
-	console.log('[extractPersonas] Iniciando extracción de personas...');
 	
 	// Buscar líneas que parecen filas de datos de personas
 	// Formato esperado en UNA SOLA LÍNEA:
@@ -435,7 +405,6 @@ function extractPersonas(text: string): Array<{
 					cantidadLegajos: legajos,
 					montoConcepto
 				});
-				console.log(`[extractPersonas] Persona agregada (formato 1): ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 			}
 			continue;
 		}
@@ -471,19 +440,15 @@ function extractPersonas(text: string): Array<{
 						cantidadLegajos: legajos,
 						montoConcepto
 					});
-					console.log(`[extractPersonas] Persona agregada (formato 2): ${nombre}, TotRem: ${totRemunerativo}, Legajos: ${legajos}, Monto: ${montoConcepto}`);
 					i++; // Saltar la siguiente línea ya que la procesamos
 				}
 			}
 		}
 	}
 	
-	console.log(`[extractPersonas] Total de personas encontradas: ${personas.length}`);
-	
 	// Calcular y mostrar el total de montos
 	if (personas.length > 0) {
 		const totalMonto = personas.reduce((sum, p) => sum + p.montoConcepto, 0);
-		console.log(`[extractPersonas] Suma total de Monto del Concepto: ${totalMonto}`);
 	}
 	
 	return personas;
@@ -515,14 +480,11 @@ async function findMemberByName(
 		});
 
 		if (m) {
-			console.log(`[findMemberByName] ✓ Miembro encontrado: ${m.id} para nombre "${fullName}"`);
 			return { id: m.id };
 		}
 
-		console.log(`[findMemberByName] ✗ No se encontró miembro para nombre "${fullName}"`);
 		return null;
 	} catch (e) {
-		console.warn('[findMemberByName] Error en búsqueda:', e);
 		return null;
 	}
 }
@@ -552,27 +514,15 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 		errors: [] as string[]
 	};
 
-	console.log('[SESSION_CLEANUP] Iniciando limpieza de sesión...');
-	console.log('[SESSION_CLEANUP] Datos a limpiar:', {
-		periodId: data.periodId,
-		periodWasCreated: data.periodWasCreated,
-		pdfFileIds: data.pdfFileIds.length,
-		contributionLineIds: data.contributionLineIds.length,
-		memberIdsCreated: data.memberIdsCreated.length,
-		savedFilePaths: data.savedFilePaths.length
-	});
-
 	// ORDEN: Respetar foreign keys (de más dependiente a menos dependiente)
 
 	// 1. Eliminar ContributionLines específicas de esta sesión
 	if (data.contributionLineIds.length > 0) {
-		console.log('[SESSION_CLEANUP][1] Eliminando ContributionLines...');
 		try {
 			const deleted = await prisma.contributionLine.deleteMany({
 				where: { id: { in: data.contributionLineIds } }
 			});
 			results.contributionLinesDeleted = deleted.count;
-			console.log(`[SESSION_CLEANUP][1] ✓ ${deleted.count} ContributionLines eliminadas`);
 		} catch (e) {
 			const msg = `ContributionLines: ${e instanceof Error ? e.message : e}`;
 			results.errors.push(msg);
@@ -582,13 +532,11 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 2. Eliminar Members NUEVOS (creados en esta sesión, no los que ya existían)
 	if (data.memberIdsCreated.length > 0) {
-		console.log('[SESSION_CLEANUP][2] Eliminando Members nuevos...');
 		try {
 			const deleted = await prisma.member.deleteMany({
 				where: { id: { in: data.memberIdsCreated } }
 			});
 			results.membersDeleted = deleted.count;
-			console.log(`[SESSION_CLEANUP][2] ✓ ${deleted.count} Members nuevos eliminados`);
 		} catch (e) {
 			const msg = `Members: ${e instanceof Error ? e.message : e}`;
 			results.errors.push(msg);
@@ -598,13 +546,11 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 3. Eliminar PdfFiles de esta sesión
 	if (data.pdfFileIds.length > 0) {
-		console.log('[SESSION_CLEANUP][3] Eliminando PdfFiles...');
 		try {
 			const deleted = await prisma.pdfFile.deleteMany({
 				where: { id: { in: data.pdfFileIds } }
 			});
 			results.pdfFilesDeleted = deleted.count;
-			console.log(`[SESSION_CLEANUP][3] ✓ ${deleted.count} PdfFiles eliminados`);
 		} catch (e) {
 			const msg = `PdfFiles: ${e instanceof Error ? e.message : e}`;
 			results.errors.push(msg);
@@ -614,7 +560,6 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 4. Eliminar PayrollPeriod SOLO si fue CREADO en esta sesión (no si ya existía)
 	if (data.periodId && data.periodWasCreated) {
-		console.log('[SESSION_CLEANUP][4] Eliminando PayrollPeriod creado en esta sesión...');
 		try {
 			// Verificar que no tenga otros PDFs asociados (por si algo quedó)
 			const period = await prisma.payrollPeriod.findUnique({
@@ -625,9 +570,7 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 			if (period && period.pdfFiles.length === 0) {
 				await prisma.payrollPeriod.delete({ where: { id: data.periodId } });
 				results.periodDeleted = true;
-				console.log(`[SESSION_CLEANUP][4] ✓ PayrollPeriod eliminado`);
 			} else if (period) {
-				console.log(`[SESSION_CLEANUP][4] ⚠️ PayrollPeriod tiene ${period.pdfFiles.length} PDFs asociados, no se elimina`);
 			}
 		} catch (e) {
 			const msg = `PayrollPeriod: ${e instanceof Error ? e.message : e}`;
@@ -638,17 +581,14 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 
 	// 5. Eliminar archivos físicos de esta sesión
 	if (data.savedFilePaths.length > 0) {
-		console.log('[SESSION_CLEANUP][5] Eliminando archivos físicos...');
 		for (const filePath of data.savedFilePaths) {
 			const deleted = await deleteFile(filePath);
 			if (deleted) {
 				results.filesDeleted++;
 			}
 		}
-		console.log(`[SESSION_CLEANUP][5] ✓ ${results.filesDeleted} archivos físicos eliminados`);
 	}
 
-	console.log('[SESSION_CLEANUP] ✓ Limpieza de sesión completada:', results);
 	return results;
 }
 
@@ -672,12 +612,8 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	try {
-		console.log('\n\n========================================');
-		console.log('🚀 [APORTES] INICIO DE PROCESAMIENTO');
-		console.log('========================================\n');
 		
 		const contentType = event.request.headers.get('content-type');
-		console.log('[APORTES][1] Content-Type:', contentType);
 		
 		if (!contentType || !contentType.includes('multipart/form-data')) {
 			return json({ error: 'Se esperaba multipart/form-data' }, { status: 400 });
@@ -686,10 +622,6 @@ export const POST: RequestHandler = async (event) => {
 		const formData = await event.request.formData();
 		const file = formData.get('file') as File | null;
 		const selectedPeriodRaw = (formData.get('selectedPeriod') as string | null) ?? null;
-		console.log('[APORTES][2] Archivo recibido:', file?.name);
-		console.log('[APORTES][2] Tamaño:', file?.size, 'bytes');
-		console.log('[APORTES][2] Tipo:', file?.type);
-		console.log('[APORTES][2] Período seleccionado:', selectedPeriodRaw);
 
 		if (!file) {
 			return json({ error: 'No se proporcionó ningún archivo' }, { status: 400 });
@@ -707,17 +639,12 @@ export const POST: RequestHandler = async (event) => {
 			return json({ error: `El archivo excede el tamaño máximo de ${MAX_FILE_SIZE / 1024 / 1024}MB` }, { status: 413 });
 		}
 
-		console.log('[APORTES][3] Convirtiendo archivo a buffer...');
 		const buffer = Buffer.from(await file.arrayBuffer());
-		console.log('[APORTES][3] Buffer creado:', buffer.length, 'bytes');
 		
 		// Calcular hash SHA-256 para deduplicación
-		console.log('[APORTES][4] Calculando hash SHA-256...');
 		const bufferHash = createHash('sha256').update(buffer).digest('hex');
-		console.log('[APORTES][4] Hash SHA-256:', bufferHash);
 		
 		// Deduplicación en DB por hash (fuente de verdad)
-		console.log('[APORTES][5] Verificando duplicados en base de datos...');
 		try {
 			const existingPdf = await prisma.pdfFile.findUnique({
 				where: { bufferHash },
@@ -731,7 +658,6 @@ export const POST: RequestHandler = async (event) => {
 				}
 			});
 			if (existingPdf) {
-				console.warn('[APORTES][6] ⚠️ Duplicado en DB:', { id: existingPdf.id, fileName: existingPdf.fileName });
 
 				// Devolver datos del PDF existente para que el frontend pueda mostrarlos
 				const peopleCount = existingPdf.peopleCount ?? existingPdf.contributionLine.length;
@@ -761,16 +687,13 @@ export const POST: RequestHandler = async (event) => {
 					}
 				}, { status: 409 });
 			}
-			console.log('[APORTES][6] ✓ No es duplicado en DB');
 		} catch (dbDupErr) {
 			console.error('[APORTES][6] ❌ Error verificando duplicado en DB:', dbDupErr);
 			// Si hay error verificando, es mejor fallar que continuar y crear duplicado
 			throw dbDupErr;
 		}
 
-		console.log('[APORTES][7] Validando tipo de archivo...');
 		const detectedFileType = await fileTypeFromBuffer(buffer);
-		console.log('[APORTES][7] Tipo detectado:', detectedFileType?.mime);
 		
 		if (!detectedFileType || detectedFileType.mime !== 'application/pdf') {
 			console.error('[APORTES][7] ❌ Tipo de archivo inválido:', detectedFileType?.mime);
@@ -780,11 +703,8 @@ export const POST: RequestHandler = async (event) => {
 			console.error('[APORTES][7] ❌ El buffer no contiene un PDF válido');
 			return json({ error: 'El archivo no parece ser un PDF válido' }, { status: 400 });
 		}
-		console.log('[APORTES][7] ✓ Archivo PDF válido');
 
-		console.log('[APORTES][8] Guardando archivo con UUID...');
 		const savedPath = await saveAnalyzerFile(buffer, file.name);
-		console.log('[APORTES][8] ✓ Archivo guardado:', savedPath);
 		// ROLLBACK: Registrar archivo físico guardado
 		sessionData.savedFilePaths.push(savedPath);
 
@@ -794,19 +714,9 @@ export const POST: RequestHandler = async (event) => {
 		// ============================================================================
 		// NUEVO: Usar analyzer con IA (Claude API)
 		// ============================================================================
-		console.log('[APORTES][10] 🤖 Usando analyzer con IA (Claude API)...');
 		let analyzerResult: any = null;
 		try {
 			analyzerResult = await analyzeAportesIA(buffer, file.name);
-			console.log('[APORTES][10] ✓ Analyzer IA ejecutado exitosamente');
-			console.log('[APORTES][10] Tipo detectado:', analyzerResult.tipo);
-			console.log('[APORTES][10] Escuela:', analyzerResult.escuela?.nombre);
-			console.log('[APORTES][10] CUIT:', analyzerResult.escuela?.cuit);
-			console.log('[APORTES][10] Concepto:', analyzerResult.concepto);
-			console.log('[APORTES][10] Periodo:', analyzerResult.periodo);
-			console.log('[APORTES][10] Total personas:', analyzerResult.totales?.cantidadPersonas);
-			console.log('[APORTES][10] Monto total:', analyzerResult.totales?.montoTotal);
-			console.log('[APORTES][10] Personas detectadas:', analyzerResult.personas?.length);
 		} catch (analyzerErr) {
 			console.error('[APORTES][10] ❌ Error en analyzer IA:', analyzerErr);
 			// El analyzer IA es crítico, si falla retornamos error
@@ -819,44 +729,28 @@ export const POST: RequestHandler = async (event) => {
 		// ============================================================================
 
 		// 1) Intentar pdfjs-dist legacy (por líneas)
-		console.log('[APORTES][11] Extrayendo texto del PDF con PDF.js...');
 		let extractedText = await extractTextWithPdfJs(buffer);
-		console.log('[APORTES][11] Texto extraído:', extractedText ? `${extractedText.length} caracteres` : 'VACÍO');
 		
-		
-		
-		
-
 		// 2) Fallback a pdf-parse si no devolvió texto
 		if (!extractedText || extractedText.trim().length === 0) {
-			console.log('[APORTES][12] PDF.js no extrajo texto. Intentando con pdf-parse...');
 			try {
 				// Importar pdf-parse dinámicamente para evitar problemas de cliente
 				const pdfParseModule = await import('pdf-parse');
 				const result = await pdfParseModule.default(buffer);
 				extractedText = (result.text || '');
-				console.log('[APORTES][12] pdf-parse extrajo:', extractedText.length, 'caracteres');
 			} catch (e) {
 				console.error('[APORTES][12] ❌ Error en pdf-parse:', e);
 			}
 		} else {
-			console.log('[APORTES][12] ✓ Usando texto de PDF.js');
 		}
 
-		console.log('[APORTES][13] Convirtiendo texto a minúsculas...');
 		extractedText = extractedText.toLowerCase();
-		console.log('[APORTES][13] ✓ Texto procesado:', extractedText.length, 'caracteres');
 		
-
 		let kind: 'comprobante' | 'listado' | 'desconocido' = 'desconocido';
 		if (extractedText) {
 			
 			const isComprobante = /(comprobante|transferencia|operaci[oó]n|cbu|importe|referencia)/i.test(extractedText);
 			const isListado = /(listado|detalle de aportes|aportes|cuil|cuit|legajo|n[oº]\.\?\s*orden)/i.test(extractedText);
-			
-			
-			
-			
 			
 			if (isComprobante && !isListado) {
 				kind = 'comprobante';
@@ -875,7 +769,6 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		const fullText = extractedText;
-		console.log('[APORTES][17] Texto final para procesamiento:', fullText.length, 'caracteres');
 
 		let preview: unknown = undefined;
 		let checks: unknown = undefined;
@@ -883,41 +776,31 @@ export const POST: RequestHandler = async (event) => {
 		let membersResult: { found: number; created: number; updated: number; names: string[] } | undefined = undefined;
 
 		// DEBUG: mostrar primeras líneas del texto para diagnóstico
-		console.log('[APORTES][18] Mostrando primeras 40 líneas del texto:');
 		try {
 			const firstLines = fullText.split(/\r?\n/).slice(0, 40);
 			firstLines.forEach((line, idx) => {
-				console.log(`  Línea ${idx + 1}: "${line}"`);
 			});
 		} catch (e) {
 			console.error('[APORTES][18] Error mostrando líneas:', e);
 		}
 
-		console.log('[APORTES][19] Procesando líneas...');
 		const rawLines = fullText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-		console.log('[APORTES][19] Total de líneas no vacías:', rawLines.length);
 		
-		console.log('[APORTES][20] Extrayendo datos de líneas con extractLineData...');
 		const rows = rawLines
 			.map((line, idx) => ({ lineNumber: idx + 1, ...extractLineData(line) }))
 			.filter((r) => r.cuit || r.importe || r.nombre);
-		console.log('[APORTES][20] Filas extraídas con extractLineData:', rows.length);
 
 		// Detectar institución por CUIT de cabecera
-		console.log('[APORTES][21] Detectando institución por CUIT...');
 		let institution: { id: string; name: string | null; cuit: string | null; address?: string | null } | undefined = undefined;
 		try {
 			// Priorizar datos del analyzer IA si están disponibles
 			let instCuitDigits: string | null = null;
 			if (analyzerResult && analyzerResult.escuela && analyzerResult.escuela.cuit) {
-				console.log('[APORTES][21] ✓ Usando CUIT del analyzer IA:', analyzerResult.escuela.cuit);
 				instCuitDigits = analyzerResult.escuela.cuit.replace(/\D/g, '');
 			} else {
 				instCuitDigits = extractInstitutionCuit(fullText);
-				console.log('[APORTES][21] CUIT extraído (crudo - método legacy):', instCuitDigits);
 			}
 			const instCuit = formatCuitUtil(instCuitDigits);
-			console.log('[APORTES][21] CUIT normalizado (usando utilidad centralizada):', instCuit);
 			
 			if (!instCuit) {
 				console.error('[APORTES][21] ❌ No se pudo determinar CUIT institucional desde el PDF');
@@ -928,19 +811,15 @@ export const POST: RequestHandler = async (event) => {
 				}, { status: 400 });
 			}
 			
-			console.log('[APORTES][22] Conectando a base de datos...');
 			try {
 				await prisma.$connect();
-				console.log('[APORTES][22] ✓ Conexión a DB OK');
 			} catch (dbConnErr) {
 				console.error('[APORTES][22] ❌ Error conectando a DB:', dbConnErr);
 			}
 
-			console.log('[APORTES][23] Buscando institución en DB por CUIT:', instCuit);
 			try {
 				const existing = await prisma.institution.findUnique({ where: { cuit: instCuit } });
 				if (existing) {
-					console.log('[APORTES][23] ✓ Institución encontrada:', { id: existing.id, cuit: existing.cuit, name: existing.name });
 					institution = { id: existing.id, name: existing.name ?? null, cuit: existing.cuit ?? null, address: existing.address ?? null };
 
 					// Validar que usuarios LIQUIDADOR solo puedan subir PDFs de sus instituciones asignadas
@@ -968,7 +847,6 @@ export const POST: RequestHandler = async (event) => {
 								}
 							}, { status: 403 });
 						}
-						console.log('[APORTES][23] ✓ Validación de institución OK para usuario LIQUIDADOR');
 					}
 				} else {
 					console.error('[APORTES][23] ❌ No existe institución con ese CUIT');
@@ -988,21 +866,16 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		if (rows.length > 0) {
-			console.log('[APORTES][24] Rows detectados con extractLineData:', rows.length);
 		}
 
 		// Extraer datos específicos de tabla (solo si el analyzer falló)
 		let tableData: any = {};
 		if (!analyzerResult || !analyzerResult.totales) {
-			console.log('[APORTES][25] 📊 Extrayendo datos de tabla con extractTableData (método legacy)...');
 			tableData = extractTableData(fullText);
-			console.log('[APORTES][25] Datos de tabla extraídos:', tableData);
 		} else {
-			console.log('[APORTES][25] ⏩ Saltando extractTableData - usando datos del analyzer IA');
 		}
 
 		// Extraer filas individuales de personas
-		console.log('[APORTES][26] 👥 Extrayendo personas...');
 
 		// Priorizar datos del analyzer IA si están disponibles
 		let personas: Array<{
@@ -1013,7 +886,6 @@ export const POST: RequestHandler = async (event) => {
 		}> = [];
 
 		if (analyzerResult && analyzerResult.personas && analyzerResult.personas.length > 0) {
-			console.log('[APORTES][26] ✓ Usando personas del analyzer IA');
 			// El analyzer IA ya devuelve personas en formato plano
 			personas = analyzerResult.personas.map((p: any) => ({
 				nombre: p.nombre,
@@ -1021,34 +893,26 @@ export const POST: RequestHandler = async (event) => {
 				cantidadLegajos: p.cantidadLegajos,
 				montoConcepto: p.montoConcepto
 			}));
-			console.log('[APORTES][26] Total de personas del analyzer IA:', personas.length);
 		} else {
-			console.log('[APORTES][26] Usando extractPersonas (método legacy)...');
 			personas = extractPersonas(fullText);
-			console.log('[APORTES][26] Total de personas extraídas (legacy):', personas.length);
 		}
 		
 		// Detectar tipo de PDF (FOPID o SUELDO) - priorizar analyzer IA
-		console.log('[APORTES][26.5] 🔍 Detectando tipo de PDF...');
 		let pdfType: 'FOPID' | 'SUELDO' = 'SUELDO'; // default
 
 		// El analyzer IA devuelve periodo = "FOPID" si es FOPID
 		if (analyzerResult && analyzerResult.periodo === 'FOPID') {
 			pdfType = 'FOPID';
-			console.log('[APORTES][26.5] ✓ PDF detectado como FOPID (analyzer IA)');
 		} else {
 			// Fallback: buscar en texto
 			const firstLines = fullText.split(/\r?\n/).slice(0, 20).join('\n');
 			if (/\bfopid\b/i.test(firstLines)) {
 				pdfType = 'FOPID';
-				console.log('[APORTES][26.5] ✓ PDF detectado como FOPID (texto)');
 			} else {
-				console.log('[APORTES][26.5] ✓ PDF detectado como SUELDO (default)');
 			}
 		}
 
 		// Calcular datos de tabla para el PDF
-		console.log('[APORTES][26.8] 📊 Calculando datos para PdfFile...');
 
 		let peopleCountForPdf: number | null = null;
 		let totalAmountForPdf: number | null = null;
@@ -1057,32 +921,24 @@ export const POST: RequestHandler = async (event) => {
 		if (analyzerResult && analyzerResult.totales) {
 			peopleCountForPdf = analyzerResult.totales.cantidadPersonas;
 			totalAmountForPdf = analyzerResult.totales.montoTotal;
-			console.log('[APORTES][26.8] ✓ Usando totales del analyzer IA:', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
 		} else {
 			// Fallback: Método legacy
-			console.log('[APORTES][26.8] Calculando con métodos legacy...');
 			const tableDataPreview = extractTableData(fullText);
 			const personasPreview = extractPersonas(fullText);
 			peopleCountForPdf = tableDataPreview.personas ?? personasPreview.length;
 			totalAmountForPdf = tableDataPreview.montoConcepto ?? personasPreview.reduce((a, p) => a + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0), 0);
-			console.log('[APORTES][26.8] Totales calculados (legacy):', { peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
 		}
 
 		// Extraer concepto del texto - priorizar analyzer IA
 		let conceptForPdf = 'Aporte Sindical SIDEPP (1%)'; // default
 		if (analyzerResult && analyzerResult.concepto) {
 			conceptForPdf = analyzerResult.concepto;
-			console.log('[APORTES][26.8] ✓ Concepto del analyzer IA:', conceptForPdf);
 		} else {
 			const conceptoMatch = fullText.match(/concepto:\s*([^\n]+)/i);
 			conceptForPdf = conceptoMatch ? conceptoMatch[1].trim() : 'Aporte Sindical SIDEPP (1%)';
-			console.log('[APORTES][26.8] Concepto del método legacy:', conceptForPdf);
 		}
 
-		console.log('[APORTES][26.8] Datos calculados:', { concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf });
-
 		// Crear PdfFile en DB con el tipo detectado y los datos calculados
-		console.log('[APORTES][27] 💾 Creando registro PdfFile en DB con tipo:', pdfType);
 		try {
 			// El analyzer IA no devuelve metadata de pdf2json, así que no la guardamos
 			const pdfMetadata: any = null;
@@ -1100,7 +956,6 @@ export const POST: RequestHandler = async (event) => {
 				}
 			});
 			pdfFileId = createdPdf.id;
-			console.log('[APORTES][27] ✓ PdfFile creado:', { id: pdfFileId, fileName: createdPdf.fileName, type: pdfType, concept: conceptForPdf, peopleCount: peopleCountForPdf, totalAmount: totalAmountForPdf, hasMetadata: !!pdfMetadata });
 			// ROLLBACK: Registrar PdfFile creado
 			sessionData.pdfFileIds.push(createdPdf.id);
 		} catch (pdfDbErr) {
@@ -1109,7 +964,6 @@ export const POST: RequestHandler = async (event) => {
 		}
 		
 		// Persistir ContributionLine por cada persona asociada al PdfFile
-		console.log('[APORTES][28] 💾 Guardando contribution lines y buscando/creando miembros...');
 		try {
 			if (pdfFileId && institution && personas.length > 0) {
 				let membersCreated = 0;
@@ -1117,15 +971,12 @@ export const POST: RequestHandler = async (event) => {
 				
 				for (const p of personas) {
 					const nombreUpperCase = p.nombre.toUpperCase();
-					console.log(`[APORTES][28] Procesando persona: ${nombreUpperCase}`);
-					console.log(`[APORTES][28]   -> Datos: cantidadLegajos=${p.cantidadLegajos} (${typeof p.cantidadLegajos}), montoConcepto=${p.montoConcepto} (${typeof p.montoConcepto}), totRemunerativo=${p.totRemunerativo} (${typeof p.totRemunerativo})`);
 
 					// Buscar miembro por nombre (case-insensitive) dentro de la institución
 					let member = await findMemberByName(institution.id, nombreUpperCase);
 
 					if (!member) {
 						// Crear miembro si no existe
-						console.log(`[APORTES][28]   -> Miembro no encontrado, intentando crear: ${nombreUpperCase}`);
 
 						// Intentar crear hasta 3 veces para manejar race conditions
 						let createAttempts = 0;
@@ -1142,13 +993,11 @@ export const POST: RequestHandler = async (event) => {
 								});
 								member = { id: createdMember.id };
 								membersCreated++;
-								console.log(`[APORTES][28]   -> ✓ Miembro creado exitosamente: ${createdMember.id}`);
 								// ROLLBACK: Registrar Member NUEVO creado
 								sessionData.memberIdsCreated.push(createdMember.id);
 							} catch (cmErr: any) {
 								// Manejar race condition (unique constraint violation)
 								if (cmErr?.code === 'P2002') {
-									console.log(`[APORTES][28]   -> Race condition detectada (intento ${createAttempts}/${maxCreateAttempts}), buscando miembro existente...`);
 
 									// Esperar un poco antes de reintentar buscar
 									await new Promise(resolve => setTimeout(resolve, 50 * createAttempts));
@@ -1158,7 +1007,6 @@ export const POST: RequestHandler = async (event) => {
 
 									if (member) {
 										membersFound++;
-										console.log(`[APORTES][28]   -> ✓ Miembro encontrado tras race condition: ${member.id}`);
 										break; // Salir del loop, miembro encontrado
 									} else if (createAttempts >= maxCreateAttempts) {
 										console.error(`[APORTES][28]   -> ❌ No se pudo crear ni encontrar miembro tras ${maxCreateAttempts} intentos: ${nombreUpperCase}`);
@@ -1173,7 +1021,6 @@ export const POST: RequestHandler = async (event) => {
 						}
 					} else {
 						membersFound++;
-						console.log(`[APORTES][28]   -> ✓ Miembro encontrado: ${member.id}`);
 					}
 					
 					// Crear ContributionLine (con verificación de duplicados)
@@ -1187,7 +1034,6 @@ export const POST: RequestHandler = async (event) => {
 						});
 
 						if (existingContribution) {
-							console.log(`[APORTES][28]   -> ⏭️  ContributionLine ya existe para ${nombreUpperCase}, saltando...`);
 						} else {
 							// Crear ContributionLine solo si NO existe
 							const createdContributionLine = await prisma.contributionLine.create({
@@ -1202,7 +1048,6 @@ export const POST: RequestHandler = async (event) => {
 									...(member ? { member: { connect: { id: member.id } } } : {})
 								}
 							});
-							console.log(`[APORTES][28]   -> ✓ ContributionLine creada para ${nombreUpperCase}`);
 							// ROLLBACK: Registrar ContributionLine creada
 							sessionData.contributionLineIds.push(createdContributionLine.id);
 						}
@@ -1211,11 +1056,8 @@ export const POST: RequestHandler = async (event) => {
 					}
 				}
 				
-				console.log(`[APORTES][28] ✓ Resumen: ${membersFound} miembros encontrados, ${membersCreated} miembros creados, ${personas.length} contribution lines creadas`);
-
 				// Validar totales: comparar suma de ContributionLines vs totales del analyzer
 				if (analyzerResult && analyzerResult.totales && personas.length > 0) {
-					console.log('[APORTES][28.5] 🔍 Validando totales...');
 
 					const totalCalculado = personas.reduce((sum, p) => {
 						return sum + (Number.isFinite(p.montoConcepto) ? p.montoConcepto : 0);
@@ -1225,28 +1067,17 @@ export const POST: RequestHandler = async (event) => {
 					const diferencia = Math.abs(totalCalculado - totalAnalyzer);
 					const porcentajeDiferencia = (diferencia / totalAnalyzer) * 100;
 
-					console.log('[APORTES][28.5] Totales comparados:', {
-						totalCalculado: totalCalculado.toFixed(2),
-						totalAnalyzer: totalAnalyzer.toFixed(2),
-						diferencia: diferencia.toFixed(2),
-						porcentajeDiferencia: porcentajeDiferencia.toFixed(2) + '%'
-					});
-
 					if (diferencia > 0.5) {
 						if (porcentajeDiferencia > 1) {
-							console.warn(`[APORTES][28.5] ⚠️ ADVERTENCIA: Discrepancia significativa (${porcentajeDiferencia.toFixed(2)}%) entre totales`);
 						} else {
-							console.log('[APORTES][28.5] ℹ️  Diferencia menor aceptable (probablemente redondeo)');
 						}
 					} else {
-						console.log('[APORTES][28.5] ✓ Totales coinciden correctamente');
 					}
 				}
 			}
 		} catch (persistErr) {
 			console.error('[APORTES][28] ❌ Error en proceso de guardado:', persistErr);
 		}
-
 
 		if (rows.length > 0) {
 			// PRIORIZAR analyzer IA sobre método legacy para el cálculo de totales
@@ -1255,12 +1086,10 @@ export const POST: RequestHandler = async (event) => {
 			if (analyzerResult?.totales?.montoTotal) {
 				// Usar currency.js para asegurar precisión del monto del analyzer IA
 				sumTotal = currency(analyzerResult.totales.montoTotal, { precision: 2 }).value;
-				console.log('[APORTES] Usando sumTotal del analyzer IA (currency.js):', sumTotal);
 			} else {
 				// Fallback al método legacy usando currency.js para sumar
 				const amounts = rows.map(r => parseMoneyARS(r.importe));
 				sumTotal = sumMoneyARS(amounts);
-				console.log('[APORTES] Usando sumTotal del método legacy (currency.js):', sumTotal);
 			}
 			const declaredTotal = analyzerResult?.totales?.montoTotal
 				? currency(analyzerResult.totales.montoTotal, { precision: 2 }).value
@@ -1270,11 +1099,6 @@ export const POST: RequestHandler = async (event) => {
 				? currency(sumTotal).subtract(declaredTotal).value === 0
 				: false;
 			
-			
-			
-			
-			
-
 			// Priorizar período del analyzer IA sobre el método legacy
 			let detectedPeriod: { month?: number | null; year?: number | null; raw?: string | null } = detectPeriod(fullText);
 
@@ -1287,7 +1111,6 @@ export const POST: RequestHandler = async (event) => {
 						year: parseInt(mmYyyyMatch[2]),
 						raw: analyzerResult.periodo
 					};
-					console.log('[APORTES] Período detectado del analyzer IA:', detectedPeriod);
 				}
 			}
 			// Fallback: si no hay período pero hay fecha, extraer mes de la fecha (formato MM/DD/YYYY)
@@ -1299,7 +1122,6 @@ export const POST: RequestHandler = async (event) => {
 						year: parseInt(fechaMatch[2]),
 						raw: `${fechaMatch[1]}/${fechaMatch[2]}`
 					};
-					console.log('[APORTES] Período extraído de fecha del analyzer IA:', detectedPeriod);
 				}
 			}
 
@@ -1355,7 +1177,6 @@ export const POST: RequestHandler = async (event) => {
 						year: parseInt(mmYyyyMatch[2]),
 						raw: analyzerResult.periodo
 					};
-					console.log('[APORTES] Período detectado del analyzer IA (else):', detectedPeriod);
 				}
 			}
 			// Fallback: si no hay período pero hay fecha, extraer mes de la fecha (formato MM/DD/YYYY)
@@ -1367,7 +1188,6 @@ export const POST: RequestHandler = async (event) => {
 						year: parseInt(fechaMatch[2]),
 						raw: `${fechaMatch[1]}/${fechaMatch[2]}`
 					};
-					console.log('[APORTES] Período extraído de fecha del analyzer IA (else):', detectedPeriod);
 				}
 			}
 
@@ -1419,7 +1239,6 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		// Crear PayrollPeriod asociado a la institución y al PdfFile
-		console.log('[APORTES][29] 💾 Creando PayrollPeriod...');
 		try {
 			if (institution && pdfFileId) {
 				// Determinar período a usar: seleccionado por UI, del analyzer mejorado, o detectado del texto
@@ -1429,7 +1248,6 @@ export const POST: RequestHandler = async (event) => {
 				// Intentar extraer período del analyzer mejorado
 				let analyzerPeriod: { month: number | null; year: number | null } = { month: null, year: null };
 				if (analyzerResult && analyzerResult.periodo) {
-					console.log('[APORTES][29] Período del analyzer:', analyzerResult.periodo);
 
 					// El analyzer puede retornar:
 					// 1. Formato "MM/YYYY" (ej: "11/2024")
@@ -1438,7 +1256,6 @@ export const POST: RequestHandler = async (event) => {
 
 					if (analyzerResult.periodo === 'FOPID') {
 						// FOPID no tiene mes/año específico, dejar null para que use detected o selected
-						console.log('[APORTES][29] Período FOPID detectado, usando período seleccionado o detectado');
 					} else {
 						// Intentar formato MM/YYYY primero
 						const mmYyyyMatch = analyzerResult.periodo.match(/^(\d{1,2})\/(\d{4})$/);
@@ -1447,7 +1264,6 @@ export const POST: RequestHandler = async (event) => {
 								month: parseInt(mmYyyyMatch[1]),
 								year: parseInt(mmYyyyMatch[2])
 							};
-							console.log('[APORTES][29] Período parseado (MM/YYYY):', analyzerPeriod);
 						} else {
 							// Fallback: intentar formato "Noviembre 2024"
 							const periodoMatch = analyzerResult.periodo.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})/i);
@@ -1459,9 +1275,7 @@ export const POST: RequestHandler = async (event) => {
 									month: mesIdx >= 0 ? mesIdx + 1 : null,
 									year: parseInt(periodoMatch[2])
 								};
-								console.log('[APORTES][29] Período parseado (texto):', analyzerPeriod);
 							} else {
-								console.warn('[APORTES][29] ⚠️ Formato de período no reconocido del analyzer:', analyzerResult.periodo);
 							}
 						}
 					}
@@ -1470,11 +1284,6 @@ export const POST: RequestHandler = async (event) => {
 				// Prioridad: seleccionado > analyzer > detectado
 				const useYear = selected?.year ?? analyzerPeriod.year ?? detected.year ?? null;
 				const useMonth = selected?.month ?? analyzerPeriod.month ?? detected.month ?? null;
-
-				console.log('[APORTES][29] Período detectado (legacy):', detected);
-				console.log('[APORTES][29] Período analyzer:', analyzerPeriod);
-				console.log('[APORTES][29] Período seleccionado (UI):', selected);
-				console.log('[APORTES][29] Usando:', { year: useYear, month: useMonth });
 
 				if (!useYear || !useMonth) {
 					const errorMsg = `No se pudo determinar el período (mes/año).
@@ -1507,11 +1316,6 @@ export const POST: RequestHandler = async (event) => {
 						});
 
 						if (period) {
-							console.log('[APORTES][29] ✓ PayrollPeriod existente encontrado:', {
-								id: period.id,
-								month: period.month,
-								year: period.year
-							});
 							return { id: period.id, wasCreated: false };
 						}
 
@@ -1525,16 +1329,10 @@ export const POST: RequestHandler = async (event) => {
 									transferId: fallbackTransferId
 								}
 							});
-							console.log('[APORTES][29] ✓ PayrollPeriod creado:', {
-								id: period.id,
-								month: period.month,
-								year: period.year
-							});
 							return { id: period.id, wasCreated: true };
 						} catch (createErr: any) {
 							// Si falla por constraint único (race condition), reintentar buscando
 							if (createErr?.code === 'P2002' && retryCount < maxRetries) {
-								console.log(`[APORTES][29] Race condition detectada, reintentando búsqueda (${retryCount + 1}/${maxRetries})...`);
 								await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1))); // Backoff exponencial
 								return getOrCreatePeriod(retryCount + 1);
 							}
@@ -1563,7 +1361,6 @@ export const POST: RequestHandler = async (event) => {
 							where: { id: pdfFileId },
 							data: { periodId: createdPeriodId }
 						});
-						console.log('[APORTES][29] ✓ PDF asociado al período:', { pdfFileId, periodId: createdPeriodId });
 					} catch (updateErr) {
 						console.error('[APORTES][29] ❌ Error asociando PDF:', updateErr);
 						throw updateErr; // Relanzar para que el error se propague
@@ -1583,8 +1380,6 @@ export const POST: RequestHandler = async (event) => {
 			throw ppErr; // Relanzar para que el error llegue al catch principal y devuelva un 500
 		}
 
-		
-
 		const responseData = {
 			fileName: file.name,
 			storagePath: savedPath,
@@ -1600,20 +1395,9 @@ export const POST: RequestHandler = async (event) => {
 			members: membersResult
 		};
 
-		console.log('\n========================================');
-		console.log('✅ [APORTES] PROCESAMIENTO EXITOSO');
-		console.log('========================================');
-		console.log('[APORTES] Resumen de respuesta:');
-		console.log('  - Archivo:', responseData.fileName);
-		console.log('  - Clasificación:', responseData.classification);
-		console.log('  - Institución:', (institution as any)?.name || 'N/A');
-		console.log('  - Personas encontradas:', personas?.length || 0);
-		console.log('  - Monto del Concepto (tabla):', tableData?.montoConcepto || 'N/A');
 		if (personas && personas.length > 0) {
 			const totalMonto = personas.reduce((sum, p) => sum + p.montoConcepto, 0);
-			console.log('  - Total Monto del Concepto (suma):', totalMonto);
 		}
-		console.log('========================================\n\n');
 
 		return json(responseData, { status: 201 });
 	} catch (err) {
@@ -1626,10 +1410,8 @@ export const POST: RequestHandler = async (event) => {
 		console.error('========================================');
 
 		// ROLLBACK DE SESIÓN: Limpiar solo los datos creados en esta sesión
-		console.log('\n🧹 [APORTES] Ejecutando rollback de sesión...');
 		try {
 			const cleanupResults = await performSessionCleanup(sessionData);
-			console.log('🧹 [APORTES] Rollback de sesión completado:', cleanupResults);
 		} catch (cleanupErr) {
 			console.error('🧹 [APORTES] Error durante rollback de sesión:', cleanupErr);
 		}
@@ -1662,11 +1444,6 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'Solo administradores pueden ejecutar limpieza completa' }, { status: 403 });
 	}
 
-	console.log('\n========================================');
-	console.log('🧹 [CLEANUP] INICIO DE LIMPIEZA COMPLETA (ADMIN)');
-	console.log(`🧹 [CLEANUP] Usuario: ${auth.user?.email} (${auth.user?.role})`);
-	console.log('========================================\n');
-
 	const results = {
 		filesDeleted: 0,
 		pdfFilesDeleted: 0,
@@ -1678,7 +1455,6 @@ export const DELETE: RequestHandler = async (event) => {
 
 	try {
 		// 1. Eliminar archivos físicos de la carpeta analyzer
-		console.log('[CLEANUP][1] Eliminando archivos de', ANALYZER_DIR);
 		try {
 			const { readdir } = await import('node:fs/promises');
 			const { join } = await import('node:path');
@@ -1688,33 +1464,27 @@ export const DELETE: RequestHandler = async (event) => {
 				const deleted = await deleteFile(filePath);
 				if (deleted) results.filesDeleted++;
 			}
-			console.log('[CLEANUP][1] ✓', results.filesDeleted, 'archivos eliminados');
 		} catch (e) {
 			results.errors.push(`Directorio: ${e}`);
 		}
 
 		// 2. Eliminar ContributionLines de la DB
-		console.log('[CLEANUP][2] Eliminando ContributionLines de DB...');
 		try {
 			const deleteResult = await prisma.contributionLine.deleteMany({});
 			results.contributionLinesDeleted = deleteResult.count;
-			console.log('[CLEANUP][2] ✓', results.contributionLinesDeleted, 'contribution lines eliminadas');
 		} catch (e) {
 			results.errors.push(`ContributionLines: ${e}`);
 		}
 
 		// 3. Eliminar PdfFiles de la DB
-		console.log('[CLEANUP][3] Eliminando PdfFiles de DB...');
 		try {
 			const deleteResult = await prisma.pdfFile.deleteMany({});
 			results.pdfFilesDeleted = deleteResult.count;
-			console.log('[CLEANUP][3] ✓', results.pdfFilesDeleted, 'pdf files eliminados');
 		} catch (e) {
 			results.errors.push(`PdfFiles: ${e}`);
 		}
 
 		// 4. Eliminar PayrollPeriods huérfanos de la DB
-		console.log('[CLEANUP][4] Eliminando PayrollPeriods huérfanos de DB...');
 		try {
 			const deleteResult = await prisma.payrollPeriod.deleteMany({
 				where: {
@@ -1724,16 +1494,9 @@ export const DELETE: RequestHandler = async (event) => {
 				}
 			});
 			results.payrollPeriodsDeleted = deleteResult.count;
-			console.log('[CLEANUP][4] ✓', results.payrollPeriodsDeleted, 'payroll periods eliminados');
 		} catch (e) {
 			results.errors.push(`PayrollPeriods: ${e}`);
 		}
-
-		console.log('\n========================================');
-		console.log('✅ [CLEANUP] LIMPIEZA COMPLETA FINALIZADA');
-		console.log('========================================');
-		console.log('Resumen:', results);
-		console.log('========================================\n');
 
 		return json({
 			status: 'success',
