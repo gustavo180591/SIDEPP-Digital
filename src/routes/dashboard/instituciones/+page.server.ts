@@ -63,12 +63,10 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
       return {
         institutions: userInstitutions,
         pagination: {
-          page: 1,
-          limit: userInstitutions.length,
-          total: userInstitutions.length,
+          currentPage: 1,
           totalPages: 1,
-          hasNext: false,
-          hasPrev: false
+          totalItems: userInstitutions.length,
+          itemsPerPage: userInstitutions.length
         },
         filters: {}
       };
@@ -106,12 +104,10 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
     return {
       institutions: result.data,
       pagination: {
-        page: result.meta.currentPage,
-        limit: result.meta.perPage,
-        total: result.meta.total,
+        currentPage: result.meta.currentPage,
         totalPages: result.meta.lastPage,
-        hasNext: result.meta.next !== null,
-        hasPrev: result.meta.prev !== null
+        totalItems: result.meta.total,
+        itemsPerPage: result.meta.perPage
       },
       filters
     };
@@ -120,12 +116,10 @@ export const load: ServerLoad = async ({ url, locals }: { url: URL; locals: any 
     return {
       institutions: [],
       pagination: {
-        page: 1,
-        limit: 10,
-        total: 0,
+        currentPage: 1,
         totalPages: 0,
-        hasNext: false,
-        hasPrev: false
+        totalItems: 0,
+        itemsPerPage: 10
       },
       filters: {}
     };
