@@ -180,6 +180,12 @@ export const actions: Actions = {
         return { success: false, message: 'El número de matrícula ya existe en esta institución' };
       }
 
+      // Verificar que el documento de identidad no esté duplicado en esta institución
+      const documentoExists = await MemberService.existsByDocumentoIdentidad(documentoIdentidad.trim(), institutionId);
+      if (documentoExists) {
+        return { success: false, message: 'Ya existe un miembro con este documento de identidad en esta institución' };
+      }
+
       await MemberService.create({
         fullName: fullName.trim(),
         email: email?.trim() || undefined,
@@ -277,6 +283,12 @@ export const actions: Actions = {
       const matriculaExists = await MemberService.existsByNumeroMatricula(numeroMatricula.trim(), institutionId, memberId);
       if (matriculaExists) {
         return { success: false, message: 'El número de matrícula ya existe en esta institución' };
+      }
+
+      // Verificar documento de identidad duplicado (excluyendo el miembro actual)
+      const documentoExists = await MemberService.existsByDocumentoIdentidad(documentoIdentidad.trim(), institutionId, memberId);
+      if (documentoExists) {
+        return { success: false, message: 'Ya existe otro miembro con este documento de identidad en esta institución' };
       }
 
       await MemberService.update(memberId, {

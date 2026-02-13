@@ -174,6 +174,24 @@ export class MemberService {
     }
   }
 
+  static async existsByDocumentoIdentidad(documentoIdentidad: string, institutionId: string, excludeId?: string): Promise<boolean> {
+    try {
+      const where: any = {
+        documentoIdentidad,
+        institucionId: institutionId
+      };
+
+      if (excludeId) {
+        where.id = { not: excludeId };
+      }
+
+      const count = await prisma.member.count({ where });
+      return count > 0;
+    } catch (error) {
+      handlePrismaError(error, 'verificar el documento de identidad');
+    }
+  }
+
   static async getAll(options: {
     search?: string;
     page?: number;

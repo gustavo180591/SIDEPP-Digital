@@ -20,6 +20,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { requireAuth } from '$lib/server/auth/middleware';
 import { saveBatchAtomic, type BatchSaveInput } from '$lib/server/analyzer/save';
 import type { AportesPreviewResult, TransferenciaPreviewResult } from '$lib/server/analyzer/preview';
+import { sumarMontos, diferenciaMonto, calcularTolerancia } from '$lib/utils/currency.js';
 
 interface ConfirmRequest {
   sessionId: string;
@@ -102,6 +103,38 @@ export const POST: RequestHandler = async (event) => {
               expected: body.institutionId,
               detected: preview.institution?.id
             }
+          }, { status: 400 });
+        }
+      }
+    }
+
+    // VALIDAR MONTOS: La única traba es que coincidan listado con comprobante
+    if (!body.forceConfirm) {
+      const montosAportes: number[] = [];
+      for (const key of ['sueldos', 'fopid', 'aguinaldo'] as const) {
+        const preview = body.previews[key];
+        if (preview?.success && preview.type === 'APORTES') {
+          montosAportes.push((preview as AportesPreviewResult).totalAmount);
+        }
+      }
+      const totalAportes = sumarMontos(...montosAportes);
+
+      let totalTransferencia = 0;
+      if (body.previews.transferencia?.success && body.previews.transferencia.type === 'TRANSFERENCIA') {
+        totalTransferencia = (body.previews.transferencia as TransferenciaPreviewResult).transferAmount;
+      }
+
+      // Solo validar si hay ambos tipos de documentos
+      if (totalAportes > 0 && totalTransferencia > 0) {
+        const diferencia = diferenciaMonto(totalAportes, totalTransferencia);
+        const montoMayor = Math.max(totalAportes, totalTransferencia);
+        const tolerancia = calcularTolerancia(montoMayor, 0.001, 1);
+
+        if (diferencia > tolerancia) {
+          return json({
+            success: false,
+            error: 'Los montos no coinciden',
+            details: `Total aportes: $${totalAportes.toFixed(2)} | Total transferencia: $${totalTransferencia.toFixed(2)} | Diferencia: $${diferencia.toFixed(2)}`
           }, { status: 400 });
         }
       }

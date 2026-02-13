@@ -39,7 +39,7 @@ model Member {
   documentoIdentidad  String?
   nacionalidad        String?            @default("Argentina")
   status              String?            @default("active")
-  email               String?            @unique
+  email               String?
   phone               String?
   address             String?
   city                String?

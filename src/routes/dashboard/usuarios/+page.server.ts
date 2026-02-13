@@ -142,12 +142,23 @@ export const actions: Actions = {
         return fail(400, { error: 'Ya existe un usuario con este email' });
       }
 
+      // Validar que todas las instituciones seleccionadas existan
+      const filteredInstitutionIds = institutionIds.filter(id => id.trim());
+      if (filteredInstitutionIds.length > 0) {
+        const allInstitutions = await InstitutionService.findMany({}, { page: 1, limit: 100 });
+        const validIds = new Set(allInstitutions.data.map((i: any) => i.id));
+        const invalidIds = filteredInstitutionIds.filter(id => !validIds.has(id));
+        if (invalidIds.length > 0) {
+          return fail(400, { error: 'Una o más instituciones seleccionadas no existen' });
+        }
+      }
+
       // Crear el usuario con múltiples instituciones
       const user = await UserService.create({
         name: name.trim(),
         email: email.trim(),
         password: password,
-        institutionIds: institutionIds.filter(id => id.trim()),
+        institutionIds: filteredInstitutionIds,
         role: (role as 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR') || 'LIQUIDADOR',
         isActive
       });
@@ -199,6 +210,17 @@ export const actions: Actions = {
         return fail(400, { error: 'Ya existe otro usuario con este email' });
       }
 
+      // Validar que todas las instituciones seleccionadas existan
+      const filteredInstitutionIds = institutionIds.filter(id => id.trim());
+      if (filteredInstitutionIds.length > 0) {
+        const allInstitutions = await InstitutionService.findMany({}, { page: 1, limit: 100 });
+        const validIds = new Set(allInstitutions.data.map((i: any) => i.id));
+        const invalidIds = filteredInstitutionIds.filter(id => !validIds.has(id));
+        if (invalidIds.length > 0) {
+          return fail(400, { error: 'Una o más instituciones seleccionadas no existen' });
+        }
+      }
+
       // Preparar datos de actualización con múltiples instituciones
       const updateData: {
         name: string;
@@ -210,7 +232,7 @@ export const actions: Actions = {
       } = {
         name: name.trim(),
         email: email.trim(),
-        institutionIds: institutionIds.filter(id => id.trim()),
+        institutionIds: filteredInstitutionIds,
         role: (role as 'ADMIN' | 'FINANZAS' | 'LIQUIDADOR') || 'LIQUIDADOR',
         isActive
       };
