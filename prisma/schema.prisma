@@ -19,6 +19,7 @@ model Institution {
   responsibleName  String?
   responsibleEmail String?
   responsablePhone String?
+  fopidEnabled     Boolean           @default(true)
   createdAt        DateTime?         @default(now())
   updatedAt        DateTime?         @updatedAt
   members          Member[]

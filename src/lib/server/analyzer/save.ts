@@ -85,6 +85,24 @@ async function findMemberByName(
 }
 
 /**
+ * Busca un miembro por documento de identidad (CUIL/CUIT) dentro de una institución
+ */
+async function findMemberByDocumento(
+  institutionId: string,
+  documentoIdentidad: string,
+  tx: TransactionClient
+): Promise<{ id: string } | null> {
+  if (!documentoIdentidad) return null;
+  const m = await tx.member.findFirst({
+    where: {
+      institucionId: institutionId,
+      documentoIdentidad: documentoIdentidad
+    }
+  });
+  return m ? { id: m.id } : null;
+}
+
+/**
  * Detecta si un error de Prisma es por violación de constraint unique (P2002)
  */
 function isPrismaUniqueConstraintError(error: unknown): boolean {
@@ -254,23 +272,36 @@ async function saveAportesFile(
   if (analysis.personas && analysis.personas.length > 0) {
     for (const persona of analysis.personas) {
       const nombreUpperCase = persona.nombre.toUpperCase();
+      const cuilCuit = persona.cuilCuit?.replace(/[-\s]/g, '') || null;
 
-      // Buscar o crear miembro
-      let member = await findMemberByName(institutionId, nombreUpperCase, tx);
+      // Buscar miembro: primero por CUIL/CUIT (si viene de CSV), luego por nombre
+      let member = cuilCuit
+        ? await findMemberByDocumento(institutionId, cuilCuit, tx)
+        : null;
+
+      if (!member) {
+        member = await findMemberByName(institutionId, nombreUpperCase, tx);
+      }
 
       if (!member) {
         try {
           const createdMember = await tx.member.create({
             data: {
               institucion: { connect: { id: institutionId } },
-              fullName: nombreUpperCase
+              fullName: nombreUpperCase,
+              ...(cuilCuit ? { documentoIdentidad: cuilCuit } : {})
             }
           });
           member = { id: createdMember.id };
         } catch (err: any) {
           // Race condition: buscar nuevamente
           if (err?.code === 'P2002') {
-            member = await findMemberByName(institutionId, nombreUpperCase, tx);
+            member = cuilCuit
+              ? await findMemberByDocumento(institutionId, cuilCuit, tx)
+              : null;
+            if (!member) {
+              member = await findMemberByName(institutionId, nombreUpperCase, tx);
+            }
           } else {
             throw err;
           }

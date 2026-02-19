@@ -9,7 +9,7 @@
   export let onClose: () => void;
   export let onDelete: (() => void) | null = null;
 
-  let formData = {
+  let formData: Record<string, string> = {
     name: institution?.name || '',
     cuit: institution?.cuit || '',
     address: institution?.address || '',
@@ -18,7 +18,8 @@
     country: institution?.country || 'Argentina',
     responsibleName: institution?.responsibleName || '',
     responsibleEmail: institution?.responsibleEmail || '',
-    responsablePhone: institution?.responsablePhone || ''
+    responsablePhone: institution?.responsablePhone || '',
+    fopidEnabled: (institution as any)?.fopidEnabled !== false ? 'true' : 'false'
   };
 
   // Reset form data when institution changes or modal opens
@@ -32,7 +33,8 @@
       country: institution.country || 'Argentina',
       responsibleName: institution.responsibleName || '',
       responsibleEmail: institution.responsibleEmail || '',
-      responsablePhone: institution.responsablePhone || ''
+      responsablePhone: institution.responsablePhone || '',
+      fopidEnabled: (institution as any)?.fopidEnabled !== false ? 'true' : 'false'
     };
   }
 
@@ -48,7 +50,8 @@
         country: 'Argentina',
         responsibleName: '',
         responsibleEmail: '',
-        responsablePhone: ''
+        responsablePhone: '',
+        fopidEnabled: 'true'
       };
     }
   }
@@ -63,7 +66,8 @@
       country: 'Argentina',
       responsibleName: '',
       responsibleEmail: '',
-      responsablePhone: ''
+      responsablePhone: '',
+      fopidEnabled: 'true'
     };
     onClose();
   }
@@ -145,6 +149,17 @@
         placeholder: '+54 11 1234-5678',
         pattern: '^[\\d\\s\\-+()]{7,20}$',
         value: formData.responsablePhone
+      },
+      {
+        name: 'fopidEnabled',
+        label: 'Requiere FOPID',
+        type: 'select',
+        options: [
+          { value: 'true', label: 'Sí - Requiere archivo FOPID' },
+          { value: 'false', label: 'No - No requiere FOPID' }
+        ],
+        value: formData.fopidEnabled,
+        span: 2
       }
     ];
   }

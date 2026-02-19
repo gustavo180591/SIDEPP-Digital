@@ -11,6 +11,7 @@ export type InstitutionBase = {
   responsibleName?: string | null;
   responsibleEmail?: string | null;
   responsablePhone?: string | null;
+  fopidEnabled?: boolean;
 };
 
 // Tipo para crear una nueva institución

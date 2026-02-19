@@ -3,7 +3,7 @@
   import SearchableSelect from './shared/SearchableSelect.svelte';
 
   // Props
-  export let institutions: Array<{ id: string; name: string | null }> = [];
+  export let institutions: Array<{ id: string; name: string | null; fopidEnabled?: boolean }> = [];
 
   // Opciones para los selects de mes y año
   const monthOptions = [
@@ -57,6 +57,10 @@
 
   // Computed value para selectedPeriod en formato YYYY-MM
   $: selectedPeriod = selectedMonth && selectedYear ? `${selectedYear}-${selectedMonth}` : '';
+
+  // Determinar si la institución seleccionada requiere FOPID
+  $: selectedInstitution = institutions.find(i => i.id === selectedInstitutionId);
+  $: requiresFopid = selectedInstitution?.fopidEnabled !== false;
 
   // Mostrar input de Aguinaldo solo en Junio (06) o Diciembre (12)
   $: showAguinaldo = selectedMonth === '06' || selectedMonth === '12';
@@ -243,8 +247,13 @@
       return;
     }
 
-    if (!fileSueldos || !fileFopid) {
-      errorMessage = 'Debes subir los archivos: Aportes Sueldos y Aportes FOPID.';
+    if (!fileSueldos) {
+      errorMessage = 'Debes subir el archivo de Aportes Sueldos.';
+      return;
+    }
+
+    if (requiresFopid && !fileFopid) {
+      errorMessage = 'Debes subir el archivo de Aportes FOPID.';
       return;
     }
 
@@ -265,7 +274,9 @@
     try {
       const formData = new FormData();
       formData.append('files', fileSueldos);
-      formData.append('files', fileFopid);
+      if (requiresFopid && fileFopid) {
+        formData.append('files', fileFopid);
+      }
       if (showAguinaldo && fileAguinaldo) {
         formData.append('files', fileAguinaldo);
       }
@@ -479,40 +490,42 @@
 
       <div class="flex flex-col gap-4">
         <div>
-          <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF) <span class="text-red-500">*</span></label>
+          <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF o CSV) <span class="text-red-500">*</span></label>
           <input
             id="pdf-sueldos"
             bind:this={fileInputSueldos}
             type="file"
-            accept="application/pdf"
+            accept="application/pdf,.csv,text/csv"
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
           />
         </div>
+        {#if requiresFopid}
         <div>
-          <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF) <span class="text-red-500">*</span></label>
+          <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF o CSV) <span class="text-red-500">*</span></label>
           <input
             id="pdf-fopid"
             bind:this={fileInputFopid}
             type="file"
-            accept="application/pdf"
+            accept="application/pdf,.csv,text/csv"
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
           />
         </div>
+        {/if}
         {#if showAguinaldo}
           <div>
             <label for="pdf-aguinaldo" class="mb-1 block text-sm font-medium text-gray-700">
-              Aportes Aguinaldo (PDF) <span class="text-red-500">*</span>
+              Aportes Aguinaldo (PDF o CSV) <span class="text-red-500">*</span>
               <span class="text-xs text-gray-500">(Solo Junio/Diciembre)</span>
             </label>
             <input
               id="pdf-aguinaldo"
               bind:this={fileInputAguinaldo}
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,.csv,text/csv"
               class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
               disabled={state === 'analyzing'}
               required

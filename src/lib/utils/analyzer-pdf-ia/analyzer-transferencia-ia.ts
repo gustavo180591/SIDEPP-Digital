@@ -134,6 +134,7 @@ REGLAS IMPORTANTES:
 - Buscar los datos del ordenante despues de "Ordenante" y cerca de "IIBB"
 - El CUIT del ordenante va SIN guiones (solo 11 numeros)
 - El CUIT del beneficiario/titular (en operacion) va CON guiones (XX-XXXXXXXX-X)
+- Si hay múltiples campos de importe (importe, importe a transferir, importe total), SIEMPRE usar el valor más alto como importe principal
 - Si importeATransferir o importeTotal no se encuentran, usar el valor de importe
 - Si un campo no se encuentra, usar null
 - NO incluyas el campo "archivo" en la respuesta, se agrega automaticamente

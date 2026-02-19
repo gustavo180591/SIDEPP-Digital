@@ -373,13 +373,15 @@ export const actions: Actions = {
 
     try {
       const formData = await request.formData();
+      const fopidEnabledRaw = formData.get('fopidEnabled');
       const institutionData = {
         name: formData.get('name') as string,
         cuit: formData.get('cuit') as string,
         city: formData.get('city') as string,
         state: formData.get('state') as string,
         responsibleName: formData.get('responsibleName') as string,
-        responsibleEmail: formData.get('responsibleEmail') as string
+        responsibleEmail: formData.get('responsibleEmail') as string,
+        fopidEnabled: fopidEnabledRaw === 'true' || fopidEnabledRaw === 'on'
       };
 
       await InstitutionService.update(institutionId, institutionData);

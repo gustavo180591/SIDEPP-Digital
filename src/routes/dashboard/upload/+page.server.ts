@@ -15,14 +15,19 @@ export const load: PageServerLoad = async ({ locals }) => {
 
   // Para ADMIN, mostrar todas las instituciones
   // Para LIQUIDADOR, mostrar solo sus instituciones asignadas
-  let institutions: Array<{ id: string; name: string | null }> = [];
+  let institutions: Array<{ id: string; name: string | null; fopidEnabled?: boolean }> = [];
 
   if (locals.user.role === 'ADMIN') {
     const result = await InstitutionService.findMany({}, { page: 1, limit: 100 });
-    institutions = result.data.map(inst => ({ id: inst.id, name: inst.name }));
+    institutions = result.data.map(inst => ({ id: inst.id, name: inst.name, fopidEnabled: (inst as any).fopidEnabled ?? true }));
   } else {
     // LIQUIDADOR: usar las instituciones del usuario
-    institutions = locals.user.institutions || [];
+    const userInsts = locals.user.institutions || [];
+    // Enrich with fopidEnabled from DB
+    for (const inst of userInsts) {
+      const full = await InstitutionService.getById(inst.id);
+      institutions.push({ id: inst.id, name: inst.name, fopidEnabled: (full as any)?.fopidEnabled ?? true });
+    }
   }
 
   return {

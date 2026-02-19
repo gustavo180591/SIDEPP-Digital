@@ -17,6 +17,7 @@ export interface PersonaAporte {
   totalRemunerativo: number;
   cantidadLegajos: number;
   montoConcepto: number;
+  cuilCuit?: string;
 }
 
 export interface Totales {

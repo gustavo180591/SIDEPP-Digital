@@ -13,6 +13,7 @@ import { analyzeAportesIA, analyzeTransferenciaIA } from '$lib/utils/analyzer-pd
 import type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult } from '$lib/utils/analyzer-pdf-ia/types/index.js';
 import { sumarMontos, diferenciaMonto, calcularTolerancia, porcentajeMonto, redondearMonto } from '$lib/utils/currency.js';
 import { formatCuit, normalizeCuit } from '$lib/utils/cuit-utils.js';
+import { parseAportesCSV } from './csv-parser.js';
 
 // ============================================================================
 // TIPOS
@@ -157,6 +158,21 @@ async function findInstitutionByCuit(cuit: string | null): Promise<{
 }
 
 /**
+ * Busca una institución por ID
+ */
+async function findInstitutionById(id: string): Promise<{
+  id: string;
+  name: string | null;
+  cuit: string | null;
+} | null> {
+  if (!id) return null;
+  return prisma.institution.findUnique({
+    where: { id },
+    select: { id: true, name: true, cuit: true }
+  });
+}
+
+/**
  * Verifica si un archivo ya existe en la BD por su hash
  */
 async function checkDuplicate(bufferHash: string): Promise<{
@@ -190,7 +206,8 @@ async function checkDuplicate(bufferHash: string): Promise<{
  */
 export async function analyzeAportesPreview(
   buffer: Buffer,
-  fileName: string
+  fileName: string,
+  fallbackInstitutionId?: string
 ): Promise<AportesPreviewResult | PreviewError> {
   try {
 
@@ -213,15 +230,19 @@ export async function analyzeAportesPreview(
     // Analizar con IA
     const analysis = await analyzeAportesIA(buffer, fileName);
 
-    // Buscar institución
+    // Buscar institución: primero por CUIT del PDF, luego fallback por ID del formulario
     const cuit = analysis.escuela?.cuit;
-    const institution = await findInstitutionByCuit(cuit);
+    let institution = await findInstitutionByCuit(cuit);
+
+    if (!institution && fallbackInstitutionId) {
+      institution = await findInstitutionById(fallbackInstitutionId);
+    }
 
     if (!institution) {
       return {
         success: false,
-        error: `No existe una institución con CUIT ${formatCuit(cuit) || cuit}. Debe cargarla primero.`,
-        details: `CUIT detectado: ${cuit}`,
+        error: `No se pudo determinar la institución. CUIT detectado: ${formatCuit(cuit) || cuit || 'ninguno'}.`,
+        details: `Verifique que la institución esté cargada en el sistema.`,
         fileName
       };
     }
@@ -261,7 +282,8 @@ export async function analyzeAportesPreview(
  */
 export async function analyzeTransferenciaPreview(
   buffer: Buffer,
-  fileName: string
+  fileName: string,
+  fallbackInstitutionId?: string
 ): Promise<TransferenciaPreviewResult | PreviewError> {
   try {
 
@@ -301,14 +323,18 @@ export async function analyzeTransferenciaPreview(
       cuit = analysis.ordenante?.cuit || null;
     }
 
-    // Buscar institución por CUIT del ordenante
-    const institution = await findInstitutionByCuit(cuit);
+    // Buscar institución: primero por CUIT del ordenante, luego fallback por ID del formulario
+    let institution = await findInstitutionByCuit(cuit);
+
+    if (!institution && fallbackInstitutionId) {
+      institution = await findInstitutionById(fallbackInstitutionId);
+    }
 
     if (!institution) {
       return {
         success: false,
-        error: `No existe una institución con CUIT ${formatCuit(cuit) || cuit}. Debe cargarla primero.`,
-        details: `CUIT del ordenante detectado: ${cuit}`,
+        error: `No se pudo determinar la institución. CUIT del ordenante: ${formatCuit(cuit) || cuit || 'no detectado'}.`,
+        details: `Verifique que la institución esté cargada en el sistema.`,
         fileName
       };
     }
@@ -364,11 +390,11 @@ export async function analyzeBatchPreview(
     let result: PreviewResult;
 
     if (file.type === 'APORTES') {
-      result = await analyzeAportesPreview(file.buffer, file.fileName);
+      result = await analyzeAportesPreview(file.buffer, file.fileName, institutionId);
 
       // Fallback: si falla como aportes, intentar como transferencia
       if (!result.success && !previews.transferencia) {
-        const fallbackResult = await analyzeTransferenciaPreview(file.buffer, file.fileName);
+        const fallbackResult = await analyzeTransferenciaPreview(file.buffer, file.fileName, institutionId);
         if (fallbackResult.success) {
           warnings.push(`"${file.fileName}" fue detectado como comprobante de transferencia (no como listado de aportes).`);
           previews.transferencia = fallbackResult;
@@ -410,11 +436,11 @@ export async function analyzeBatchPreview(
       }
 
     } else if (file.type === 'TRANSFERENCIA') {
-      result = await analyzeTransferenciaPreview(file.buffer, file.fileName);
+      result = await analyzeTransferenciaPreview(file.buffer, file.fileName, institutionId);
 
       // Fallback: si falla como transferencia, intentar como aportes
       if (!result.success) {
-        const fallbackResult = await analyzeAportesPreview(file.buffer, file.fileName);
+        const fallbackResult = await analyzeAportesPreview(file.buffer, file.fileName, institutionId);
         if (fallbackResult.success) {
           warnings.push(`"${file.fileName}" fue detectado como listado de aportes (no como comprobante de transferencia).`);
           result = fallbackResult;
@@ -512,4 +538,65 @@ export async function analyzeBatchPreview(
     },
     allFilesValid: allFilesValid && coinciden
   };
+}
+
+/**
+ * Analiza un archivo CSV de aportes sin guardar nada
+ */
+export async function analyzeAportesCSVPreview(
+  buffer: Buffer,
+  fileName: string,
+  fallbackInstitutionId?: string
+): Promise<AportesPreviewResult | PreviewError> {
+  try {
+    // Calcular hash
+    const bufferHash = createHash('sha256').update(buffer).digest('hex');
+
+    // Verificar duplicado
+    const duplicateCheck = await checkDuplicate(bufferHash);
+
+    // Parsear CSV
+    const analysis = parseAportesCSV(buffer, fileName);
+
+    // Buscar institución por fallback (CSV no tiene CUIT)
+    let institution: { id: string; name: string | null; cuit: string | null } | null = null;
+    if (fallbackInstitutionId) {
+      institution = await findInstitutionById(fallbackInstitutionId);
+    }
+
+    if (!institution) {
+      return {
+        success: false,
+        error: 'No se pudo determinar la institución para el CSV. Seleccione una institución en el formulario.',
+        fileName
+      };
+    }
+
+    // Detectar tipo de concepto
+    const conceptType = detectConceptType(analysis);
+
+    return {
+      success: true,
+      type: 'APORTES',
+      fileName,
+      bufferHash,
+      bufferBase64: buffer.toString('base64'),
+      ...duplicateCheck,
+      analysis,
+      institution,
+      peopleCount: analysis.totales?.cantidadPersonas || analysis.personas?.length || 0,
+      totalAmount: analysis.totales?.montoTotal || 0,
+      conceptType
+    };
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[analyzeAportesCSVPreview] Error para ${fileName}:`, errorMessage);
+    return {
+      success: false,
+      error: 'Error al procesar el CSV de aportes',
+      details: errorMessage,
+      fileName
+    };
+  }
 }
