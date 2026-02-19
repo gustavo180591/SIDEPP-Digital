@@ -13,7 +13,7 @@ import { analyzeAportesIA, analyzeTransferenciaIA } from '$lib/utils/analyzer-pd
 import type { ListadoPDFResult, TransferenciaPDFResult, MultiTransferenciaPDFResult } from '$lib/utils/analyzer-pdf-ia/types/index.js';
 import { sumarMontos, diferenciaMonto, calcularTolerancia, porcentajeMonto, redondearMonto } from '$lib/utils/currency.js';
 import { formatCuit, normalizeCuit } from '$lib/utils/cuit-utils.js';
-import { parseAportesCSV } from './csv-parser.js';
+import { parseAportesCSV, parseAportesExcel } from './csv-parser.js';
 
 // ============================================================================
 // TIPOS
@@ -595,6 +595,61 @@ export async function analyzeAportesCSVPreview(
     return {
       success: false,
       error: 'Error al procesar el CSV de aportes',
+      details: errorMessage,
+      fileName
+    };
+  }
+}
+
+/**
+ * Analiza un archivo Excel (.xlsx) de aportes sin guardar nada
+ */
+export async function analyzeAportesExcelPreview(
+  buffer: Buffer,
+  fileName: string,
+  fallbackInstitutionId?: string
+): Promise<AportesPreviewResult | PreviewError> {
+  try {
+    const bufferHash = createHash('sha256').update(buffer).digest('hex');
+    const duplicateCheck = await checkDuplicate(bufferHash);
+
+    const analysis = parseAportesExcel(buffer, fileName);
+
+    let institution: { id: string; name: string | null; cuit: string | null } | null = null;
+    if (fallbackInstitutionId) {
+      institution = await findInstitutionById(fallbackInstitutionId);
+    }
+
+    if (!institution) {
+      return {
+        success: false,
+        error: 'No se pudo determinar la institución para el Excel. Seleccione una institución en el formulario.',
+        fileName
+      };
+    }
+
+    const conceptType = detectConceptType(analysis);
+
+    return {
+      success: true,
+      type: 'APORTES',
+      fileName,
+      bufferHash,
+      bufferBase64: buffer.toString('base64'),
+      ...duplicateCheck,
+      analysis,
+      institution,
+      peopleCount: analysis.totales?.cantidadPersonas || analysis.personas?.length || 0,
+      totalAmount: analysis.totales?.montoTotal || 0,
+      conceptType
+    };
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[analyzeAportesExcelPreview] Error para ${fileName}:`, errorMessage);
+    return {
+      success: false,
+      error: 'Error al procesar el Excel de aportes',
       details: errorMessage,
       fileName
     };

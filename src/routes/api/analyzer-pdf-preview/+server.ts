@@ -23,6 +23,7 @@ import {
   analyzeTransferenciaPreview,
   analyzeBatchPreview,
   analyzeAportesCSVPreview,
+  analyzeAportesExcelPreview,
   type FilePreviewInput,
   type BatchPreviewResult,
   type AportesPreviewResult,
@@ -31,10 +32,19 @@ import {
 
 const { MAX_FILE_SIZE } = CONFIG;
 
-// Función para detectar si el archivo es CSV
+// Detecta si el archivo es CSV (texto plano separado por delimitador)
 function isCSVFile(file: File): boolean {
   const lowerName = file.name.toLowerCase();
-  return lowerName.endsWith('.csv') || file.type === 'text/csv' || file.type === 'application/vnd.ms-excel';
+  return lowerName.endsWith('.csv') || lowerName.endsWith('.tsv') || lowerName.endsWith('.txt')
+    || file.type === 'text/csv' || file.type === 'text/tab-separated-values';
+}
+
+// Detecta si el archivo es Excel (.xlsx, .xls)
+function isExcelFile(file: File): boolean {
+  const lowerName = file.name.toLowerCase();
+  return lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')
+    || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    || file.type === 'application/vnd.ms-excel';
 }
 
 // Función para detectar el tipo de archivo basándose en el nombre y contenido
@@ -127,14 +137,17 @@ export const POST: RequestHandler = async (event) => {
       }
     }
 
-    // Separar archivos CSV de PDFs
+    // Separar archivos por tipo: CSV, Excel, PDF
     const csvFiles: { buffer: Buffer; fileName: string }[] = [];
+    const excelFiles: { buffer: Buffer; fileName: string }[] = [];
     const pdfFiles: { file: File; buffer: Buffer }[] = [];
 
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
       if (isCSVFile(file)) {
         csvFiles.push({ buffer, fileName: file.name });
+      } else if (isExcelFile(file)) {
+        excelFiles.push({ buffer, fileName: file.name });
       } else {
         pdfFiles.push({ file, buffer });
       }
@@ -171,7 +184,7 @@ export const POST: RequestHandler = async (event) => {
         institutionIdRaw || undefined
       );
     } else {
-      // Solo CSVs, crear batch result vacío
+      // Solo CSVs/Excel, crear batch result vacío
       const { createHash } = await import('node:crypto');
       batchResult = {
         sessionId: createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 16),
@@ -208,8 +221,33 @@ export const POST: RequestHandler = async (event) => {
       }
     }
 
-    // Recalcular validación si hubo CSVs
-    if (csvFiles.length > 0) {
+    // Procesar archivos Excel de aportes e inyectar en el resultado
+    for (const excel of excelFiles) {
+      const excelResult = await analyzeAportesExcelPreview(excel.buffer, excel.fileName, institutionIdRaw || undefined);
+
+      if (excelResult.success && excelResult.type === 'APORTES') {
+        const conceptType = (excelResult as AportesPreviewResult).conceptType;
+        if (conceptType === 'FOPID' && !batchResult.previews.fopid) {
+          batchResult.previews.fopid = excelResult;
+        } else if (!batchResult.previews.sueldos) {
+          batchResult.previews.sueldos = excelResult;
+        } else if (!batchResult.previews.fopid) {
+          batchResult.previews.fopid = excelResult;
+        } else if (!batchResult.previews.aguinaldo) {
+          batchResult.previews.aguinaldo = excelResult;
+        }
+      } else if (!excelResult.success) {
+        if (!batchResult.previews.sueldos) {
+          batchResult.previews.sueldos = excelResult;
+        } else if (!batchResult.previews.fopid) {
+          batchResult.previews.fopid = excelResult;
+        }
+        batchResult.allFilesValid = false;
+      }
+    }
+
+    // Recalcular validación si hubo CSVs o Excel
+    if (csvFiles.length > 0 || excelFiles.length > 0) {
       const { sumarMontos, diferenciaMonto, calcularTolerancia, porcentajeMonto } = await import('$lib/utils/currency.js');
 
       const montosAportes: number[] = [];

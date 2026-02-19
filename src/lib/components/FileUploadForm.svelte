@@ -490,12 +490,12 @@
 
       <div class="flex flex-col gap-4">
         <div>
-          <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF o CSV) <span class="text-red-500">*</span></label>
+          <label for="pdf-sueldos" class="mb-1 block text-sm font-medium text-gray-700">Aportes Sueldos (PDF, CSV o Excel) <span class="text-red-500">*</span></label>
           <input
             id="pdf-sueldos"
             bind:this={fileInputSueldos}
             type="file"
-            accept="application/pdf,.csv,text/csv"
+            accept="application/pdf,.csv,.xlsx,.xls"
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
@@ -503,12 +503,12 @@
         </div>
         {#if requiresFopid}
         <div>
-          <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF o CSV) <span class="text-red-500">*</span></label>
+          <label for="pdf-fopid" class="mb-1 block text-sm font-medium text-gray-700">Aportes FOPID (PDF, CSV o Excel) <span class="text-red-500">*</span></label>
           <input
             id="pdf-fopid"
             bind:this={fileInputFopid}
             type="file"
-            accept="application/pdf,.csv,text/csv"
+            accept="application/pdf,.csv,.xlsx,.xls"
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
@@ -518,14 +518,14 @@
         {#if showAguinaldo}
           <div>
             <label for="pdf-aguinaldo" class="mb-1 block text-sm font-medium text-gray-700">
-              Aportes Aguinaldo (PDF o CSV) <span class="text-red-500">*</span>
+              Aportes Aguinaldo (PDF, CSV o Excel) <span class="text-red-500">*</span>
               <span class="text-xs text-gray-500">(Solo Junio/Diciembre)</span>
             </label>
             <input
               id="pdf-aguinaldo"
               bind:this={fileInputAguinaldo}
               type="file"
-              accept="application/pdf,.csv,text/csv"
+              accept="application/pdf,.csv,.xlsx,.xls"
               class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
               disabled={state === 'analyzing'}
               required
