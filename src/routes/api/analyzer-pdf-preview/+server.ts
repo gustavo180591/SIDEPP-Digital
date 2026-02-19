@@ -51,7 +51,19 @@ function isExcelFile(file: File): boolean {
 function detectFileType(fileName: string): 'APORTES' | 'TRANSFERENCIA' | 'UNKNOWN' {
   const lowerName = fileName.toLowerCase();
 
-  // Patrones de listados/aportes primero (más específicos)
+  // Patrones de pago/transferencia PRIMERO (antes que aportes)
+  // "Pago Aportes" = comprobante de pago, no listado de aportes
+  if (
+    lowerName.includes('pago') ||
+    lowerName.includes('transfer') ||
+    lowerName.includes('comprobante') ||
+    lowerName.includes('cbu') ||
+    /^\d{4}\s*-\s*sidep/i.test(lowerName)
+  ) {
+    return 'TRANSFERENCIA';
+  }
+
+  // Patrones de listados/aportes
   if (
     lowerName.includes('listado') ||
     lowerName.includes('aporte') ||
@@ -63,16 +75,6 @@ function detectFileType(fileName: string): 'APORTES' | 'TRANSFERENCIA' | 'UNKNOW
     /^\d{4}\s*-\s*listado/i.test(lowerName)
   ) {
     return 'APORTES';
-  }
-
-  // Patrones de transferencias (sin 'sidep' que es demasiado genérico)
-  if (
-    lowerName.includes('transfer') ||
-    lowerName.includes('comprobante') ||
-    lowerName.includes('cbu') ||
-    /^\d{4}\s*-\s*sidep/i.test(lowerName)
-  ) {
-    return 'TRANSFERENCIA';
   }
 
   // Si no podemos determinar por el nombre, asumimos que es un listado
