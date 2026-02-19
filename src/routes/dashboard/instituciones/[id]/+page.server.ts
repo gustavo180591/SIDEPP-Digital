@@ -377,10 +377,13 @@ export const actions: Actions = {
       const institutionData = {
         name: formData.get('name') as string,
         cuit: formData.get('cuit') as string,
+        address: formData.get('address') as string,
         city: formData.get('city') as string,
         state: formData.get('state') as string,
+        country: formData.get('country') as string,
         responsibleName: formData.get('responsibleName') as string,
         responsibleEmail: formData.get('responsibleEmail') as string,
+        responsablePhone: formData.get('responsablePhone') as string,
         fopidEnabled: fopidEnabledRaw === 'true' || fopidEnabledRaw === 'on'
       };
 

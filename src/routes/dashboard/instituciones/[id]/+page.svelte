@@ -201,6 +201,22 @@
               <label class="text-sm font-medium text-gray-500">País</label>
               <p class="text-gray-900">{data.institution.country || 'Argentina'}</p>
             </div>
+            <div>
+              <label class="text-sm font-medium text-gray-500">FOPID</label>
+              <p class="text-gray-900">
+                {#if data.institution.fopidEnabled !== false}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    Requiere FOPID
+                  </span>
+                {:else}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                    <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                    No requiere FOPID
+                  </span>
+                {/if}
+              </p>
+            </div>
           </div>
       </div>
 

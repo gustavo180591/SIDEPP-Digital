@@ -19,7 +19,7 @@
     responsibleName: institution?.responsibleName || '',
     responsibleEmail: institution?.responsibleEmail || '',
     responsablePhone: institution?.responsablePhone || '',
-    fopidEnabled: (institution as any)?.fopidEnabled !== false ? 'true' : 'false'
+    fopidEnabled: institution?.fopidEnabled !== false ? 'true' : 'false'
   };
 
   // Reset form data when institution changes or modal opens
@@ -34,7 +34,7 @@
       responsibleName: institution.responsibleName || '',
       responsibleEmail: institution.responsibleEmail || '',
       responsablePhone: institution.responsablePhone || '',
-      fopidEnabled: (institution as any)?.fopidEnabled !== false ? 'true' : 'false'
+      fopidEnabled: institution?.fopidEnabled !== false ? 'true' : 'false'
     };
   }
 
