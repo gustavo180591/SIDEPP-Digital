@@ -273,14 +273,14 @@
 
     try {
       const formData = new FormData();
-      formData.append('files', fileSueldos);
+      formData.append('file_sueldos', fileSueldos);
       if (requiresFopid && fileFopid) {
-        formData.append('files', fileFopid);
+        formData.append('file_fopid', fileFopid);
       }
       if (showAguinaldo && fileAguinaldo) {
-        formData.append('files', fileAguinaldo);
+        formData.append('file_aguinaldo', fileAguinaldo);
       }
-      formData.append('files', fileTransfer);
+      formData.append('file_transferencia', fileTransfer);
       formData.append('selectedPeriod', selectedPeriod);
       formData.append('institutionId', selectedInstitutionId);
 
