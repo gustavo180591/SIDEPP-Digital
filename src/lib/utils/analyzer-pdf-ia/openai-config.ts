@@ -10,7 +10,7 @@ export const openai = new OpenAI({
 });
 
 export const MODEL_CONFIG = {
-  model: 'gpt-4o-mini' as const,
+  model: (env.OPENAI_MODEL || 'gpt-4o-mini') as string,
   temperature: 0,
-  max_tokens: 2000, // Optimizado: reducido de 4096 (suficiente para JSONs de respuesta)
+  max_tokens: 4096,
 };

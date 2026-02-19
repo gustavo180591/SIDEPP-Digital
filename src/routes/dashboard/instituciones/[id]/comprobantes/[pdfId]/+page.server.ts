@@ -10,20 +10,9 @@ function hasAccessToInstitution(user: App.Locals['user'], institutionId: string)
   return user.institutions?.some(inst => inst.id === institutionId) || false;
 }
 
-export const load: PageServerLoad = async ({ params, url, locals }) => {
-  // Resolver IDs con fallbacks de URL
-  let urlInstitutionId: string | undefined = params.id as string | undefined;
-  let pdfFileId: string | undefined = (params as any).id_1 ?? (params as any).pdfId ?? (params as any).pid;
-
-  if (!urlInstitutionId || !pdfFileId) {
-    const segments = url.pathname.split('/').filter(Boolean);
-    // .../dashboard/instituciones/{instId}/comprobantes/{pdfFileId}
-    const idx = segments.findIndex((s) => s === 'instituciones');
-    if (idx >= 0) {
-      urlInstitutionId = urlInstitutionId || segments[idx + 1];
-      pdfFileId = pdfFileId || segments[idx + 3];
-    }
-  }
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const institutionId = params.id;
+  const pdfFileId = params.pdfId;
 
   if (!pdfFileId) {
     throw error(400, 'ID del archivo PDF requerido');

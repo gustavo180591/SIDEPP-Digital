@@ -105,7 +105,12 @@ function validateName(name: string): string | null {
 }
 
 export const actions: Actions = {
-  create: async ({ request }: { request: Request }) => {
+  create: async ({ request, locals }: { request: Request; locals: any }) => {
+    // Solo ADMIN puede gestionar usuarios
+    if (!locals.user || locals.user.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para crear usuarios' });
+    }
+
     try {
       const formData = await request.formData();
 
@@ -170,7 +175,11 @@ export const actions: Actions = {
     }
   },
 
-  update: async ({ request }: { request: Request }) => {
+  update: async ({ request, locals }: { request: Request; locals: any }) => {
+    if (!locals.user || locals.user.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para modificar usuarios' });
+    }
+
     try {
       const formData = await request.formData();
 
@@ -252,7 +261,11 @@ export const actions: Actions = {
     }
   },
 
-  delete: async ({ request }: { request: Request }) => {
+  delete: async ({ request, locals }: { request: Request; locals: any }) => {
+    if (!locals.user || locals.user.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para eliminar usuarios' });
+    }
+
     try {
       const formData = await request.formData();
       const id = formData.get('id') as string;
@@ -269,7 +282,11 @@ export const actions: Actions = {
     }
   },
 
-  toggleActive: async ({ request }: { request: Request }) => {
+  toggleActive: async ({ request, locals }: { request: Request; locals: any }) => {
+    if (!locals.user || locals.user.role !== 'ADMIN') {
+      return fail(403, { error: 'No tiene permisos para cambiar el estado de usuarios' });
+    }
+
     try {
       const formData = await request.formData();
       const id = formData.get('id') as string;

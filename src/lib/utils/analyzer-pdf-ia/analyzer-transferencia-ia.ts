@@ -59,7 +59,7 @@ const TransferenciaSchema = z.object({
   operacion: OperacionSchema,
 });
 
-const SYSTEM_PROMPT = `Eres un asistente especializado en extraer datos de comprobantes de transferencias bancarias del Banco Macro de Argentina.
+const SYSTEM_PROMPT = `Eres un asistente especializado en extraer datos de comprobantes de transferencias bancarias de Argentina (Banco Macro, Banco Nacion, Banco Provincia, y otros).
 
 INSTRUCCIONES:
 1. Analiza el texto del PDF de transferencia bancaria
@@ -130,13 +130,49 @@ FORMATO JSON REQUERIDO:
 }
 
 REGLAS IMPORTANTES:
-- El ORDENANTE es la ESCUELA que hace la transferencia, NO el Banco Macro
+- El ORDENANTE es la ESCUELA/EMPRESA que hace la transferencia, NO el banco emisor
 - Buscar los datos del ordenante despues de "Ordenante" y cerca de "IIBB"
 - El CUIT del ordenante va SIN guiones (solo 11 numeros)
 - El CUIT del beneficiario/titular (en operacion) va CON guiones (XX-XXXXXXXX-X)
 - Si importeATransferir o importeTotal no se encuentran, usar el valor de importe
 - Si un campo no se encuentra, usar null
-- NO incluyas el campo "archivo" en la respuesta, se agrega automaticamente`;
+- NO incluyas el campo "archivo" en la respuesta, se agrega automaticamente
+- El campo "banco" debe indicar el nombre del banco emisor detectado del documento
+
+EJEMPLO DE ENTRADA Y SALIDA:
+
+Texto de entrada:
+"Banco Macro S.A. CUIT: 30-50001008-4
+Transferencia a terceros
+Nro. Referencia: 123456789 Nro. Operacion: 987654321
+Fecha: 15/03/2024 Hora: 10:30 AM
+Ordenante: ESCUELA SAN JOSE CUIT: 30123456789 IIBB
+Cuenta Origen: CC $1234567
+Importe: $54.755,35
+CBU Destino: 2850590940090418135201
+Titular: SINDICATO DOCENTES EDUCACION PUBLICA CUIT: 30-71234567-8"
+
+Salida esperada:
+{
+  "tipo": "TRANSFERENCIA",
+  "titulo": "Transferencia a terceros banco Macro",
+  "nroReferencia": "123456789",
+  "nroOperacion": "987654321",
+  "fecha": "15/03/2024",
+  "hora": "10:30 AM",
+  "ordenante": {"cuit": "30123456789", "nombre": "ESCUELA SAN JOSE", "domicilio": null},
+  "operacion": {
+    "cuentaOrigen": "CC $1234567",
+    "importe": 54755.35,
+    "cbuDestino": "2850590940090418135201",
+    "banco": "Macro",
+    "titular": "SINDICATO DOCENTES EDUCACION PUBLICA",
+    "cuit": "30-71234567-8",
+    "tipoOperacion": "Transferencia a terceros",
+    "importeATransferir": 54755.35,
+    "importeTotal": 54755.35
+  }
+}`;
 
 /**
  * Verifica si un error de OpenAI es recuperable (se puede reintentar)

@@ -126,7 +126,32 @@ REGLAS IMPORTANTES:
 - Preserva los espacios dobles en nombres (APELLIDO  NOMBRE)
 - El nombre de la escuela debe estar en MAYUSCULAS
 - NO incluyas el campo "archivo" en la respuesta, se agrega automaticamente
-- RECUERDA: totalRemunerativo > montoConcepto SIEMPRE`;
+- RECUERDA: totalRemunerativo > montoConcepto SIEMPRE
+
+EJEMPLO DE ENTRADA Y SALIDA:
+
+Texto de entrada:
+"Listado por concepto - Apte. Sindical SIDEPP (1%)
+ESCUELA DE LA FAMILIA AGRICOLA SAN JOSE
+CUIT: 30-12345678-9 Ruta Nacional 14 km 1200
+Fecha: 11/07/2024
+GONZALEZ  MARIA          1    22852.54    2285254.37
+LOPEZ  JUAN              2    15430.21    1543021.00
+Total: 2 personas  $38282.75"
+
+Salida esperada:
+{
+  "tipo": "LISTADO_APORTES",
+  "escuela": {"nombre": "ESCUELA DE LA FAMILIA AGRICOLA SAN JOSE", "direccion": "Ruta Nacional 14 km 1200", "cuit": "30-12345678-9"},
+  "fecha": "11/07/2024",
+  "periodo": "11/2024",
+  "concepto": "Apte. Sindical SIDEPP (1%)",
+  "personas": [
+    {"nombre": "GONZALEZ  MARIA", "totalRemunerativo": 2285254.37, "cantidadLegajos": 1, "montoConcepto": 22852.54},
+    {"nombre": "LOPEZ  JUAN", "totalRemunerativo": 1543021.00, "cantidadLegajos": 2, "montoConcepto": 15430.21}
+  ],
+  "totales": {"cantidadPersonas": 2, "montoTotal": 38282.75}
+}`;
 
 /**
  * Verifica si un error de OpenAI es recuperable (se puede reintentar)
@@ -257,7 +282,20 @@ REGLAS IMPORTANTES:
 - Si un campo no es visible o no se encuentra, usa null
 - Los montos deben ser numeros decimales exactos (no redondear)
 - Lee TODAS las filas de la tabla de personas visibles en la imagen
-- RECUERDA: totalRemunerativo > montoConcepto SIEMPRE`;
+- RECUERDA: totalRemunerativo > montoConcepto SIEMPRE
+
+EJEMPLO DE SALIDA ESPERADA:
+{
+  "tipo": "LISTADO_APORTES",
+  "escuela": {"nombre": "ESCUELA SAN JOSE", "direccion": "Ruta 14 km 1200", "cuit": "30-12345678-9"},
+  "fecha": "11/07/2024",
+  "periodo": "11/2024",
+  "concepto": "Apte. Sindical SIDEPP (1%)",
+  "personas": [
+    {"nombre": "GONZALEZ  MARIA", "totalRemunerativo": 2285254.37, "cantidadLegajos": 1, "montoConcepto": 22852.54}
+  ],
+  "totales": {"cantidadPersonas": 1, "montoTotal": 22852.54}
+}`;
 
 /**
  * Analiza un PDF de listado de aportes usando OpenAI (texto)
