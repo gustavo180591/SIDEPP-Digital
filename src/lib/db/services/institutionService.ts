@@ -192,6 +192,7 @@ export class InstitutionService {
           responsibleName: true,
           responsibleEmail: true,
           responsablePhone: true,
+          fopidEnabled: true,
           createdAt: true,
           updatedAt: true
         },

@@ -40,6 +40,7 @@ export type InstitutionListItem = Pick<
   | 'responsibleName'
   | 'responsibleEmail'
   | 'responsablePhone'
+  | 'fopidEnabled'
   | 'createdAt'
   | 'updatedAt'
 >;

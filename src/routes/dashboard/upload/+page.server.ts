@@ -19,14 +19,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 
   if (locals.user.role === 'ADMIN') {
     const result = await InstitutionService.findMany({}, { page: 1, limit: 100 });
-    institutions = result.data.map(inst => ({ id: inst.id, name: inst.name, fopidEnabled: (inst as any).fopidEnabled ?? true }));
+    institutions = result.data.map(inst => ({ id: inst.id, name: inst.name, fopidEnabled: inst.fopidEnabled ?? true }));
   } else {
     // LIQUIDADOR: usar las instituciones del usuario
     const userInsts = locals.user.institutions || [];
     // Enrich with fopidEnabled from DB
     for (const inst of userInsts) {
       const full = await InstitutionService.getById(inst.id);
-      institutions.push({ id: inst.id, name: inst.name, fopidEnabled: (full as any)?.fopidEnabled ?? true });
+      institutions.push({ id: inst.id, name: inst.name, fopidEnabled: full?.fopidEnabled ?? true });
     }
   }
 
