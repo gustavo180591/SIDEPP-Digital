@@ -112,13 +112,6 @@ export const POST: RequestHandler = async (event) => {
 
     // Obtener todos los archivos
     const files: File[] = [];
-    for (const [key, value] of formData.entries()) {
-      if (key.startsWith('file') && value instanceof File) {
-        files.push(value);
-      }
-    }
-
-    // También verificar si hay un array de archivos
     const filesArray = formData.getAll('files');
     for (const file of filesArray) {
       if (file instanceof File) {
