@@ -358,13 +358,23 @@ export async function analyzeBatchPreview(
   const warnings: string[] = [];
   let allFilesValid = true;
 
-  // Procesar cada archivo
+  // Procesar cada archivo con fallback automático de tipo
   for (const file of files) {
 
     let result: PreviewResult;
 
     if (file.type === 'APORTES') {
       result = await analyzeAportesPreview(file.buffer, file.fileName);
+
+      // Fallback: si falla como aportes, intentar como transferencia
+      if (!result.success && !previews.transferencia) {
+        const fallbackResult = await analyzeTransferenciaPreview(file.buffer, file.fileName);
+        if (fallbackResult.success) {
+          warnings.push(`"${file.fileName}" fue detectado como comprobante de transferencia (no como listado de aportes).`);
+          previews.transferencia = fallbackResult;
+          continue;
+        }
+      }
 
       if (result.success) {
         // Determinar a qué slot corresponde basándose en el concepto
@@ -401,6 +411,26 @@ export async function analyzeBatchPreview(
 
     } else if (file.type === 'TRANSFERENCIA') {
       result = await analyzeTransferenciaPreview(file.buffer, file.fileName);
+
+      // Fallback: si falla como transferencia, intentar como aportes
+      if (!result.success) {
+        const fallbackResult = await analyzeAportesPreview(file.buffer, file.fileName);
+        if (fallbackResult.success) {
+          warnings.push(`"${file.fileName}" fue detectado como listado de aportes (no como comprobante de transferencia).`);
+          result = fallbackResult;
+          // Asignar al slot de aportes correspondiente
+          const conceptType = (fallbackResult as AportesPreviewResult).conceptType;
+          if (conceptType === 'FOPID') {
+            previews.fopid = fallbackResult;
+          } else if (!previews.sueldos) {
+            previews.sueldos = fallbackResult;
+          } else {
+            previews.aguinaldo = fallbackResult;
+          }
+          continue;
+        }
+      }
+
       previews.transferencia = result;
 
       if (!result.success) {

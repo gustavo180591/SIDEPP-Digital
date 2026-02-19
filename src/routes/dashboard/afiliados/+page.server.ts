@@ -175,6 +175,12 @@ export const actions: Actions = {
         return { success: false, message: 'ID de miembro requerido' };
       }
 
+      // Verificar que el miembro pertenece a la institución indicada
+      const existingMember = await MemberService.findById(memberId);
+      if (!existingMember || existingMember.institucionId !== institutionId) {
+        return { success: false, message: 'Miembro no encontrado en esta institución' };
+      }
+
       // Validar que usuarios LIQUIDADOR solo puedan actualizar miembros de sus instituciones
       if (locals.user?.role === 'LIQUIDADOR') {
         if (!hasAccessToInstitution(locals.user, institutionId)) {
@@ -239,6 +245,12 @@ export const actions: Actions = {
 
       if (!memberId) {
         return { success: false, message: 'ID de miembro requerido' };
+      }
+
+      // Verificar que el miembro pertenece a la institución indicada
+      const existingMember = await MemberService.findById(memberId);
+      if (!existingMember || existingMember.institucionId !== institutionId) {
+        return { success: false, message: 'Miembro no encontrado en esta institución' };
       }
 
       // Validar que usuarios LIQUIDADOR solo puedan eliminar miembros de sus instituciones

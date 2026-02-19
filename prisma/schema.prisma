@@ -55,6 +55,8 @@ model Member {
 
   @@unique([documentoIdentidad, institucionId], name: "unique_documento_institution")
   @@unique([fullName, institucionId], name: "unique_fullname_institution")
+  @@unique([numeroOrden, institucionId], name: "unique_orden_institution")
+  @@unique([numeroMatricula, institucionId], name: "unique_matricula_institution")
   @@map("members")
 }
 

@@ -14,10 +14,10 @@ export const CONFIG = {
   // Usar variable de entorno UPLOAD_DIR si existe (para Docker), sino fallback a directorio local
   UPLOAD_DIR: process.env.UPLOAD_DIR || join(ROOT_DIR, 'uploads'),
 
-  // Tamaño máximo de archivo (10MB por defecto)
+  // Tamaño máximo de archivo (500MB por defecto)
   MAX_FILE_SIZE: process.env.MAX_FILE_SIZE
     ? parseInt(process.env.MAX_FILE_SIZE, 10)
-    : 10 * 1024 * 1024, // 10MB
+    : 500 * 1024 * 1024, // 500MB
 };
 
 // Asegurarse de que el directorio de subidas exista

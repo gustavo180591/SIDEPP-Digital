@@ -233,6 +233,12 @@ export const actions: Actions = {
         return { success: false, message: 'ID de miembro requerido' };
       }
 
+      // Verificar que el miembro pertenece a esta institución
+      const existingMember = await MemberService.findById(memberId);
+      if (!existingMember || existingMember.institucionId !== institutionId) {
+        return { success: false, message: 'Miembro no encontrado en esta institución' };
+      }
+
       const fullName = formData.get('fullName') as string;
       const email = formData.get('email') as string;
       const phone = formData.get('phone') as string;
@@ -335,6 +341,12 @@ export const actions: Actions = {
       
       if (!memberId) {
         return { success: false, message: 'ID de miembro requerido' };
+      }
+
+      // Verificar que el miembro pertenece a esta institución
+      const existingMember = await MemberService.findById(memberId);
+      if (!existingMember || existingMember.institucionId !== institutionId) {
+        return { success: false, message: 'Miembro no encontrado en esta institución' };
       }
 
       await MemberService.delete(memberId);

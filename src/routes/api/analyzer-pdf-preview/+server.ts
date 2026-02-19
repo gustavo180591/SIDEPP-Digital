@@ -34,18 +34,7 @@ const { MAX_FILE_SIZE } = CONFIG;
 function detectFileType(fileName: string): 'APORTES' | 'TRANSFERENCIA' | 'UNKNOWN' {
   const lowerName = fileName.toLowerCase();
 
-  // Patrones comunes para transferencias
-  if (
-    lowerName.includes('transfer') ||
-    lowerName.includes('comprobante') ||
-    lowerName.includes('sidep') ||
-    lowerName.includes('cbu') ||
-    /^\d{4}\s*-\s*sidep/i.test(lowerName)
-  ) {
-    return 'TRANSFERENCIA';
-  }
-
-  // Patrones comunes para listados
+  // Patrones de listados/aportes primero (más específicos)
   if (
     lowerName.includes('listado') ||
     lowerName.includes('aporte') ||
@@ -53,9 +42,20 @@ function detectFileType(fileName: string): 'APORTES' | 'TRANSFERENCIA' | 'UNKNOW
     lowerName.includes('sueldo') ||
     lowerName.includes('haberes') ||
     lowerName.includes('aguinaldo') ||
+    lowerName.includes('concepto') ||
     /^\d{4}\s*-\s*listado/i.test(lowerName)
   ) {
     return 'APORTES';
+  }
+
+  // Patrones de transferencias (sin 'sidep' que es demasiado genérico)
+  if (
+    lowerName.includes('transfer') ||
+    lowerName.includes('comprobante') ||
+    lowerName.includes('cbu') ||
+    /^\d{4}\s*-\s*sidep/i.test(lowerName)
+  ) {
+    return 'TRANSFERENCIA';
   }
 
   // Si no podemos determinar por el nombre, asumimos que es un listado
