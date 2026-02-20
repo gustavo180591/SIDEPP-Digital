@@ -115,31 +115,25 @@ export const POST: RequestHandler = async (event) => {
       allFilesValid: true
     };
 
-    // Procesar cada archivo en paralelo
-    const [sueldosResult, fopidResult, aguinaldoResult, transferenciaResult] = await Promise.all([
-      analyzeAportesFile(fileSueldos, institutionId),
-      fileFopid instanceof File ? analyzeAportesFile(fileFopid, institutionId) : null,
-      fileAguinaldo instanceof File ? analyzeAportesFile(fileAguinaldo, institutionId) : null,
-      (async () => {
-        const buffer = Buffer.from(await fileTransferencia.arrayBuffer());
-        return analyzeTransferenciaPreview(buffer, fileTransferencia.name, institutionId);
-      })()
-    ]);
-
-    // Asignar resultados a sus slots
+    // Procesar archivos secuencialmente para no saturar CPU/RAM del servidor
+    const sueldosResult = await analyzeAportesFile(fileSueldos, institutionId);
     batchResult.previews.sueldos = sueldosResult;
     if (!sueldosResult.success) batchResult.allFilesValid = false;
 
-    if (fopidResult) {
+    if (fileFopid instanceof File) {
+      const fopidResult = await analyzeAportesFile(fileFopid, institutionId);
       batchResult.previews.fopid = fopidResult;
       if (!fopidResult.success) batchResult.allFilesValid = false;
     }
 
-    if (aguinaldoResult) {
+    if (fileAguinaldo instanceof File) {
+      const aguinaldoResult = await analyzeAportesFile(fileAguinaldo, institutionId);
       batchResult.previews.aguinaldo = aguinaldoResult;
       if (!aguinaldoResult.success) batchResult.allFilesValid = false;
     }
 
+    const transferenciaBuffer = Buffer.from(await fileTransferencia.arrayBuffer());
+    const transferenciaResult = await analyzeTransferenciaPreview(transferenciaBuffer, fileTransferencia.name, institutionId);
     batchResult.previews.transferencia = transferenciaResult;
     if (!transferenciaResult.success) batchResult.allFilesValid = false;
 
