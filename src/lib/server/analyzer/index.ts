@@ -16,8 +16,8 @@
 export {
   analyzeAportesPreview,
   analyzeTransferenciaPreview,
-  analyzeBatchPreview,
-  type FilePreviewInput,
+  analyzeAportesCSVPreview,
+  analyzeAportesExcelPreview,
   type AportesPreviewResult,
   type TransferenciaPreviewResult,
   type PreviewError,

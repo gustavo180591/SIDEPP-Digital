@@ -184,7 +184,7 @@ export const POST: RequestHandler = async (event) => {
     for (const key of ['sueldos', 'fopid', 'aguinaldo'] as const) {
       const preview = batchResult.previews[key];
       if (preview && preview.success && preview.type === 'APORTES') {
-        personCounts[key] = (preview as AportesPreviewResult).totalPersonas;
+        personCounts[key] = (preview as AportesPreviewResult).peopleCount;
       }
     }
     const counts = Object.values(personCounts);
