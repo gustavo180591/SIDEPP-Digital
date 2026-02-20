@@ -133,13 +133,14 @@
             return async ({ result, update }) => {
               loading = false;
               if (result.type === 'success' || (result.type === 'failure' && result.data?.success)) {
+                await update();
                 onClose();
               } else if (result.type === 'failure') {
                 error = result.data?.error || 'Error al procesar la solicitud';
+                await update();
               } else if (result.type === 'error') {
                 error = result.error?.message || 'Error inesperado';
               }
-              await update();
             };
           }}
         >
@@ -169,13 +170,14 @@
             return async ({ result, update }) => {
               loading = false;
               if (result.type === 'success' || (result.type === 'failure' && result.data?.success)) {
+                await update();
                 onClose();
               } else if (result.type === 'failure') {
                 error = result.data?.error || 'Error al procesar la solicitud';
+                await update();
               } else if (result.type === 'error') {
                 error = result.error?.message || 'Error inesperado';
               }
-              await update();
             };
           }}
         >

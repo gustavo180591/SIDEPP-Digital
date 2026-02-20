@@ -145,6 +145,7 @@ export const actions: Actions = {
       const responsibleName = formData.get('responsibleName') as string;
       const responsibleEmail = formData.get('responsibleEmail') as string;
       const responsablePhone = formData.get('responsablePhone') as string;
+      const fopidEnabledRaw = formData.get('fopidEnabled');
 
       // Validaciones
       if (!name?.trim()) {
@@ -184,7 +185,8 @@ export const actions: Actions = {
         country: country?.trim() || 'Argentina',
         responsibleName: responsibleName?.trim() || null,
         responsibleEmail: responsibleEmail?.trim() || null,
-        responsablePhone: responsablePhone?.trim() || null
+        responsablePhone: responsablePhone?.trim() || null,
+        fopidEnabled: fopidEnabledRaw === 'true' || fopidEnabledRaw === 'on'
       });
 
       return { success: true, institution };
@@ -213,6 +215,7 @@ export const actions: Actions = {
       const responsibleName = formData.get('responsibleName') as string;
       const responsibleEmail = formData.get('responsibleEmail') as string;
       const responsablePhone = formData.get('responsablePhone') as string;
+      const fopidEnabledRaw = formData.get('fopidEnabled');
 
       if (!id) {
         return fail(400, { error: 'ID de institución requerido' });
@@ -256,7 +259,8 @@ export const actions: Actions = {
         country: country?.trim() || 'Argentina',
         responsibleName: responsibleName?.trim() || null,
         responsibleEmail: responsibleEmail?.trim() || null,
-        responsablePhone: responsablePhone?.trim() || null
+        responsablePhone: responsablePhone?.trim() || null,
+        fopidEnabled: fopidEnabledRaw === 'true' || fopidEnabledRaw === 'on'
       });
 
       return { success: true, institution };
