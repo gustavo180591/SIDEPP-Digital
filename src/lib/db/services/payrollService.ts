@@ -9,8 +9,11 @@ export class PayrollService {
     filters: { search?: string; year?: number; month?: number } = {},
     pagination: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' } = {}
   ): Promise<PaginatedResult<any>> {
+    try {
     const { search = '', year, month } = filters;
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+    const ALLOWED_SORT_FIELDS = ['createdAt', 'year', 'month', 'updatedAt'] as const;
+    const { page = 1, limit = 10, sortOrder = 'desc' } = pagination;
+    const sortBy = ALLOWED_SORT_FIELDS.includes(pagination.sortBy as any) ? pagination.sortBy! : 'createdAt';
 
     const where: any = { institutionId };
     if (year) where.year = year;
@@ -69,9 +72,14 @@ export class PayrollService {
 
     // Mantener el total original para paginación correcta (no recalcular con data.length expandido)
     return { ...result, data } as PaginatedResult<any>;
+    } catch (error) {
+      console.error('Error al obtener períodos de nómina:', error);
+      throw new Error('No se pudieron obtener los períodos de nómina');
+    }
   }
 
   static async getById(id: string) {
+    try {
     const p = await prisma.payrollPeriod.findUnique({
       where: { id },
       include: {
@@ -161,6 +169,10 @@ export class PayrollService {
     }));
 
     return { ...transformedPeriod, pdfFile: transformedPdf, pdfFiles: transformedPdfFiles };
+    } catch (error) {
+      console.error('Error al obtener período de nómina:', error);
+      throw new Error('No se pudo obtener el período de nómina');
+    }
   }
 }
 

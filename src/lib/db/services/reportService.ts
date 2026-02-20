@@ -33,6 +33,7 @@ export async function getAportesPorPeriodo(params: {
   startMonth?: string; // 'YYYY-MM'
   endMonth?: string; // 'YYYY-MM'
 }): Promise<ReporteAportesPorPeriodo> {
+  try {
   const { institutionId, startMonth, endMonth } = params;
 
   // Construir filtros para PayrollPeriod
@@ -199,22 +200,31 @@ export async function getAportesPorPeriodo(params: {
     totalesPorMes,
     institution
   };
+  } catch (error) {
+    console.error('Error al generar reporte de aportes por período:', error);
+    throw new Error('No se pudo generar el reporte de aportes');
+  }
 }
 
 /**
  * Obtiene todas las instituciones disponibles para el selector
  */
 export async function getInstitutionsForReport() {
-  return await prisma.institution.findMany({
-    select: {
-      id: true,
-      name: true,
-      cuit: true
-    },
-    orderBy: {
-      name: 'asc'
-    }
-  });
+  try {
+    return await prisma.institution.findMany({
+      select: {
+        id: true,
+        name: true,
+        cuit: true
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener instituciones para reporte:', error);
+    throw new Error('No se pudieron obtener las instituciones');
+  }
 }
 
 /**
@@ -224,22 +234,27 @@ export async function getAvailableMonthsRange(): Promise<{
   minMonth: string | null;
   maxMonth: string | null;
 }> {
-  const minPeriod = await prisma.payrollPeriod.findFirst({
-    orderBy: [{ year: 'asc' }, { month: 'asc' }],
-    select: { year: true, month: true }
-  });
+  try {
+    const minPeriod = await prisma.payrollPeriod.findFirst({
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
+      select: { year: true, month: true }
+    });
 
-  const maxPeriod = await prisma.payrollPeriod.findFirst({
-    orderBy: [{ year: 'desc' }, { month: 'desc' }],
-    select: { year: true, month: true }
-  });
+    const maxPeriod = await prisma.payrollPeriod.findFirst({
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      select: { year: true, month: true }
+    });
 
-  return {
-    minMonth: minPeriod
-      ? `${minPeriod.year}-${String(minPeriod.month).padStart(2, '0')}`
-      : null,
-    maxMonth: maxPeriod
-      ? `${maxPeriod.year}-${String(maxPeriod.month).padStart(2, '0')}`
-      : null
-  };
+    return {
+      minMonth: minPeriod
+        ? `${minPeriod.year}-${String(minPeriod.month).padStart(2, '0')}`
+        : null,
+      maxMonth: maxPeriod
+        ? `${maxPeriod.year}-${String(maxPeriod.month).padStart(2, '0')}`
+        : null
+    };
+  } catch (error) {
+    console.error('Error al obtener rango de meses disponibles:', error);
+    throw new Error('No se pudo obtener el rango de meses');
+  }
 }

@@ -151,7 +151,9 @@ export class InstitutionService {
     pagination: PaginationParams = {}
   ): Promise<PaginatedResult<InstitutionListItem>> {
     try {
-      const { sortBy = 'createdAt', sortOrder = 'desc' } = pagination;
+      const ALLOWED_SORT_FIELDS = ['createdAt', 'name', 'cuit', 'city', 'state', 'country', 'updatedAt'] as const;
+      const { sortOrder = 'desc' } = pagination;
+      const sortBy = ALLOWED_SORT_FIELDS.includes(pagination.sortBy as any) ? pagination.sortBy! : 'createdAt';
       const { search, city, state, country } = filters;
 
       // Construir condiciones WHERE
