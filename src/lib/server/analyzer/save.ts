@@ -39,6 +39,7 @@ export interface BatchSaveInput {
   selectedPeriod: { month: number; year: number };
   institutionId: string;
   forceConfirm?: boolean;
+  uploadedBy?: string;
 }
 
 export interface SaveResult {
@@ -127,7 +128,7 @@ function isPrismaUniqueConstraintError(error: unknown): boolean {
  * 3. Si la transacción falla, limpiar archivos del disco
  */
 export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveResult> {
-  const { previews, selectedPeriod, institutionId } = input;
+  const { previews, selectedPeriod, institutionId, uploadedBy } = input;
 
         
   // Archivos físicos guardados (para cleanup en caso de error)
@@ -173,7 +174,8 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
             periodId,
             institutionId,
             savedFilePaths,
-            tx
+            tx,
+            uploadedBy
           );
 
           savedFiles[key as 'sueldos' | 'fopid' | 'aguinaldo'] = aportesResult;
@@ -186,7 +188,8 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
           previews.transferencia as TransferenciaPreviewResult,
           periodId,
           savedFilePaths,
-          tx
+          tx,
+          uploadedBy
         );
 
         savedFiles.transferencia = transferResult;
@@ -243,7 +246,8 @@ async function saveAportesFile(
   periodId: string,
   institutionId: string,
   savedFilePaths: string[],
-  tx: TransactionClient
+  tx: TransactionClient,
+  uploadedBy?: string
 ): Promise<{ pdfFileId: string; contributionLineCount: number }> {
   // 1. Guardar archivo físico con UUID
   const buffer = Buffer.from(preview.bufferBase64, 'base64');
@@ -262,7 +266,8 @@ async function saveAportesFile(
       concept: analysis.concepto || 'Aporte Sindical SIDEPP (1%)',
       peopleCount: preview.peopleCount,
       totalAmount: preview.totalAmount.toString(),
-      period: { connect: { id: periodId } }
+      period: { connect: { id: periodId } },
+      uploadedBy
     }
   });
 
@@ -334,7 +339,8 @@ async function saveTransferenciaFile(
   preview: TransferenciaPreviewResult,
   periodId: string,
   savedFilePaths: string[],
-  tx: TransactionClient
+  tx: TransactionClient,
+  uploadedBy?: string
 ): Promise<{ pdfFileId: string; bankTransferId: string }> {
   // 1. Guardar archivo físico con UUID
   const buffer = Buffer.from(preview.bufferBase64, 'base64');
@@ -350,7 +356,8 @@ async function saveTransferenciaFile(
       type: 'COMPROBANTE',
       concept: 'Transferencia Bancaria',
       totalAmount: preview.transferAmount.toString(),
-      period: { connect: { id: periodId } }
+      period: { connect: { id: periodId } },
+      uploadedBy
     }
   });
 

@@ -150,7 +150,8 @@ export const POST: RequestHandler = async (event) => {
       },
       selectedPeriod: body.selectedPeriod,
       institutionId: body.institutionId,
-      forceConfirm: body.forceConfirm
+      forceConfirm: body.forceConfirm,
+      uploadedBy: auth.user!.id
     };
 
     // Ejecutar guardado atómico
