@@ -39,20 +39,20 @@
   <div class="container mx-auto p-6">
     <!-- Header con navegación -->
     <div class="flex items-center gap-4 mb-6">
-      {#if data.user?.role === 'ADMIN'}
       <a href="/dashboard/instituciones" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
-        Volver a Instituciones
+        {data.user?.role === 'LIQUIDADOR' ? 'Mis Instituciones' : 'Volver a Instituciones'}
       </a>
-      {/if}
+      {#if data.user?.role !== 'LIQUIDADOR'}
       <a href="/dashboard/instituciones/{data.institution?.id}" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
         Ver Institución
       </a>
+      {/if}
       <a href="/dashboard/instituciones/{data.institution?.id}/comprobantes" class="btn btn-ghost btn-sm">
         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
