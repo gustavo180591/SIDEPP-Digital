@@ -94,8 +94,9 @@ const auth: Handle = async ({ event, resolve }) => {
       throw redirect(303, '/unauthorized');
     }
 
-    // Detalle de institución: solo ADMIN y FINANZAS pueden acceder
-    if (isInstitutionDetailRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS') {
+    // Detalle de institución: ADMIN, FINANZAS y LIQUIDADOR pueden acceder
+    // (LIQUIDADOR necesita acceso a /dashboard/instituciones/{id}/comprobantes)
+    if (isInstitutionDetailRoute && userRole !== 'ADMIN' && userRole !== 'FINANZAS' && userRole !== 'LIQUIDADOR') {
       throw redirect(303, '/unauthorized');
     }
 
