@@ -172,7 +172,7 @@ async function checkDuplicate(bufferHash: string): Promise<{
   isDuplicate: boolean;
   duplicateInfo?: { pdfFileId: string; existingFileName: string };
 }> {
-  const existing = await prisma.pdfFile.findUnique({
+  const existing = await prisma.pdfFile.findFirst({
     where: { bufferHash },
     select: { id: true, fileName: true }
   });
