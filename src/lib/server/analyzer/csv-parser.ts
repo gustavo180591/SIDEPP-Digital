@@ -92,10 +92,8 @@ function detectColumns(headers: string[]): ColumnMapping {
 /**
  * Parsea un archivo Excel .xlsx y retorna un ListadoPDFResult
  */
-export function parseAportesExcel(buffer: Buffer, fileName: string): ListadoPDFResult {
-  // Dynamic import para no romper si xlsx no está instalado
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const XLSX = require('xlsx');
+export async function parseAportesExcel(buffer: Buffer, fileName: string): Promise<ListadoPDFResult> {
+  const XLSX = await import('xlsx');
 
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];

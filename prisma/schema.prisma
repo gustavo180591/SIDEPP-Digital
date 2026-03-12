@@ -131,7 +131,7 @@ model PdfFile {
   periodId         String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
-  bufferHash       String?            @unique
+  bufferHash       String?
   concept          String?
   peopleCount      Int?
   totalAmount      Decimal?           @db.Decimal(18, 2)

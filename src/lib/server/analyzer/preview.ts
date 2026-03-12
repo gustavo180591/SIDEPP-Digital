@@ -432,7 +432,7 @@ export async function analyzeAportesExcelPreview(
     const bufferHash = createHash('sha256').update(buffer).digest('hex');
     const duplicateCheck = await checkDuplicate(bufferHash);
 
-    const analysis = parseAportesExcel(buffer, fileName);
+    const analysis = await parseAportesExcel(buffer, fileName);
 
     let institution: { id: string; name: string | null; cuit: string | null } | null = null;
     if (fallbackInstitutionId) {
