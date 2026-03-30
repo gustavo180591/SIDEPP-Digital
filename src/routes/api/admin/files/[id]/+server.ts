@@ -24,7 +24,7 @@ export const DELETE: RequestHandler = async (event) => {
         contributionLine: true,
         period: {
           include: {
-            transfer: true,
+            transfers: true,
             pdfFiles: true
           }
         }
@@ -57,10 +57,10 @@ export const DELETE: RequestHandler = async (event) => {
       const remainingFiles = pdfFile.period.pdfFiles.filter(f => f.id !== fileId);
 
       if (remainingFiles.length === 0) {
-        // Eliminar BankTransfer si existe
-        if (pdfFile.period.transfer) {
-          await prisma.bankTransfer.delete({
-            where: { id: pdfFile.period.transfer.id }
+        // Eliminar BankTransfers si existen
+        if (pdfFile.period.transfers && pdfFile.period.transfers.length > 0) {
+          await prisma.bankTransfer.deleteMany({
+            where: { id: { in: pdfFile.period.transfers.map((t: any) => t.id) } }
           });
         }
 

@@ -34,7 +34,7 @@ export interface BatchSaveInput {
     sueldos?: AportesPreviewResult;
     fopid?: AportesPreviewResult;
     aguinaldo?: AportesPreviewResult;
-    transferencia?: TransferenciaPreviewResult;
+    transferencias?: TransferenciaPreviewResult[];
   };
   selectedPeriod: { month: number; year: number };
   institutionId: string;
@@ -57,7 +57,7 @@ export interface BatchSaveResult {
     sueldos?: { pdfFileId: string; contributionLineCount: number };
     fopid?: { pdfFileId: string; contributionLineCount: number };
     aguinaldo?: { pdfFileId: string; contributionLineCount: number };
-    transferencia?: { pdfFileId: string; bankTransferId: string };
+    transferencias?: { pdfFileId: string; bankTransferId: string }[];
   };
 }
 
@@ -182,17 +182,21 @@ export async function saveBatchAtomic(input: BatchSaveInput): Promise<BatchSaveR
         }
       }
 
-      // 3. Guardar transferencia
-      if (previews.transferencia?.success && previews.transferencia.type === 'TRANSFERENCIA') {
-        const transferResult = await saveTransferenciaFile(
-          previews.transferencia as TransferenciaPreviewResult,
-          periodId,
-          savedFilePaths,
-          tx,
-          uploadedBy
-        );
-
-        savedFiles.transferencia = transferResult;
+      // 3. Guardar transferencias (una o más)
+      if (previews.transferencias && previews.transferencias.length > 0) {
+        savedFiles.transferencias = [];
+        for (const transferencia of previews.transferencias) {
+          if (transferencia.success && transferencia.type === 'TRANSFERENCIA') {
+            const transferResult = await saveTransferenciaFile(
+              transferencia as TransferenciaPreviewResult,
+              periodId,
+              savedFilePaths,
+              tx,
+              uploadedBy
+            );
+            savedFiles.transferencias.push(transferResult);
+          }
+        }
       }
 
       return { periodId, savedFiles };

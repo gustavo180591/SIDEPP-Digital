@@ -45,7 +45,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
           cuit: true
         }
       },
-      transfer: {
+      transfers: {
         select: {
           id: true,
           importe: true,
@@ -109,10 +109,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
   return {
     periods: periods.map(p => ({
       ...p,
-      transfer: p.transfer ? {
-        ...p.transfer,
-        importe: p.transfer.importe?.toString() || null
-      } : null,
+      transfers: (p.transfers || []).map(t => ({
+        ...t,
+        importe: t.importe?.toString() || null
+      })),
       pdfFiles: p.pdfFiles.map(f => ({
         ...f,
         totalAmount: f.totalAmount?.toString() || null

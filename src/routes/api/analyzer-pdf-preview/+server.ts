@@ -5,7 +5,7 @@
  *   - file_sueldos: Aportes Sueldos (PDF, CSV o Excel)
  *   - file_fopid: Aportes FOPID (PDF, CSV o Excel)
  *   - file_aguinaldo: Aportes Aguinaldo (PDF, CSV o Excel)
- *   - file_transferencia: Comprobante de transferencia (PDF)
+ *   - file_transferencia: Comprobante(s) de transferencia (PDF, puede ser múltiple)
  *
  * POST /api/analyzer-pdf-preview
  */
@@ -81,18 +81,18 @@ export const POST: RequestHandler = async (event) => {
     const fileSueldos = formData.get('file_sueldos') as File | null;
     const fileFopid = formData.get('file_fopid') as File | null;
     const fileAguinaldo = formData.get('file_aguinaldo') as File | null;
-    const fileTransferencia = formData.get('file_transferencia') as File | null;
+    const filesTransferencia = formData.getAll('file_transferencia').filter((f): f is File => f instanceof File);
 
     // Validar que al menos sueldos y transferencia existan
     if (!fileSueldos || !(fileSueldos instanceof File)) {
       return json({ error: 'Se requiere el archivo de Aportes Sueldos' }, { status: 400 });
     }
-    if (!fileTransferencia || !(fileTransferencia instanceof File)) {
-      return json({ error: 'Se requiere el archivo de Transferencia Bancaria' }, { status: 400 });
+    if (filesTransferencia.length === 0) {
+      return json({ error: 'Se requiere al menos un archivo de Transferencia Bancaria' }, { status: 400 });
     }
 
     // Validar tamaño de archivos
-    const allFiles = [fileSueldos, fileFopid, fileAguinaldo, fileTransferencia].filter((f): f is File => f instanceof File);
+    const allFiles = [fileSueldos, fileFopid, fileAguinaldo, ...filesTransferencia].filter((f): f is File => f instanceof File);
     for (const file of allFiles) {
       if (file.size > MAX_FILE_SIZE) {
         return json({
@@ -132,10 +132,14 @@ export const POST: RequestHandler = async (event) => {
       if (!aguinaldoResult.success) batchResult.allFilesValid = false;
     }
 
-    const transferenciaBuffer = Buffer.from(await fileTransferencia.arrayBuffer());
-    const transferenciaResult = await analyzeTransferenciaPreview(transferenciaBuffer, fileTransferencia.name, institutionId);
-    batchResult.previews.transferencia = transferenciaResult;
-    if (!transferenciaResult.success) batchResult.allFilesValid = false;
+    // Procesar transferencias (una o más)
+    batchResult.previews.transferencias = [];
+    for (const fileTransf of filesTransferencia) {
+      const transfBuffer = Buffer.from(await fileTransf.arrayBuffer());
+      const transfResult = await analyzeTransferenciaPreview(transfBuffer, fileTransf.name, institutionId);
+      batchResult.previews.transferencias.push(transfResult);
+      if (!transfResult.success) batchResult.allFilesValid = false;
+    }
 
     // Calcular validación de totales
     const { sumarMontos, diferenciaMonto, calcularTolerancia, porcentajeMonto } = await import('$lib/utils/currency.js');
@@ -149,10 +153,10 @@ export const POST: RequestHandler = async (event) => {
     }
 
     const totalAportes = sumarMontos(...montosAportes);
-    let totalTransferencia = 0;
-    if (transferenciaResult.success && transferenciaResult.type === 'TRANSFERENCIA') {
-      totalTransferencia = (transferenciaResult as TransferenciaPreviewResult).transferAmount;
-    }
+    const montosTransferencias = batchResult.previews.transferencias
+      .filter(t => t.success && t.type === 'TRANSFERENCIA')
+      .map(t => (t as TransferenciaPreviewResult).transferAmount);
+    const totalTransferencia = sumarMontos(...montosTransferencias);
 
     const diferencia = diferenciaMonto(totalAportes, totalTransferencia);
     const montoMayor = Math.max(totalAportes, totalTransferencia);

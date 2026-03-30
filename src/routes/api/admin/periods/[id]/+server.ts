@@ -22,7 +22,7 @@ export const DELETE: RequestHandler = async (event) => {
       where: { id: periodId },
       include: {
         institution: true,
-        transfer: true,
+        transfers: true,
         pdfFiles: {
           include: {
             contributionLine: true
@@ -55,10 +55,10 @@ export const DELETE: RequestHandler = async (event) => {
       });
     }
 
-    // 4. Eliminar BankTransfer si existe
-    if (period.transfer) {
-      await prisma.bankTransfer.delete({
-        where: { id: period.transfer.id }
+    // 4. Eliminar BankTransfers si existen
+    if (period.transfers && period.transfers.length > 0) {
+      await prisma.bankTransfer.deleteMany({
+        where: { id: { in: period.transfers.map(t => t.id) } }
       });
     }
 
@@ -87,7 +87,7 @@ export const DELETE: RequestHandler = async (event) => {
         filesDeleted: period.pdfFiles.length,
         physicalFilesDeleted: filesDeletedCount,
         contributionLinesDeleted: contributionLineIds.length,
-        bankTransferDeleted: !!period.transfer
+        bankTransfersDeleted: period.transfers?.length || 0
       }
     });
 

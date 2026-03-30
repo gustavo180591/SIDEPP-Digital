@@ -206,8 +206,9 @@
       {/if}
     </div>
 
-    <!-- Información de Transferencia Bancaria -->
-    {#if data.payroll?.transfer}
+    <!-- Información de Transferencias Bancarias -->
+    {#if data.payroll?.transfers?.length > 0}
+      {#each data.payroll.transfers as transf, tIdx}
       <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-6 hover:shadow-xl transition-shadow duration-300">
         <div class="flex items-center gap-3 mb-6">
           <div class="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg">
@@ -216,7 +217,7 @@
             </svg>
           </div>
           <div class="flex-1">
-            <h2 class="text-xl font-bold text-gray-900">Transferencia Bancaria</h2>
+            <h2 class="text-xl font-bold text-gray-900">Transferencia Bancaria {data.payroll.transfers.length > 1 ? `#${tIdx + 1}` : ''}</h2>
             <p class="text-sm text-gray-500">Información del pago realizado</p>
           </div>
           <div>
@@ -237,7 +238,7 @@
             <div class="flex-1 min-w-0">
               <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Fecha</label>
               <p class="text-sm text-gray-900 font-semibold mt-0.5">
-                {data.payroll.transfer?.datetime ? formatDate(data.payroll.transfer.datetime) : 'No especificada'}
+                {transf.datetime ? formatDate(transf.datetime) : 'No especificada'}
               </p>
             </div>
           </div>
@@ -248,7 +249,7 @@
             </svg>
             <div class="flex-1 min-w-0">
               <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nº Operación</label>
-              <p class="text-sm text-gray-900 font-mono font-semibold mt-0.5 truncate">{data.payroll.transfer?.operationNo || '-'}</p>
+              <p class="text-sm text-gray-900 font-mono font-semibold mt-0.5 truncate">{transf.operationNo || '-'}</p>
             </div>
           </div>
 
@@ -258,7 +259,7 @@
             </svg>
             <div class="flex-1 min-w-0">
               <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Referencia</label>
-              <p class="text-sm text-gray-900 font-semibold mt-0.5 truncate">{data.payroll.transfer?.reference || '-'}</p>
+              <p class="text-sm text-gray-900 font-semibold mt-0.5 truncate">{transf.reference || '-'}</p>
             </div>
           </div>
 
@@ -269,7 +270,7 @@
             <div class="flex-1 min-w-0">
               <label class="text-xs font-medium text-green-700 uppercase tracking-wide">Importe</label>
               <p class="text-lg text-green-600 font-bold mt-0.5">
-                {formatCurrency(data.payroll.transfer?.importe || 0)}
+                {formatCurrency(transf.importe || 0)}
               </p>
             </div>
           </div>
@@ -280,7 +281,7 @@
             </svg>
             <div class="flex-1 min-w-0">
               <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">CBU Destino</label>
-              <p class="text-sm text-gray-900 font-mono font-semibold mt-0.5 break-all">{data.payroll.transfer?.cbuDestino || '-'}</p>
+              <p class="text-sm text-gray-900 font-mono font-semibold mt-0.5 break-all">{transf.cbuDestino || '-'}</p>
             </div>
           </div>
 
@@ -290,11 +291,12 @@
             </svg>
             <div class="flex-1 min-w-0">
               <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Titular</label>
-              <p class="text-sm text-gray-900 font-semibold mt-0.5">{data.payroll.transfer?.titular || '-'}</p>
+              <p class="text-sm text-gray-900 font-semibold mt-0.5">{transf.titular || '-'}</p>
             </div>
           </div>
         </div>
       </div>
+      {/each}
     {/if}
 
     <!-- Detalle por Afiliado - Solo para SUELDO, FOPID, AGUINALDO -->

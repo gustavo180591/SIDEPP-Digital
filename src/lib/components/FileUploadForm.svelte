@@ -95,7 +95,7 @@
       sueldos?: PreviewResult;
       fopid?: PreviewResult;
       aguinaldo?: PreviewResult;
-      transferencia?: PreviewResult;
+      transferencias?: PreviewResult[];
     };
     validation: {
       totalAportes: number;
@@ -116,7 +116,7 @@
       sueldos?: { pdfFileId: string; contributionLineCount: number };
       fopid?: { pdfFileId: string; contributionLineCount: number };
       aguinaldo?: { pdfFileId: string; contributionLineCount: number };
-      transferencia?: { pdfFileId: string; bankTransferId: string };
+      transferencias?: { pdfFileId: string; bankTransferId: string }[];
     };
   };
 
@@ -234,7 +234,7 @@
     const fileSueldos = fileInputSueldos?.files?.[0];
     const fileFopid = fileInputFopid?.files?.[0];
     const fileAguinaldo = fileInputAguinaldo?.files?.[0];
-    const fileTransfer = fileInputTransfer?.files?.[0];
+    const filesTransfer = fileInputTransfer?.files;
 
     // Validaciones
     if (!selectedMonth || !selectedYear) {
@@ -262,8 +262,8 @@
       return;
     }
 
-    if (!fileTransfer) {
-      errorMessage = 'Debes subir el archivo de Transferencia Bancaria.';
+    if (!filesTransfer || filesTransfer.length === 0) {
+      errorMessage = 'Debes subir al menos un archivo de Transferencia Bancaria.';
       return;
     }
 
@@ -280,7 +280,9 @@
       if (showAguinaldo && fileAguinaldo) {
         formData.append('file_aguinaldo', fileAguinaldo);
       }
-      formData.append('file_transferencia', fileTransfer);
+      for (const ft of Array.from(filesTransfer)) {
+        formData.append('file_transferencia', ft);
+      }
       formData.append('selectedPeriod', selectedPeriod);
       formData.append('institutionId', selectedInstitutionId);
 
@@ -329,7 +331,13 @@
     try {
       // Obtener la institución detectada de los previews
       let detectedInstitutionId = selectedInstitutionId;
-      for (const preview of Object.values(previewResult.previews)) {
+      const allPreviews = [
+        previewResult.previews.sueldos,
+        previewResult.previews.fopid,
+        previewResult.previews.aguinaldo,
+        ...(previewResult.previews.transferencias || [])
+      ];
+      for (const preview of allPreviews) {
         if (preview && preview.success && preview.institution) {
           detectedInstitutionId = preview.institution.id;
           break;
@@ -533,12 +541,13 @@
           </div>
         {/if}
         <div>
-          <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia Bancaria (PDF) <span class="text-red-500">*</span></label>
+          <label for="pdf-transfer" class="mb-1 block text-sm font-medium text-gray-700">Transferencia Bancaria (PDF) <span class="text-red-500">*</span> <span class="text-xs text-gray-500">(puede seleccionar varios)</span></label>
           <input
             id="pdf-transfer"
             bind:this={fileInputTransfer}
             type="file"
             accept="application/pdf"
+            multiple
             class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:bg-gray-100"
             disabled={state === 'analyzing'}
             required
@@ -861,10 +870,11 @@
           </div>
         {/if}
 
-        {#if previewResult.previews.transferencia}
-          <div class="rounded-lg border {previewResult.previews.transferencia.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} shadow-sm p-4">
+        {#if previewResult.previews.transferencias}
+          {#each previewResult.previews.transferencias as transf, i}
+          <div class="rounded-lg border {transf.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'} shadow-sm p-4">
             <div class="flex items-center gap-2 mb-2">
-              {#if previewResult.previews.transferencia.success}
+              {#if transf.success}
                 <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
@@ -873,18 +883,19 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
               {/if}
-              <span class="text-sm font-semibold text-gray-600">Transferencia</span>
+              <span class="text-sm font-semibold text-gray-600">Transferencia {previewResult.previews.transferencias.length > 1 ? `#${i + 1}` : ''}</span>
             </div>
-            <div class="text-base font-medium text-gray-900 truncate" title={previewResult.previews.transferencia.fileName}>{previewResult.previews.transferencia.fileName}</div>
-            {#if previewResult.previews.transferencia.success}
-              <div class="text-sm font-semibold text-gray-900">{formatCurrency((previewResult.previews.transferencia as any).transferAmount || 0)}</div>
-              {#if (previewResult.previews.transferencia as any).isMultiple}
-                <div class="mt-1 text-xs text-gray-500">{(previewResult.previews.transferencia as any).transferCount} transferencias</div>
+            <div class="text-base font-medium text-gray-900 truncate" title={transf.fileName}>{transf.fileName}</div>
+            {#if transf.success}
+              <div class="text-sm font-semibold text-gray-900">{formatCurrency((transf as any).transferAmount || 0)}</div>
+              {#if (transf as any).isMultiple}
+                <div class="mt-1 text-xs text-gray-500">{(transf as any).transferCount} transferencias</div>
               {/if}
             {:else}
-              <div class="mt-1 text-sm text-red-600">{previewResult.previews.transferencia.error}</div>
+              <div class="mt-1 text-sm text-red-600">{transf.error}</div>
             {/if}
           </div>
+          {/each}
         {/if}
       </div>
 
@@ -1063,10 +1074,12 @@
                 Aguinaldo ({saveResult.savedFiles.aguinaldo.contributionLineCount} personas)
               </span>
             {/if}
-            {#if saveResult.savedFiles.transferencia}
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-900">
-                Transferencia
-              </span>
+            {#if saveResult.savedFiles.transferencias}
+              {#each saveResult.savedFiles.transferencias as _, i}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-900">
+                  Transferencia {saveResult.savedFiles.transferencias.length > 1 ? `#${i + 1}` : ''}
+                </span>
+              {/each}
             {/if}
           </div>
         </div>

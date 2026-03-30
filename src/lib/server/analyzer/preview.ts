@@ -79,7 +79,7 @@ export interface BatchPreviewResult {
     sueldos?: PreviewResult;
     fopid?: PreviewResult;
     aguinaldo?: PreviewResult;
-    transferencia?: PreviewResult;
+    transferencias?: PreviewResult[];
   };
   validation: {
     totalAportes: number;

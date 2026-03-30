@@ -605,10 +605,10 @@ async function performSessionCleanup(data: SessionCleanupData): Promise<{
 			// Verificar que no tenga otros PDFs asociados (por si algo quedó)
 			const period = await prisma.payrollPeriod.findUnique({
 				where: { id: data.periodId },
-				include: { pdfFiles: true, bankTransfer: true }
+				include: { pdfFiles: true, transfers: true }
 			});
 
-			if (period && period.pdfFiles.length === 0 && !period.bankTransfer) {
+			if (period && period.pdfFiles.length === 0 && period.transfers.length === 0) {
 				await prisma.payrollPeriod.delete({ where: { id: data.periodId } });
 				results.periodDeleted = true;
 			} else if (period) {
@@ -1083,7 +1083,7 @@ export const POST: RequestHandler = async (event) => {
 				if (createdPeriodId && analyzerResult && analyzerResult.operacion) {
 					try {
 						// Verificar si ya existe un BankTransfer para este período
-						const existingTransfer = await prisma.bankTransfer.findUnique({
+						const existingTransfer = await prisma.bankTransfer.findFirst({
 							where: { periodId: createdPeriodId }
 						});
 
@@ -1151,7 +1151,7 @@ export const POST: RequestHandler = async (event) => {
 								// Manejar race condition (P2002 = unique constraint violation)
 								if (createErr?.code === 'P2002') {
 									// Buscar el registro existente
-									const raceTransfer = await prisma.bankTransfer.findUnique({
+									const raceTransfer = await prisma.bankTransfer.findFirst({
 										where: { periodId: createdPeriodId }
 									});
 									if (raceTransfer) {

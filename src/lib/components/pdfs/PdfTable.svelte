@@ -60,12 +60,14 @@
       key: 'transfer',
       label: 'Transferencia',
       render: (pdf: PdfFileWithPeriod) => {
-        if (pdf?.period?.transfer) {
+        if (pdf?.period?.transfers && pdf.period.transfers.length > 0) {
+          const count = pdf.period.transfers.length;
+          const firstOp = pdf.period.transfers[0].operationNo || 'Sin número';
           return `
             <div class="text-sm">
-              <div class="font-medium text-green-600">Completada</div>
+              <div class="font-medium text-green-600">${count > 1 ? `${count} transferencias` : 'Completada'}</div>
               <div class="text-gray-500">
-                ${pdf.period.transfer.operationNo || 'Sin número'}
+                ${firstOp}
               </div>
             </div>
           `;
@@ -77,7 +79,7 @@
       key: 'status',
       label: 'Estado',
       render: (pdf: PdfFileWithPeriod) => {
-        const hasTransfer = !!pdf?.period?.transfer;
+        const hasTransfer = pdf?.period?.transfers && pdf.period.transfers.length > 0;
         return `
           <span class="badge ${hasTransfer ? 'badge-success' : 'badge-warning'}">
             ${hasTransfer ? 'Procesado' : 'Pendiente'}

@@ -4,7 +4,7 @@ import type { PdfFile, PayrollPeriod, BankTransfer } from '@prisma/client';
 
 export type PdfFileWithPeriod = PdfFile & {
   period: PayrollPeriod & {
-    transfer?: BankTransfer | null;
+    transfers?: BankTransfer[];
   };
 };
 
@@ -28,10 +28,10 @@ export class PdfService {
   private static serializePdf(pdf: any): PdfFileWithPeriod {
     const period = pdf.period ? {
       ...pdf.period,
-      transfer: pdf.period.transfer ? {
-        ...pdf.period.transfer,
-        importe: pdf.period.transfer.importe != null ? Number(pdf.period.transfer.importe) : null
-      } : null
+      transfers: (pdf.period.transfers || []).map((t: any) => ({
+        ...t,
+        importe: t.importe != null ? Number(t.importe) : null
+      }))
     } : null;
 
     return {
@@ -82,7 +82,7 @@ export class PdfService {
         include: {
           period: {
             include: {
-              transfer: true
+              transfers: true
             }
           }
         },
@@ -110,7 +110,7 @@ export class PdfService {
         include: {
           period: {
             include: {
-              transfer: true
+              transfers: true
             }
           }
         }

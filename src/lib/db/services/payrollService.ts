@@ -24,7 +24,7 @@ export class PayrollService {
       where,
       include: {
         pdfFiles: true,
-        transfer: true
+        transfers: true
       },
       orderBy: { [sortBy]: sortOrder }
     }, { page, perPage: limit });
@@ -51,7 +51,7 @@ export class PayrollService {
         totalAmount: totalAmount,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
-        transfer: p.transfer ? { ...p.transfer, importe: p.transfer.importe != null ? Number(p.transfer.importe) : null } : null
+        transfers: (p.transfers || []).map((t: any) => ({ ...t, importe: t.importe != null ? Number(t.importe) : null }))
       };
 
       // Si hay PDFs asociados, crear una entrada por cada uno
@@ -86,7 +86,7 @@ export class PayrollService {
         pdfFiles: {
           include: { contributionLine: { include: { member: true }, orderBy: { createdAt: 'desc' } } }
         },
-        transfer: true
+        transfers: true
       }
     });
     if (!p) return null;
@@ -108,7 +108,7 @@ export class PayrollService {
       totalAmount: totalAmount,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
-      transfer: p.transfer ? { ...p.transfer, importe: p.transfer.importe != null ? Number(p.transfer.importe) : null } : null
+      transfers: (p.transfers || []).map((t: any) => ({ ...t, importe: t.importe != null ? Number(t.importe) : null }))
     };
 
     // Usar el primer PDF si hay varios

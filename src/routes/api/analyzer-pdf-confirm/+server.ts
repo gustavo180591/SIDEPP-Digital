@@ -10,7 +10,7 @@
  *   - sessionId: string
  *   - selectedPeriod: { month: number; year: number }
  *   - institutionId: string
- *   - previews: { sueldos?, fopid?, aguinaldo?, transferencia? }
+ *   - previews: { sueldos?, fopid?, aguinaldo?, transferencias?[] }
  *   - forceConfirm?: boolean (guardar aunque no coincidan los totales)
  *
  * Response: BatchSaveResult
@@ -30,7 +30,7 @@ interface ConfirmRequest {
     sueldos?: AportesPreviewResult;
     fopid?: AportesPreviewResult;
     aguinaldo?: AportesPreviewResult;
-    transferencia?: TransferenciaPreviewResult;
+    transferencias?: TransferenciaPreviewResult[];
   };
   forceConfirm?: boolean;
 }
@@ -68,8 +68,9 @@ export const POST: RequestHandler = async (event) => {
     }
 
     // Validar que al menos un archivo tenga success: true
-    const validPreviews = Object.values(body.previews).filter(p => p && p.success);
-    if (validPreviews.length === 0) {
+    const aportesPreviews = [body.previews.sueldos, body.previews.fopid, body.previews.aguinaldo].filter(p => p && p.success);
+    const transferenciasValidas = (body.previews.transferencias || []).filter(p => p && p.success);
+    if (aportesPreviews.length === 0 && transferenciasValidas.length === 0) {
       return json({
         error: 'No hay archivos válidos para guardar',
         details: 'Todos los archivos tienen errores'
@@ -94,8 +95,15 @@ export const POST: RequestHandler = async (event) => {
     }
 
     // Verificar que todas las instituciones detectadas coincidan con la solicitada
-    for (const [key, preview] of Object.entries(body.previews)) {
-      if (preview && preview.success && 'institution' in preview) {
+    const allPreviews: any[] = [
+      body.previews.sueldos,
+      body.previews.fopid,
+      body.previews.aguinaldo,
+      ...(body.previews.transferencias || [])
+    ].filter(Boolean);
+
+    for (const preview of allPreviews) {
+      if (preview.success && 'institution' in preview) {
         if (preview.institution?.id !== body.institutionId) {
           return json({
             error: `El archivo ${preview.fileName} corresponde a una institución diferente`,
@@ -119,10 +127,11 @@ export const POST: RequestHandler = async (event) => {
       }
       const totalAportes = sumarMontos(...montosAportes);
 
-      let totalTransferencia = 0;
-      if (body.previews.transferencia?.success && body.previews.transferencia.type === 'TRANSFERENCIA') {
-        totalTransferencia = (body.previews.transferencia as TransferenciaPreviewResult).transferAmount;
-      }
+      // Sumar todas las transferencias
+      const montosTransferencias = (body.previews.transferencias || [])
+        .filter(t => t.success && t.type === 'TRANSFERENCIA')
+        .map(t => (t as TransferenciaPreviewResult).transferAmount);
+      const totalTransferencia = sumarMontos(...montosTransferencias);
 
       // Solo validar si hay ambos tipos de documentos
       if (totalAportes > 0 && totalTransferencia > 0) {
@@ -142,11 +151,11 @@ export const POST: RequestHandler = async (event) => {
 
     // Preparar input para guardado
     const saveInput: BatchSaveInput = {
-      previews: body.previews as {
-        sueldos?: AportesPreviewResult;
-        fopid?: AportesPreviewResult;
-        aguinaldo?: AportesPreviewResult;
-        transferencia?: TransferenciaPreviewResult;
+      previews: {
+        sueldos: body.previews.sueldos,
+        fopid: body.previews.fopid,
+        aguinaldo: body.previews.aguinaldo,
+        transferencias: body.previews.transferencias
       },
       selectedPeriod: body.selectedPeriod,
       institutionId: body.institutionId,

@@ -8,7 +8,7 @@
       month: number | null;
       year: number | null;
       institution: { id: string; name: string | null; cuit: string | null } | null;
-      transfer: { id: string; importe: string | null; operationNo: string | null; datetime: Date | null } | null;
+      transfers: Array<{ id: string; importe: string | null; operationNo: string | null; datetime: Date | null }>;
       pdfFiles: Array<{
         id: string;
         fileName: string;
@@ -337,9 +337,9 @@
             <div class="flex items-center gap-4">
               <div class="flex items-center gap-2">
                 <span class="text-sm text-gray-500">{period.pdfFiles.length} archivos</span>
-                {#if period.transfer}
+                {#if period.transfers?.length > 0}
                   <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                    Transferencia OK
+                    {period.transfers.length === 1 ? 'Transferencia OK' : `${period.transfers.length} Transferencias`}
                   </span>
                 {/if}
               </div>
@@ -452,7 +452,8 @@
               {/if}
 
               <!-- Info de transferencia si existe -->
-              {#if period.transfer}
+              {#if period.transfers?.length > 0}
+                {#each period.transfers as transf, i}
                 <div class="p-4 bg-purple-50 border-t border-purple-100">
                   <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded bg-purple-100 flex items-center justify-center">
@@ -461,19 +462,20 @@
                       </svg>
                     </div>
                     <div>
-                      <div class="font-medium text-purple-900 text-sm">Transferencia bancaria</div>
+                      <div class="font-medium text-purple-900 text-sm">Transferencia bancaria {period.transfers.length > 1 ? `#${i + 1}` : ''}</div>
                       <div class="text-xs text-purple-700">
-                        {formatMoney(period.transfer.importe)}
-                        {#if period.transfer.operationNo}
-                          · Op. {period.transfer.operationNo}
+                        {formatMoney(transf.importe)}
+                        {#if transf.operationNo}
+                          · Op. {transf.operationNo}
                         {/if}
-                        {#if period.transfer.datetime}
-                          · {formatDate(period.transfer.datetime)}
+                        {#if transf.datetime}
+                          · {formatDate(transf.datetime)}
                         {/if}
                       </div>
                     </div>
                   </div>
                 </div>
+                {/each}
               {/if}
             </div>
           {/if}
