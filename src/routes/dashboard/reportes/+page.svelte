@@ -1,5 +1,6 @@
 <script lang="ts">
   import { PageHeader } from '$lib/components/shared';
+  import { InstitutionSearch } from '$lib/components/institutions';
   import type { ReporteAportesPorPeriodo } from '$lib/db/services/reportService';
 
   let { data }: { data: any } = $props();
@@ -244,21 +245,15 @@
     <h3 class="text-lg font-semibold text-gray-900 mb-4">Filtros de Reporte</h3>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <!-- Selector de institución -->
+      <!-- Buscador de institución -->
       <div>
         <label for="institution" class="block text-sm font-medium text-gray-700 mb-2">
           Institución
         </label>
-        <select
-          id="institution"
+        <InstitutionSearch
+          institutions={data.institutions}
           bind:value={selectedInstitution}
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-        >
-          <option value="">Todas las instituciones</option>
-          {#each data.institutions as institution}
-            <option value={institution.id}>{institution.name || institution.cuit}</option>
-          {/each}
-        </select>
+        />
       </div>
 
       <!-- Mes inicio -->
