@@ -226,7 +226,7 @@ export class MemberService {
         ];
       }
 
-      const [members, total] = await Promise.all([
+      const [members, total, activeCount] = await Promise.all([
         prisma.member.findMany({
           where,
           include: {
@@ -236,13 +236,15 @@ export class MemberService {
           skip,
           take: limit
         }),
-        prisma.member.count({ where })
+        prisma.member.count({ where }),
+        prisma.member.count({ where: { ...where, status: 'active' } })
       ]);
 
       return {
         data: members,
         meta: {
           total,
+          activeCount,
           currentPage: page,
           lastPage: Math.ceil(total / limit),
           perPage: limit

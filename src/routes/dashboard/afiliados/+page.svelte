@@ -16,6 +16,7 @@
       totalPages: number;
       totalItems: number;
       itemsPerPage: number;
+      activeCount: number;
     };
     search: string;
     institutionId?: string;
@@ -243,7 +244,7 @@
             <div>
               <p class="text-sm text-gray-600">Afiliados Activos</p>
               <p class="text-3xl font-bold text-green-600">
-                {data.members.filter(m => m.status === 'active').length}
+                {data.pagination.activeCount}
               </p>
             </div>
             <div class="p-3 bg-green-100 rounded-full">

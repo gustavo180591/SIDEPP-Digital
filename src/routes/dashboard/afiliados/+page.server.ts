@@ -74,7 +74,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
         currentPage: members.meta.currentPage,
         totalPages: members.meta.lastPage,
         totalItems: members.meta.total,
-        itemsPerPage: members.meta.perPage
+        itemsPerPage: members.meta.perPage,
+        activeCount: members.meta.activeCount
       },
       search,
       institutionId,
