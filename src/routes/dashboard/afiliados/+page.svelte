@@ -222,7 +222,12 @@
 
     <!-- Estadísticas -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <div class="card bg-white shadow-sm p-4 rounded-2xl">
+      <button
+        type="button"
+        class="card bg-white shadow-sm p-4 rounded-2xl cursor-pointer hover:shadow-md transition-shadow text-left"
+        onclick={() => goto('/dashboard/afiliados/listado-completo')}
+        onkeydown={(e) => e.key === 'Enter' && goto('/dashboard/afiliados/listado-completo')}
+      >
         <div class="card-body">
           <div class="flex items-center justify-between">
             <div>
@@ -236,9 +241,14 @@
             </div>
           </div>
         </div>
-      </div>
+      </button>
 
-      <div class="card bg-white shadow-sm p-4 rounded-2xl">
+      <button
+        type="button"
+        class="card bg-white shadow-sm p-4 rounded-2xl cursor-pointer hover:shadow-md transition-shadow text-left"
+        onclick={() => goto('/dashboard/afiliados/listado-completo')}
+        onkeydown={(e) => e.key === 'Enter' && goto('/dashboard/afiliados/listado-completo')}
+      >
         <div class="card-body">
           <div class="flex items-center justify-between">
             <div>
@@ -254,15 +264,20 @@
             </div>
           </div>
         </div>
-      </div>
+      </button>
 
-      <div class="card bg-white shadow-sm p-4 rounded-2xl">
+      <button
+        type="button"
+        class="card bg-white shadow-sm p-4 rounded-2xl cursor-pointer hover:shadow-md transition-shadow text-left"
+        onclick={() => goto('/dashboard/afiliados/listado-completo')}
+        onkeydown={(e) => e.key === 'Enter' && goto('/dashboard/afiliados/listado-completo')}
+      >
         <div class="card-body">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-sm text-gray-600">Página Actual</p>
               <p class="text-3xl font-bold text-red-700">
-                {data.pagination.currentPage} / {data.pagination.totalPages}
+                Listado Completo
               </p>
             </div>
             <div class="p-3 bg-red-100 rounded-full">
@@ -272,7 +287,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </button>
     </div>
 
     <!-- Tabla de afiliados -->
@@ -283,7 +298,7 @@
           {#if canEdit}
             <button
               class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-700 to-red-600 rounded-lg shadow-md hover:shadow-lg transition-all"
-              on:click={openCreateModal}
+              onclick={openCreateModal}
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>

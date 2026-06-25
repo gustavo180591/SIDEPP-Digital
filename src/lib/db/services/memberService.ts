@@ -254,4 +254,49 @@ export class MemberService {
       handlePrismaError(error, 'obtener los miembros');
     }
   }
+
+  static async getAllWithoutPagination(options: {
+    search?: string;
+    institutionId?: string;
+    institutionIds?: string[];
+  }) {
+    try {
+      const { search = '', institutionId, institutionIds } = options;
+
+      const where: any = {
+        deletedAt: null
+      };
+
+      // Filtrar por una institución específica
+      if (institutionId) {
+        where.institucionId = institutionId;
+      }
+      // O filtrar por múltiples instituciones (para LIQUIDADOR con varias)
+      else if (institutionIds && institutionIds.length > 0) {
+        where.institucionId = { in: institutionIds };
+      }
+
+      if (search) {
+        where.OR = [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { documentoIdentidad: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { numeroOrden: { contains: search, mode: 'insensitive' } },
+          { numeroMatricula: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const members = await prisma.member.findMany({
+        where,
+        include: {
+          institucion: true
+        },
+        orderBy: { fullName: 'asc' }
+      });
+
+      return members;
+    } catch (error) {
+      handlePrismaError(error, 'obtener los miembros sin paginación');
+    }
+  }
 }

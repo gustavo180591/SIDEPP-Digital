@@ -252,7 +252,6 @@
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Cantidad</th>
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Monto Concepto</th>
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Total Remuneración</th>
-              <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Estado</th>
               <th class="text-white font-medium text-xs uppercase tracking-wider px-4 py-3 text-left">Fecha</th>
             </tr>
           </thead>
@@ -275,11 +274,6 @@
                 <td class="px-4 py-3">
                   <span class="font-semibold text-green-600">
                     {formatCurrency(contribution.totalRem)}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="badge {getStatusBadge(contribution.status)}">
-                    {getStatusLabel(contribution.status)}
                   </span>
                 </td>
                 <td class="px-4 py-3">
