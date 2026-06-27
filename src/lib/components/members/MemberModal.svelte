@@ -10,6 +10,8 @@
   // Nuevas props para selector de institución
   export let showInstitutionSelector: boolean = false;
   export let institutions: Array<{ id: string; name: string }> = [];
+  // Prop para permitir campos opcionales en edición
+  export let allowOptionalFields: boolean = false;
 
   let formData = {
     fullName: member?.fullName || '',
@@ -18,6 +20,7 @@
     numeroOrden: member?.numeroOrden || '',
     numeroMatricula: member?.numeroMatricula || '',
     documentoIdentidad: member?.documentoIdentidad || '',
+    nacionalidad: member?.nacionalidad || '',
     membershipStartDate: member?.membershipStartDate ? new Date(member.membershipStartDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     status: member?.status || 'active',
     selectedInstitutionId: institutionId || ''
@@ -32,6 +35,7 @@
       numeroOrden: member.numeroOrden || '',
       numeroMatricula: member.numeroMatricula || '',
       documentoIdentidad: member.documentoIdentidad || '',
+      nacionalidad: member.nacionalidad || '',
       membershipStartDate: member.membershipStartDate ? new Date(member.membershipStartDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: member.status || 'active',
       selectedInstitutionId: member.institucionId || institutionId || ''
@@ -48,6 +52,7 @@
         numeroOrden: '',
         numeroMatricula: '',
         documentoIdentidad: '',
+        nacionalidad: '',
         membershipStartDate: new Date().toISOString().split('T')[0],
         status: 'active',
         selectedInstitutionId: institutionId || ''
@@ -63,6 +68,7 @@
       numeroOrden: '',
       numeroMatricula: '',
       documentoIdentidad: '',
+      nacionalidad: '',
       membershipStartDate: new Date().toISOString().split('T')[0],
       status: 'active',
       selectedInstitutionId: institutionId || ''
@@ -77,79 +83,63 @@
 
   // Hacer los campos reactivos para que se actualicen cuando cambie formData
   $: fields = [
-    // Campo de institución (solo si showInstitutionSelector es true y es create)
-    ...(showInstitutionSelector && modalType === 'create' ? [{
+    // Campo de institución (si showInstitutionSelector es true)
+    ...(showInstitutionSelector ? [{
       name: 'institutionId',
       label: 'Institución',
       type: 'select',
       placeholder: 'Seleccionar institución',
-      required: true,
+      required: !allowOptionalFields,
       value: formData.selectedInstitutionId,
       options: institutions.map(inst => ({ value: inst.id, label: inst.name }))
     }] : []),
     {
       name: 'fullName',
-      label: 'Nombre Completo',
+      label: 'Nombre y Apellido',
       type: 'text',
       placeholder: 'Nombre completo del miembro',
-      required: true,
+      required: !allowOptionalFields,
       minLength: 2,
       maxLength: 200,
       value: formData.fullName
     },
     {
-      name: 'email',
-      label: 'Email',
-      type: 'email',
-      placeholder: 'email@ejemplo.com',
-      pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
-      value: formData.email
-    },
-    {
-      name: 'phone',
-      label: 'Teléfono',
-      type: 'tel',
-      placeholder: 'Número de teléfono',
-      pattern: '^[\\d\\s\\-+()]{7,20}$',
-      value: formData.phone
-    },
-    {
-      name: 'documentoIdentidad',
-      label: 'Documento de Identidad',
-      type: 'text',
-      placeholder: 'Número de documento',
-      required: true,
-      maxLength: 20,
-      value: formData.documentoIdentidad
-    },
-    {
       name: 'numeroOrden',
-      label: 'Número de Orden',
+      label: 'Nro. Orden',
       type: 'text',
       placeholder: 'Solo números',
-      required: true,
-      pattern: '^\\d+$',
+      required: !allowOptionalFields,
+      pattern: '^\\d*$',
       maxLength: 20,
       value: formData.numeroOrden
     },
     {
       name: 'numeroMatricula',
-      label: 'Número de Matrícula',
+      label: 'Nro. Matricula',
       type: 'text',
       placeholder: 'Solo números',
-      required: true,
-      pattern: '^\\d+$',
+      required: !allowOptionalFields,
+      pattern: '^\\d*$',
       maxLength: 20,
       value: formData.numeroMatricula
     },
     {
-      name: 'membershipStartDate',
-      label: 'Fecha de Ingreso',
-      type: 'date',
-      placeholder: 'Fecha de ingreso',
-      required: true,
-      max: new Date().toISOString().split('T')[0],
-      value: formData.membershipStartDate
+      name: 'documentoIdentidad',
+      label: 'DNI',
+      type: 'text',
+      placeholder: 'Número de documento',
+      required: !allowOptionalFields,
+      maxLength: 20,
+      value: formData.documentoIdentidad
+    },
+    {
+      name: 'nacionalidad',
+      label: 'Nacionalidad',
+      type: 'text',
+      placeholder: 'Nacionalidad',
+      required: !allowOptionalFields,
+      maxLength: 100,
+      value: formData.nacionalidad
     },
     {
       name: 'status',
@@ -161,6 +151,15 @@
         { value: 'active', label: 'Activo' },
         { value: 'inactive', label: 'Inactivo' }
       ]
+    },
+    {
+      name: 'membershipStartDate',
+      label: 'Fecha de Ingreso',
+      type: 'date',
+      placeholder: 'Fecha de ingreso',
+      required: !allowOptionalFields,
+      max: new Date().toISOString().split('T')[0],
+      value: formData.membershipStartDate
     }
   ];
 

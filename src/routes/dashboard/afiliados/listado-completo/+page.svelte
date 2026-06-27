@@ -209,8 +209,9 @@
     modalType="edit"
     member={selectedMember}
     institutionId={selectedMember?.institucionId || ''}
-    showInstitutionSelector={false}
+    showInstitutionSelector={true}
     institutions={data.institutions}
+    allowOptionalFields={true}
     onClose={closeModals}
   />
 

@@ -41,7 +41,7 @@ export type CreateMemberData = {
   institucionId: string;
 };
 
-export type UpdateMemberData = Partial<Omit<CreateMemberData, 'institucionId'>>;
+export type UpdateMemberData = Partial<Omit<CreateMemberData, 'institucionId'>> & { institucionId?: string };
 
 export class MemberService {
   static async create(data: CreateMemberData): Promise<Member> {
@@ -105,7 +105,8 @@ export class MemberService {
           postalCode: data.postalCode,
           country: data.country,
           membershipStartDate: data.membershipStartDate,
-          status: data.status
+          status: data.status,
+          ...(data.institucionId && { institucionId: data.institucionId })
         }
       });
 
