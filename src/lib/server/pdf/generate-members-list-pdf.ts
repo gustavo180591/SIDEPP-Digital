@@ -1,4 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import type { Member, Institution } from '@prisma/client';
 
 interface MemberWithInstitution extends Member {
@@ -24,13 +27,21 @@ export async function generateMembersListPdf(
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+  // Cargar logo SIDEPP
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const logoPath = join(__dirname, '../../../../static/IsoLogoSIDEPP.jpg');
+  const logoImageBytes = readFileSync(logoPath);
+  const logoImage = await pdfDoc.embedJpg(logoImageBytes);
+  const logoScale = 0.075; // 400% más pequeño que 0.3
+
   // Configuración de página
-  const pageWidth = 595; // A4 portrait
-  const pageHeight = 842;
+  const pageWidth = 842; // A4 landscape
+  const pageHeight = 595;
   const margin = 40;
-  const fontSize = 10;
+  const fontSize = 9;
   const headerFontSize = 14;
-  const lineHeight = 16;
+  const lineHeight = 14;
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let yPosition = pageHeight - margin;
@@ -45,39 +56,47 @@ export async function generateMembersListPdf(
       .replace(/[�]/g, ''); // Remover caracteres de reemplazo
   };
 
-  // Título
+  // Título al principio
   const title = sanitizeText('Listado Completo de Afiliados');
   const subtitle = sanitizeText(`Total: ${members.length} afiliados`);
 
   page.drawText(title, {
     x: margin,
-    y: yPosition,
+    y: yPosition - 5,
     size: headerFontSize,
     font: fontBold,
     color: rgb(0, 0, 0)
   });
 
-  yPosition -= 20;
-
   page.drawText(subtitle, {
     x: margin,
-    y: yPosition,
+    y: yPosition - 25,
     size: 11,
     font: font,
     color: rgb(0.3, 0.3, 0.3)
   });
 
-  yPosition -= 30;
+  // Dibujar logo pequeño al lado del texto
+  const logoDims = logoImage.scale(logoScale);
+  const titleWidth = fontBold.widthOfTextAtSize(title, headerFontSize);
+  page.drawImage(logoImage, {
+    x: margin + titleWidth + 20,
+    y: yPosition - logoDims.height - 5,
+    width: logoDims.width,
+    height: logoDims.height
+  });
+
+  yPosition -= 50;
 
   // Calcular anchos de columnas
-  const colOrden = 80;
-  const colMatricula = 80;
-  const colNombre = 200;
-  const colInstitucion = 150;
-  const colDni = 80;
-  const colNacionalidad = 100;
+  const colOrden = 70;
+  const colMatricula = 70;
+  const colNombre = 180;
+  const colInstitucion = 140;
+  const colDni = 70;
+  const colNacionalidad = 90;
   const colEstado = 60;
-  const colFechaIngreso = 90;
+  const colCuotas = 80;
 
   // Función auxiliar para dibujar texto centrado
   const drawCenteredText = (
@@ -136,7 +155,7 @@ export async function generateMembersListPdf(
   drawCenteredText('Estado', xPosition, yPosition, colEstado, fontSize, fontBold);
   xPosition += colEstado;
 
-  drawCenteredText('Fecha Ingreso', xPosition, yPosition, colFechaIngreso, fontSize, fontBold);
+  drawCenteredText('Cuotas Pagadas', xPosition, yPosition, colCuotas, fontSize, fontBold);
 
   // Línea debajo de headers
   yPosition -= 15;
@@ -171,7 +190,7 @@ export async function generateMembersListPdf(
       xPos += colNacionalidad;
       drawCenteredText('Estado', xPos, yPosition, colEstado, fontSize, fontBold);
       xPos += colEstado;
-      drawCenteredText('Fecha Ingreso', xPos, yPosition, colFechaIngreso, fontSize, fontBold);
+      drawCenteredText('Cuotas Pagadas', xPos, yPosition, colCuotas, fontSize, fontBold);
 
       yPosition -= 15;
       page.drawLine({
@@ -247,11 +266,12 @@ export async function generateMembersListPdf(
     });
     xPosition += colEstado;
 
-    // Fecha de Ingreso
-    const fechaIngresoText = member.createdAt
-      ? new Date(member.createdAt).toLocaleDateString('es-AR')
+    // Cuotas Pagadas (mostrar conteo de meses pagados en el año actual)
+    const currentYear = new Date().getFullYear();
+    const cuotasPagadas = member.createdAt && new Date(member.createdAt).getFullYear() === currentYear
+      ? Math.floor((new Date().getTime() - new Date(member.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 30)) + 1
       : '-';
-    drawCenteredText(sanitizeText(fechaIngresoText), xPosition, yPosition, colFechaIngreso, fontSize, font);
+    drawCenteredText(sanitizeText(String(cuotasPagadas)), xPosition, yPosition, colCuotas, fontSize, font);
 
     yPosition -= lineHeight;
   }
